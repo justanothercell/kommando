@@ -2,3 +2,4 @@
 *.bat
 *.obj
 build/
+testing/
