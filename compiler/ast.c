@@ -354,7 +354,7 @@ Module* parse_module(TokenStream* stream) {
     }
     printf("parsed %lld functions and %lld types\n", funcs_len, types_len);
     usize tlen = types_len;
-    register_primitives(types, &types_len, &types_capacity);
+    register_primitives(&types, &types_len, &types_capacity);
     printf("registered %lld primitives\n", types_capacity - tlen);
     Module* module = malloc(sizeof(Module));
     module->funcs = funcs;

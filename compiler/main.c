@@ -1,5 +1,3 @@
-#pragma once
-
 #include "tokens.c"
 #include "ast.c"
 #include "transpile.c"
@@ -42,7 +40,7 @@ int main(const int argc, const char** argv) {
     printf("compiling generated c...\n");
     
 #ifdef __WIN32__
-    const char* BUILD_CMD_TEMPLATE = "cl %s /permissive- /o %s";
+    const char* BUILD_CMD_TEMPLATE = "gcc %s /permissive- /o %s";
     char* command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
     sprintf(command, BUILD_CMD_TEMPLATE, OUT_C_FILE, OUTNAME);
 #else

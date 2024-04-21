@@ -6,7 +6,6 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <vadefs.h>
 
 void write_code(FILE* dest, const char* format, ...) {
     va_list argptr;
