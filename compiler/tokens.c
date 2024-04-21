@@ -19,12 +19,13 @@
 
 typedef enum TokenType {
     STRING,
+    NUMERAL,
     IDENTIFIER,
     SNOWFLAKE
 } TokenType;
 
 static const char *TOKENTYPE_STRING[] = {
-    "STRING", "IDENTIFIER", "SNOWFLAKE"
+    "STRING", "NUMERAL", "IDENTIFIER", "SNOWFLAKE"
 };
 
 typedef struct Token {
@@ -111,7 +112,7 @@ Token* next_token(TokenStream* stream) {
             len += 1;
             tok_len += 1;
             // single special char
-            if (!in_str && !is_alphabetic(next) && !is_numeric(next)) { type = SNOWFLAKE; break; }
+            if (!in_str && !is_alphabetic(next) && !is_numeric(next) && next != '_') { type = SNOWFLAKE; break; }
             if (len >= 32) {
                 tok = (char*) realloc(tok, tok_len + len + 1);
                 memcpy(tok + tok_len - len, &next_token_buffer, len);
@@ -124,10 +125,11 @@ Token* next_token(TokenStream* stream) {
     tok = (char*) realloc(tok, tok_len + len + 1);
     memcpy(tok + tok_len - len, &next_token_buffer, len);
 
-    tok[tok_len] = 0;
+    tok[tok_len] = '\0';
 
     Token* t = (Token*) malloc(sizeof(Token));
     t->string = tok;
-    t->type = type;
+    if (type == IDENTIFIER && is_numeric(*t->string)) t->type = NUMERAL;
+    else t->type = type;
     return t;
 }

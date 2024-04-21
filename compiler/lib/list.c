@@ -1,9 +1,15 @@
-#define list_append(element, list_ptr, length, capacity) { \
-    if (length >= capacity) { \
-        list_ptr = realloc(list_ptr, (capacity + 1) * 1.5 * sizeof(void*)); \
-        capacity += 1; \
-        capacity *= 1.5; \
+#pragma once
+
+#define list_append(element, list_ptr, length, capacity) do { \
+    printf("1: %lld %lld\n", length, capacity); \
+    if (length >= (capacity)) { \
+        (capacity) += 1; \
+        (capacity) *= 2; \
+        printf("new size: %lld %lld\n", length, capacity); \
+        (list_ptr) = realloc(list_ptr, (capacity) * sizeof(element)/*NOLINT(bugprone-sizeof-expression)*/); \
     } \
-    list_ptr[length] = element; \
-    length += 1; \
-}
+    printf("2: %lld %lld\n", length, capacity); \
+    list_ptr[(length)] = element; \
+    printf("3: %lld %lld\n", length, capacity); \
+    (length) += 1; \
+} while (0)
