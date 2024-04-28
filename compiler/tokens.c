@@ -122,7 +122,7 @@ Token* next_token(TokenStream* stream) {
     }
     if (tok_len == 0) return NULL;
 
-    tok = (char*) realloc(tok, tok_len + len + 1);
+    tok = (char*) realloc(tok, tok_len + 1);
     memcpy(tok + tok_len - len, &next_token_buffer, len);
 
     tok[tok_len] = '\0';

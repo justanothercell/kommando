@@ -1,24 +1,30 @@
 #pragma once
 
-#define __WIN32__
-#define __x86_64__
-#define __LITTLE_ENDIAN__
+#ifndef __WIN32__
+    #define __WIN32__
+#endif
+#ifndef __x86_64__
+    #define __x86_64__
+#endif
+#ifndef __LITTLE_ENDIAN__
+    #define __LITTLE_ENDIAN__
+#endif
 
 #ifdef __WIN32__
-#define __PATH_SEP__ '\\'
+    #define __PATH_SEP__ '\\'
 #else
-#define __PATH_SEP__ '/'
+    #define __PATH_SEP__ '/'
 #endif
 
 #define __FILENAME__ (strrchr(__FILE__, __PATH_SEP__) ? strrchr(__FILE__, __PATH_SEP__) + 1 : __FILE__)
 
 #ifdef __x86_64__
-#define __TARGET_BITS__ 64
-typedef signed long long int isize;
+    #define __TARGET_BITS__ 64
+    typedef signed long long int isize;
 typedef unsigned long long int usize;
 #else
-#define __TARGET_BITS__ 32
-typedef signed long int isize;
+    #define __TARGET_BITS__ 32
+    typedef signed long int isize;
 typedef unsigned long int usize;
 #endif
 
@@ -41,7 +47,7 @@ typedef u8 bool;
 
 // MANUAL
 #ifdef __LITTLE_ENDIAN__
-#define __ENDIANESS__ "little"
+    #define __ENDIANESS__ "little"
 #else
-#define __ENDIUANESS__ "big"
+    #define __ENDIUANESS__ "big"
 #endif

@@ -16,22 +16,24 @@ Type* find_type(Module* module, char* type);
 typedef struct Struct {
     char** fields;
     char** fields_t;
-    usize field_c;
+    char* name;
+    usize fields_c;
 } Struct;
 
 void drop_struct(Struct* s) {
-    for (usize i = 0;i < s->field_c;i++) {
+    for (usize i = 0;i < s->fields_c;i++) {
         free(s->fields[i]);
         free(s->fields_t[i]);
     }
     free(s->fields);
     free(s->fields_t);
+    free(s->name);
     free(s);
 }
 
 usize field_offset(Module* module, Struct* s, char* field) {
     usize offset = 0;
-    for (usize i = 0;i < s->field_c;i++) {
+    for (usize i = 0;i < s->fields_c;i++) {
         if (strcmp(field, s->fields[i]) == 0) return true;
         offset += sizeof_type(module, find_type(module, s->fields_t[i]));
     }
@@ -39,7 +41,7 @@ usize field_offset(Module* module, Struct* s, char* field) {
 }
 
 Type* field_type(Module* module, Struct* s, char* field) {
-    for (usize i = 0;i < s->field_c;i++) {
+    for (usize i = 0;i < s->fields_c;i++) {
         if (strcmp(field, s->fields[i]) == 0) {
             return find_type(module, s->fields_t[i]);
         }
@@ -127,7 +129,7 @@ usize sizeof_type(Module* module, Type* type) {
         {
             usize size = 0;
             Struct* s = type->ty;
-            for (usize i = 0;i < s->field_c;i++) {
+            for (usize i = 0;i < s->fields_c;i++) {
                 usize f_size = 0;
                 Type* f_type = NULL;
                 size += sizeof_type(module, find_type(module, s->fields_t[i]));
@@ -142,47 +144,39 @@ usize sizeof_type(Module* module, Type* type) {
 
 void write_primitive(FILE* dest, PrimType pt) {
     switch (pt) {
-        case TU8:       write_code(dest, "u8"); return;
-        case TU16:      write_code(dest, "u16"); return;
-        case TU32:      write_code(dest, "u32"); return;
-        case TU64:      write_code(dest, "u64"); return;
-        case TI8:       write_code(dest, "i8"); return;
-        case TI16:      write_code(dest, "i16"); return;
-        case TI32:      write_code(dest, "i32"); return;
-        case TI64:      write_code(dest, "i64"); return;
-        case TF32:      write_code(dest, "f32"); return;
-        case TF64:      write_code(dest, "f64"); return;
-        case TBool:     write_code(dest, "bool"); return;
-        case TUsize:    write_code(dest, "usize"); return;
-        case TIsize:    write_code(dest, "isize"); return;
+        case TU8:       write_code(dest, "unsigned char"); return;
+        case TU16:      write_code(dest, "unsigned short int"); return;
+        case TU32:      write_code(dest, "unsigned long int"); return;
+        case TU64:      write_code(dest, "unsigned long long int"); return;
+        case TI8:       write_code(dest, "signed char"); return;
+        case TI16:      write_code(dest, "signed short int"); return;
+        case TI32:      write_code(dest, "signed long int"); return;
+        case TI64:      write_code(dest, "signed long long int"); return;
+        case TF32:      write_code(dest, "float"); return;
+        case TF64:      write_code(dest, "long"); return;
+        case TBool:     write_code(dest, "u8"); return;
+    #ifdef __x86_64__
+        case TUsize:    write_code(dest, "unsigned long long in"); return;
+        case TIsize:    write_code(dest, "signed long long int"); return;
+    #else
+        case TUsize:    write_code(dest, "unsigned long in"); return;
+        case TIsize:    write_code(dest, "signed long int"); return;
+    #endif
     }
 }
 
-void write_type(Module* module, FILE* dest, Type* type) {
-    switch (type->type) {
-        case TYPE_PRIMITIVE:
-            write_primitive(dest, *(PrimType*)type->ty);
-            return;
-        case TYPE_STRUCT:
-            write_code(dest, "struct { u8 value[%lld] }", sizeof_type(module, type));
-            return;
-        case TYPE_POINTER:
-            write_code(dest, "struct { u8 value[%lld] }*", sizeof_type(module, type));
-            return;
+void write_type(Module* module, FILE* dest, Type* ty) {
+    if (ty->type == TYPE_POINTER) {
+        write_type(module, dest, (Type*)ty->ty);
+        write_code(dest, "*");
+    } else if (ty->type == TYPE_STRUCT) {
+        write_code(dest, "struct %s", ((Struct*)ty->ty)->name);
+    } else if (ty->type == TYPE_PRIMITIVE) {
+        write_primitive(dest, *(PrimType*)ty->ty);
     }
-}
-
-void write_field_access(Module* module, FILE* dest, Struct* s, char* name, char* field, bool ptr) {
-    write_code(dest, "(");
-    write_type(module, dest, field_type(module, s, field));
-    write_code(dest, "*)(%s", field);
-    if (ptr) write_code(dest, "->");
-    else write_code(dest, ".");
-    write_code(dest, "value+%lld)", field_offset(module, s, field));
 }
 
 void register_primitive(char* type_name, PrimType t, TypeDef*** types, usize* type_c, usize* capacity) {
-    printf("before %lld %lld\n", *type_c, *capacity);
     PrimType* p = malloc(sizeof(PrimType));
     *p = t;
     Type* type = malloc(sizeof(Type));
@@ -191,11 +185,23 @@ void register_primitive(char* type_name, PrimType t, TypeDef*** types, usize* ty
     TypeDef* tdef = malloc(sizeof(TypeDef));
     tdef->name = type_name;
     tdef->type = type;
-    list_append(tdef, *types, *type_c, *capacity); 
-    printf("after %lld %lld\n", *type_c, *capacity);
+    list_append(tdef, *types, *type_c, *capacity);
 }
 
-void register_primitives(TypeDef*** types, usize* type_c, usize* capacity) {
+void register_builtin_types(TypeDef*** types, usize* type_c, usize* capacity) {
+    Struct* s = malloc(sizeof(Struct));
+    s->name = "unit";
+    s->fields = NULL;
+    s->fields_t = NULL;
+    s->fields_c = 0;
+    Type* type = malloc(sizeof(Type));
+    type->type = TYPE_STRUCT;
+    type->ty = s;
+    TypeDef* tdef = malloc(sizeof(TypeDef));
+    tdef->name = "unit";
+    tdef->type = type;
+    list_append(tdef, *types, *type_c, *capacity);
+
     register_primitive("u8", TU8, types, type_c, capacity);
     register_primitive("u16", TU16, types, type_c, capacity);
     register_primitive("u32", TU32, types, type_c, capacity);
