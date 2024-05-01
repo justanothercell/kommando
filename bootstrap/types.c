@@ -50,6 +50,7 @@ Type* field_type(Module* module, Struct* s, char* field) {
 }
 
 typedef enum PrimType {
+    TAny,
     TU8,
     TU16,
     TU32,
@@ -104,6 +105,7 @@ void drop_type_def(TypeDef* tydef) {
 
 usize sizeof_primitive(PrimType pt) {
     switch (pt) {
+        case TAny: fprintf(stderr, "`any` is unsized, use as reference instead: `&any`"); exit(1);
         case TU8:       return sizeof(u8);
         case TU16:      return sizeof(u16);
         case TU32:      return sizeof(u32);
@@ -144,6 +146,7 @@ usize sizeof_type(Module* module, Type* type) {
 
 void write_primitive(FILE* dest, PrimType pt) {
     switch (pt) {
+        case TAny:      write_code(dest, "void"); return;
         case TU8:       write_code(dest, "unsigned char"); return;
         case TU16:      write_code(dest, "unsigned short int"); return;
         case TU32:      write_code(dest, "unsigned long int"); return;
@@ -154,13 +157,13 @@ void write_primitive(FILE* dest, PrimType pt) {
         case TI64:      write_code(dest, "signed long long int"); return;
         case TF32:      write_code(dest, "float"); return;
         case TF64:      write_code(dest, "long"); return;
-        case TBool:     write_code(dest, "u8"); return;
+        case TBool:     write_code(dest, "unsigned char"); return;
     #ifdef __x86_64__
-        case TUsize:    write_code(dest, "unsigned long long in"); return;
-        case TIsize:    write_code(dest, "signed long long int"); return;
+        case TUsize:    write_primitive(dest, TU64); return;
+        case TIsize:    write_primitive(dest, TI64); return;
     #else
-        case TUsize:    write_code(dest, "unsigned long in"); return;
-        case TIsize:    write_code(dest, "signed long int"); return;
+        case TUsize:    write_primitive(dest, TU32); return;
+        case TIsize:    write_primitive(dest, TI32); return;
     #endif
     }
 }
@@ -202,6 +205,7 @@ void register_builtin_types(TypeDef*** types, usize* type_c, usize* capacity) {
     tdef->type = type;
     list_append(tdef, *types, *type_c, *capacity);
 
+    register_primitive("any", TAny, types, type_c, capacity);
     register_primitive("u8", TU8, types, type_c, capacity);
     register_primitive("u16", TU16, types, type_c, capacity);
     register_primitive("u32", TU32, types, type_c, capacity);

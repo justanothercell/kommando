@@ -24,16 +24,17 @@ void write_indent(FILE* dest, usize indent) {
 typedef struct Writer {
     FILE* code;
     FILE* header;
+    bool gen_main;
 } Writer;
 
-Writer* new_writer(char* name, FILE* code, FILE* header) {
+Writer* new_writer(char* name, FILE* code, FILE* header, bool gen_main) {
     Writer* writer = malloc(sizeof(Writer));
     writer->code = code;
     writer->header = header;
+    writer->gen_main = gen_main;
 
-    write_code(header, "#pragma once\n\n", name);
-    write_code(code, "#include <stdio.h>\n\n#include \"%s.h\"\n\n", name);
-    
+    write_code(header, "#pragma once\n\n#define main __entry__\n\n", name);
+    write_code(code, "#include <stdio.h>\n#include <stdlib.h>\n\n#include \"%s.h\"\n\n#define main __entry__\n\n", name);
     return writer;
 }
 
@@ -44,7 +45,9 @@ void drop_writer(Writer* writer) {
 }
 
 void finalize_transpile(Writer* writer) {
-    write_code(writer->code, "\nint main(int arg_c, char* arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
+    if (writer->gen_main) {
+        write_code(writer->code, "\n\n#undef main\n\nint main(int arg_c, char* arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
+    }
 }
 
 void transpile_block(Module* module, Writer *writer, Block* block, usize indent);
@@ -122,10 +125,10 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
                 Expression* inner = expr->expr;
                 switch (expr->type) {
                     case REF_EXPR:
-                        write_code(writer->code, "&");
+                        write_code(writer->code, "(&");
                         break;
                     case DEREF_EXPR:
-                        write_code(writer->code, "*");
+                        write_code(writer->code, "(*");
                         break;
                     case RETURN_EXPR:
                         write_code(writer->code, "return ");
@@ -134,6 +137,13 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
                         fprintf(stderr, "Unreachabe case reached");
                 }
                 transpile_expression(module, writer, inner, indent);
+                switch (expr->type) {
+                    case REF_EXPR:
+                    case DEREF_EXPR:
+                        write_code(writer->code, ")");
+                    default:
+                        break;
+                }
             }
             break;
         case STRUCT_LITERAL:
@@ -159,6 +169,24 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
                 transpile_expression(module, writer, assign->target, indent + 1);
                 write_code(writer->code, " = ");
                 transpile_expression(module, writer, assign->value, indent + 1);
+            }
+            break;
+        case FIELD_ACCESS_EXPR:
+            {
+                FieldAccess* fa = expr->expr;
+                transpile_expression(module, writer, fa->object, indent + 1);
+                write_code(writer->code, ".");
+                transpile_expression(module, writer, fa->field, indent + 1);
+            }
+            break;
+        case BINOP_EXPR:
+            {
+                BinOp* op = expr->expr;
+                write_code(writer->code, "(");
+                transpile_expression(module, writer, op->lhs, indent + 1);
+                write_code(writer->code, " %s ", op->op);
+                transpile_expression(module, writer, op->rhs, indent + 1);
+                write_code(writer->code, ")");
             }
             break;
     }

@@ -1,5 +1,24 @@
 #pragma once
 
+// #define __TRACE__
+
+static int trace_indent = 0;
+
+#ifdef __TRACE__
+    #define TRACE(expr) ({ \
+        for (int i = 0;i < trace_indent;i++) { printf("| "); } \
+        printf("*>call %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
+        trace_indent++; \
+        void* out = expr; \
+        trace_indent--; \
+        for (int i = 0;i < trace_indent;i++) { printf("| "); } \
+        printf("*<exit %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
+        out; \
+    })
+#else
+    #define TRACE(expr) expr
+#endif
+
 #ifndef __WIN32__
     #define __WIN32__
 #endif

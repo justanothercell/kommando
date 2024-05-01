@@ -1,12 +1,13 @@
 #pragma once
 
 #include "lib/defines.c"
+#include "lib/list.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define unexpected_token_error(t, stream) { \
-    fprintf(stderr, "Unexpected token %s `%s` in line %lld during %s@%s:%d\n", TOKENTYPE_STRING[t->type], t->string, stream->line + 1, __func__, __FILENAME__, __LINE__); \
+    fprintf(stderr, "Unexpected token %s `%s` in line %lld column %lld during %s %s:%d\n", TOKENTYPE_STRING[t->type], t->string, stream->line + 1, stream->column, __func__, __FILENAME__, __LINE__); \
     exit(1); \
 }
 
@@ -51,6 +52,7 @@ typedef struct TokenStream {
     char* peek_char;
     Token* peek;
     usize line;
+    usize column;
 } TokenStream;
 
 TokenStream* new_tokenstream(FILE* fptr) {
@@ -60,6 +62,7 @@ TokenStream* new_tokenstream(FILE* fptr) {
     stream->peek_char = malloc(sizeof(char));
     *stream->peek_char = -1;
     stream->peek = NULL;
+    stream->column = 0;
     return stream;
 }
 
@@ -70,24 +73,37 @@ void drop_tokenstream(TokenStream* stream) {
     free(stream);
 }
 
-Token* next_token(TokenStream* stream) {
+#ifdef __TRACE__
+    #define next_token(stream) ({ \
+        Token* t = __next_token(stream); \
+        for (int i = 0;i < trace_indent;i++) { printf("| "); } \
+        if (t == NULL) printf("*-token: %s %s:%d EOF\n", __func__, __FILENAME__, __LINE__); \
+        else printf("*-token: %s %s:%d %s: %s in line %lld column %lld\n", __func__, __FILENAME__, __LINE__, TOKENTYPE_STRING[t->type], t->string, stream->line + 1, stream->column); \
+        t; \
+    })
+#else
+    #define next_token(stream) __next_token(stream)
+#endif
+
+
+Token* __next_token(TokenStream* stream) {
     if (stream->peek != NULL) {
         Token* t = stream->peek;
         stream->peek = NULL;
         return t;
     }
-    static char next_token_buffer[32];
     TokenType type;
-    usize len = 0;
+    char* tok = malloc(8 * sizeof(char));
     usize tok_len = 0;
-    char* tok = NULL;
+    usize tok_cap = 8;
     char next = 0;
     bool in_str = false;
     while (tok_len == 0 && next != -1) {
         while (1) {
             if (*stream->peek_char != -1) next = *stream->peek_char;
             else next = fgetc(stream->fptr);
-            if (next == '\n') stream->line += 1;
+            stream->column += 1;
+            if (next == '\n') { stream->line += 1; stream->column = 0; }
             *stream->peek_char = -1;
             if (next == '"') {
                 in_str = !in_str;
@@ -106,26 +122,16 @@ Token* next_token(TokenStream* stream) {
                 // obvious terminators
                 if (next == -1 || next == ' ' || next == '\n' || next == '\t' || next == '\r') { type = IDENTIFIER; break; }
                 // word end and special char now
-                if (tok_len > 0 && !is_alphabetic(next) && !is_numeric(next)) { *stream->peek_char = next; type = IDENTIFIER; break; };
+                if (tok_len > 0 && !is_alphabetic(next) && !is_numeric(next) && next != '_') { *stream->peek_char = next; type = IDENTIFIER; break; };
             }
-            next_token_buffer[len] = next;
-            len += 1;
-            tok_len += 1;
+            list_append(next, tok, tok_len, tok_cap);
             // single special char
             if (!in_str && !is_alphabetic(next) && !is_numeric(next) && next != '_') { type = SNOWFLAKE; break; }
-            if (len >= 32) {
-                tok = (char*) realloc(tok, tok_len + len + 1);
-                memcpy(tok + tok_len - len, &next_token_buffer, len);
-                len = 0;
-            }
         }
     }
     if (tok_len == 0) return NULL;
 
-    tok = (char*) realloc(tok, tok_len + 1);
-    memcpy(tok + tok_len - len, &next_token_buffer, len);
-
-    tok[tok_len] = '\0';
+    list_append('\0', tok, tok_len, tok_cap);
 
     Token* t = (Token*) malloc(sizeof(Token));
     t->string = tok;
