@@ -1,7 +1,8 @@
+#include "lib/defines.c"
+
 #include "tokens.c"
 #include "ast.c"
 #include "transpile.c"
-#include "lib/defines.c"
 
 #ifdef __WIN32__
     #include <io.h>
@@ -11,8 +12,9 @@
 #include <string.h>
 #include "lib/os.c"
 #include "types.c"
+#include "infer.c"
 
-int main(int argc, char** argv) {
+int main(int argc, str* argv) {
     if (argc < 3) {
         printf("Usage:\n [--exe|-e|--main|-m|--run|-r|--dir|-d] %s <input.kdo> <output>]\n\
     --exe |-e - compile to executable\n\
@@ -26,9 +28,9 @@ int main(int argc, char** argv) {
     bool gen_main = false;
     bool run = false;
 
-    char* INPUT_FILE = NULL;
-    char* OUTNAME = NULL;
-    char* OUT_DIR = ".";
+    str INPUT_FILE = NULL;
+    str OUTNAME = NULL;
+    str OUT_DIR = ".";
 
     for (int i = 1;i < argc;i++) {
         if (strlen(argv[i]) == 0) continue; 
@@ -60,9 +62,9 @@ int main(int argc, char** argv) {
 
     printf("compilign with flags: exe=%u, main=%u, run=%u\n", to_exe, gen_main, run);
 
-    char* OUT_C_FILE = malloc(strlen(argv[1] + 2));
+    str OUT_C_FILE = malloc(strlen(argv[1] + 2));
     sprintf(OUT_C_FILE, "%s.c", OUTNAME);
-    char* OUT_H_FILE = malloc(strlen(argv[1] + 2));
+    str OUT_H_FILE = malloc(strlen(argv[1] + 2));
     sprintf(OUT_H_FILE, "%s.h", OUTNAME);
 
     FILE *source = fopen(INPUT_FILE, "r");
@@ -70,11 +72,14 @@ int main(int argc, char** argv) {
     Module* module = parse_module(stream);
     drop_tokenstream(stream);
 
-    usize tlen = module->types_c;
-    usize types_capacity = module->types_c;
-    register_builtin_types(&module->types, &module->types_c, &types_capacity);
-    printf("registered %lld builtins\n", module->types_c - tlen);
+    usize tlen = module->types.length;
+    register_builtin_types(&module->types);
+    printf("registered %lld builtins\n", module->types.length - tlen);
     
+    printf("type pass...\n");
+    infer_types(module);
+    printf("inferred and propagated types\n");
+
     mkdir(OUT_DIR);
     if (chdir("build") != 0) {
         printf("`cd build` failed\n");
@@ -92,23 +97,23 @@ int main(int argc, char** argv) {
         printf("compiling generated c...\n");
         
 #ifdef __WIN32__
-        const char* BUILD_CMD_TEMPLATE = "gcc %s -Wall -o %s.exe";
-        char* command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
+        const str BUILD_CMD_TEMPLATE = "gcc %s -Wall -o %s.exe";
+        str command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
         sprintf(command, BUILD_CMD_TEMPLATE, OUT_C_FILE, OUTNAME);
 #else
-        const char* BUILD_CMD_TEMPLATE = "gcc %s -Wall -o %s";
-        char* command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
+        const str BUILD_CMD_TEMPLATE = "gcc %s -Wall -o %s";
+        str command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
         sprintf(command, BUILD_CMD_TEMPLATE, OUT_C_FILE, OUTNAME);
 #endif
         if (system(command) != 0) {
-            printf("Compilation failed\n");
+            printf("compilation failed\n");
             exit(1);
         }
 
-        printf("Compilation finished successfully.\n");
+        printf("compilation finished successfully.\n");
     }
     if (run) {
         int return_code = system(OUTNAME);
-        printf("Program exited with code %d.", return_code);
+        printf("program exited with code %d.", return_code);
     }
 }

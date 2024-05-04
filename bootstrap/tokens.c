@@ -31,13 +31,13 @@ static const char *TOKENTYPE_STRING[] = {
 
 typedef struct Token {
     TokenType type;
-    char* string;
+    str string;
 } Token;
 
-void drop_token(Token* token) {
-    free(token->string);
-    free(token);
-}
+#define drop_token(token) ({ \
+    free((token)->string); \
+    free(token); \
+})
 
 bool is_alphabetic(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -49,7 +49,7 @@ bool is_numeric(char c) {
 
 typedef struct TokenStream {
     FILE* fptr;
-    char* peek_char;
+    str peek_char;
     Token* peek;
     usize line;
     usize column;
@@ -93,9 +93,9 @@ Token* __next_token(TokenStream* stream) {
         return t;
     }
     TokenType type;
-    char* tok = malloc(8 * sizeof(char));
     usize tok_len = 0;
     usize tok_cap = 8;
+    str tok = malloc(tok_cap * sizeof(char));
     char next = 0;
     bool in_str = false;
     while (tok_len == 0 && next != -1) {
@@ -124,14 +124,14 @@ Token* __next_token(TokenStream* stream) {
                 // word end and special char now
                 if (tok_len > 0 && !is_alphabetic(next) && !is_numeric(next) && next != '_') { *stream->peek_char = next; type = IDENTIFIER; break; };
             }
-            list_append(next, tok, tok_len, tok_cap);
+            list_append_raw(next, tok, tok_len, tok_cap);
             // single special char
             if (!in_str && !is_alphabetic(next) && !is_numeric(next) && next != '_') { type = SNOWFLAKE; break; }
         }
     }
     if (tok_len == 0) return NULL;
 
-    list_append('\0', tok, tok_len, tok_cap);
+    list_append_raw('\0', tok, tok_len, tok_cap);
 
     Token* t = (Token*) malloc(sizeof(Token));
     t->string = tok;

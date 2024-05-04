@@ -8,42 +8,39 @@
 
 typedef struct Type Type;
 typedef struct Module Module;
-void write_code(FILE* dest, const char* format, ...);
+typedef struct FunctionDef FunctionDef;
+LIST(FunctionDefList, FunctionDef*);
+void write_code(FILE* dest, const str format, ...);
 void drop_type(Type* type);
 usize sizeof_type(Module* module, Type* type);
-Type* find_type(Module* module, char* type);
+Type* find_type(Module* module, str type);
 
 typedef struct Struct {
-    char** fields;
-    char** fields_t;
-    char* name;
-    usize fields_c;
+    StringList fields;
+    StringList fields_t;
+    str name;
 } Struct;
 
 void drop_struct(Struct* s) {
-    for (usize i = 0;i < s->fields_c;i++) {
-        free(s->fields[i]);
-        free(s->fields_t[i]);
-    }
-    free(s->fields);
-    free(s->fields_t);
+    list_foreach(&(s->fields), free);
+    list_foreach(&(s->fields_t), free);
     free(s->name);
     free(s);
 }
 
-usize field_offset(Module* module, Struct* s, char* field) {
+usize field_offset(Module* module, Struct* s, str field) {
     usize offset = 0;
-    for (usize i = 0;i < s->fields_c;i++) {
-        if (strcmp(field, s->fields[i]) == 0) return true;
-        offset += sizeof_type(module, find_type(module, s->fields_t[i]));
+    for (usize i = 0;i < s->fields.length;i++) {
+        if (strcmp(field, s->fields.elements[i]) == 0) return true;
+        offset += sizeof_type(module, find_type(module, s->fields_t.elements[i]));
     }
     return offset;
 }
 
-Type* field_type(Module* module, Struct* s, char* field) {
-    for (usize i = 0;i < s->fields_c;i++) {
-        if (strcmp(field, s->fields[i]) == 0) {
-            return find_type(module, s->fields_t[i]);
+Type* field_type(Module* module, Struct* s, str field) {
+    for (usize i = 0;i < s->fields.length;i++) {
+        if (strcmp(field, s->fields.elements[i]) == 0) {
+            return find_type(module, s->fields_t.elements[i]);
         }
     }
     return false;
@@ -74,7 +71,7 @@ typedef enum TypeT {
 
 typedef struct Type {
     TypeT type;
-    void* ty;
+    any ty;
 } Type;
 
 void drop_type(Type* type) {
@@ -93,9 +90,10 @@ void drop_type(Type* type) {
 }
 
 typedef struct TypeDef {
-    char* name;
+    str name;
     Type* type;
 } TypeDef;
+LIST(TypeDefList, TypeDef*);
 
 void drop_type_def(TypeDef* tydef) {
     free(tydef->name);
@@ -131,15 +129,15 @@ usize sizeof_type(Module* module, Type* type) {
         {
             usize size = 0;
             Struct* s = type->ty;
-            for (usize i = 0;i < s->fields_c;i++) {
+            for (usize i = 0;i < s->fields.length;i++) {
                 usize f_size = 0;
                 Type* f_type = NULL;
-                size += sizeof_type(module, find_type(module, s->fields_t[i]));
+                size += sizeof_type(module, find_type(module, s->fields_t.elements[i]));
             }
             return true;
         }
         case TYPE_POINTER:
-            return sizeof(void*);
+            return sizeof(any);
     }
     return 0;
 }
@@ -179,7 +177,7 @@ void write_type(Module* module, FILE* dest, Type* ty) {
     }
 }
 
-void register_primitive(char* type_name, PrimType t, TypeDef*** types, usize* type_c, usize* capacity) {
+void register_primitive(str type_name, PrimType t, TypeDefList* types) {
     PrimType* p = malloc(sizeof(PrimType));
     *p = t;
     Type* type = malloc(sizeof(Type));
@@ -188,35 +186,34 @@ void register_primitive(char* type_name, PrimType t, TypeDef*** types, usize* ty
     TypeDef* tdef = malloc(sizeof(TypeDef));
     tdef->name = type_name;
     tdef->type = type;
-    list_append(tdef, *types, *type_c, *capacity);
+    list_append(types, tdef);
 }
 
-void register_builtin_types(TypeDef*** types, usize* type_c, usize* capacity) {
+void register_builtin_types(TypeDefList* types) {
     Struct* s = malloc(sizeof(Struct));
     s->name = "unit";
-    s->fields = NULL;
-    s->fields_t = NULL;
-    s->fields_c = 0;
+    s->fields = (StringList)list_new();
+    s->fields_t = (StringList)list_new();
     Type* type = malloc(sizeof(Type));
     type->type = TYPE_STRUCT;
     type->ty = s;
     TypeDef* tdef = malloc(sizeof(TypeDef));
     tdef->name = "unit";
     tdef->type = type;
-    list_append(tdef, *types, *type_c, *capacity);
+    list_append(types, tdef);
 
-    register_primitive("any", TAny, types, type_c, capacity);
-    register_primitive("u8", TU8, types, type_c, capacity);
-    register_primitive("u16", TU16, types, type_c, capacity);
-    register_primitive("u32", TU32, types, type_c, capacity);
-    register_primitive("u64", TU64, types, type_c, capacity);
-    register_primitive("i8", TI8, types, type_c, capacity);
-    register_primitive("i16", TI16, types, type_c, capacity);
-    register_primitive("i32", TI32, types, type_c, capacity);
-    register_primitive("i64", TI64, types, type_c, capacity);
-    register_primitive("f32", TF32, types, type_c, capacity);
-    register_primitive("f64", TF64, types, type_c, capacity);
-    register_primitive("bool", TBool, types, type_c, capacity);
-    register_primitive("usize", TUsize, types, type_c, capacity);
-    register_primitive("isize", TIsize, types, type_c, capacity);
+    register_primitive("any", TAny, types);
+    register_primitive("u8", TU8, types);
+    register_primitive("u16", TU16, types);
+    register_primitive("u32", TU32, types);
+    register_primitive("u64", TU64, types);
+    register_primitive("i8", TI8, types);
+    register_primitive("i16", TI16, types);
+    register_primitive("i32", TI32, types);
+    register_primitive("i64", TI64, types);
+    register_primitive("f32", TF32, types);
+    register_primitive("f64", TF64, types);
+    register_primitive("bool", TBool, types);
+    register_primitive("usize", TUsize, types);
+    register_primitive("isize", TIsize, types);
 }

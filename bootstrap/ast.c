@@ -27,13 +27,16 @@ typedef enum ExprType {
 } ExprType;
 
 typedef struct Expression {
-    ExprType type;
-    void* expr;
+    ExprType kind;
+    any expr;
+    str type;
+    usize src_line;
 } Expression;
 
+LIST(ExpressionList, Expression*);
+
 typedef struct Block {
-    Expression** exprs;
-    usize expr_c;
+    ExpressionList exprs;
 } Block;
 
 typedef struct Assign {
@@ -44,7 +47,7 @@ typedef struct Assign {
 typedef struct BinOp {
     Expression* lhs;
     Expression* rhs;
-    char* op;
+    str op;
     usize precedence;
 } BinOp;
 
@@ -62,8 +65,8 @@ typedef struct IfExpr {
 
 typedef struct VarDecl {
     Expression* value;
-    char* type;
-    char* name;
+    str type;
+    str name;
 } VarDecl;
 
 void drop_expression(Expression* expression);
@@ -95,10 +98,7 @@ void drop_field_access(FieldAccess* fa) {
 }
 
 void drop_block(Block* block) {
-    for (usize i = 0;i < block->expr_c;i++) {
-        drop_expression(block->exprs[i]);
-    }
-    free(block->exprs);
+    list_foreach(&(block->exprs), drop_expression);
     free(block);
 }
 
@@ -121,21 +121,17 @@ void drop_while_expr(WhileExpr* while_expr) {
 }
 
 typedef struct FunctionCall {
-    char* name;
-    Expression** args;
-    usize args_c;
+    str name;
+    ExpressionList args;
 } FunctionCall;
 
 void drop_function_call(FunctionCall* call) {
-    for (usize i = 0;i < call->args_c;i++) {
-        drop_expression(call->args[i]);
-    }
-    free(call->args);
+    list_foreach(&(call->args), drop_expression);
     free(call);
 }
 
 void drop_expression(Expression* expr) {
-    switch (expr->type) {
+    switch (expr->kind) {
         case FUNC_CALL_EXPR:
             drop_function_call((FunctionCall*) expr->expr);
             break;
@@ -152,7 +148,7 @@ void drop_expression(Expression* expr) {
             drop_token((Token*) expr->expr);
             break;
         case VARIABLE_EXPR:
-            free((char*) expr->expr);
+            free((str) expr->expr);
             break;
         case REF_EXPR:
         case DEREF_EXPR:
@@ -160,7 +156,7 @@ void drop_expression(Expression* expr) {
             drop_expression((Expression*) expr->expr);
             break;
         case STRUCT_LITERAL:
-            free((char*) expr->expr);
+            free((str) expr->expr);
             break;
         case VAR_DECL_EXPR:
             drop_var_decl((VarDecl*) expr->expr);
@@ -175,28 +171,24 @@ void drop_expression(Expression* expr) {
             drop_binop((BinOp*) expr->expr);
             break;
     }
+    free(expr->type);
     free(expr);
 }
 
 typedef struct FunctionDef {
-    char* name;
+    str name;
     Block* body;
-    char* ret_t;
-    char** args_t;
-    char** args;
-    usize args_c;
+    str ret_t;
+    StringList args_t;
+    StringList args;
 } FunctionDef;
 
 void drop_function_def(FunctionDef* func) {
     drop_block(func->body);
     free(func->name);
     free(func->ret_t);
-    for (usize i = 0;i < func->args_c;i++) {
-        free(func->args[i]);
-        free(func->args_t[i]);    
-    }
-    free(func->args_t);
-    free(func->args);
+    list_foreach(&(func->args), free);
+    list_foreach(&(func->args_t), free);
     free(func);
 }
 
@@ -204,10 +196,10 @@ void drop_function_def(FunctionDef* func) {
 Block* __parse_block(TokenStream* stream);
 
 #define parse_type_value(stream) TRACE(__parse_type_value(stream))
-char* __parse_type_value(TokenStream* stream) {
+str __parse_type_value(TokenStream* stream) {
     Token* t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
-    char* ty = malloc(strlen(t->string) + 1);
+    str ty = malloc(strlen(t->string) + 1);
     strcpy(ty, t->string);
     ty[strlen(ty)] = '\0';
     while (t->type == SNOWFLAKE && strcmp(t->string, "&") == 0) {
@@ -215,9 +207,10 @@ char* __parse_type_value(TokenStream* stream) {
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
         usize old = strlen(ty);
-        ty = realloc(ty, old + strlen(t->string) + 1);
-        strcpy(old + ty, t->string);
-        ty[strlen(ty)] = '\0';
+        usize len = old + strlen(t->string);
+        ty = realloc(ty, len + 1);
+        strcpy(ty + old, t->string);
+        ty[len] = '\0';
     }
     drop_token(t);
     return ty;
@@ -231,11 +224,12 @@ Expression* __parse_subscript(TokenStream* stream) {
     Token* t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-    char* field = t->string;
+    str field = t->string;
     free(t);
     Expression* expr = malloc(sizeof(Expression));
-    expr->type = VARIABLE_EXPR;
+    expr->kind = VARIABLE_EXPR;
     expr->expr = field;
+    expr->src_line = stream->line;
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type == SNOWFLAKE && strcmp(t->string, ".") == 0) {
@@ -243,9 +237,9 @@ Expression* __parse_subscript(TokenStream* stream) {
         Expression* field = parse_subscript(stream);
         FieldAccess* fa = malloc(sizeof(FieldAccess));
         fa->object = expr;
-        fa->field = field; 
+        fa->field = field;
         expr = malloc(sizeof(Expression));
-        expr->type = FIELD_ACCESS_EXPR;
+        expr->kind = FIELD_ACCESS_EXPR;
         expr->expr = fa;
     } else {
         stream->peek = t;
@@ -256,11 +250,12 @@ Expression* __parse_subscript(TokenStream* stream) {
 #define parse_expresslet(stream) TRACE(__parse_expresslet(stream))
 Expression* __parse_expresslet(TokenStream* stream) {
     Expression* expr = malloc(sizeof(Expression));
+    expr->src_line = stream->line;
     Token* t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type == SNOWFLAKE && strcmp(t->string, "{") == 0) {
         stream->peek = t;
-        expr->type = BLOCK_EXPR;
+        expr->kind = BLOCK_EXPR;
         expr->expr = parse_block(stream);
     } else if (t->type == SNOWFLAKE && strcmp(t->string, "(") == 0) {
         drop_token(t);
@@ -270,10 +265,10 @@ Expression* __parse_expresslet(TokenStream* stream) {
         if (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) unexpected_token_error(t, stream);
         drop_token(t);
     } else if (t->type == STRING || t->type == NUMERAL) {
-        expr->type = LITERAL_EXPR;
+        expr->kind = LITERAL_EXPR;
         expr->expr = t;
     } else if (t->type == IDENTIFIER) {
-        char* name = t->string;
+        str name = t->string;
         free(t);
         if (strcmp(name, "if") == 0) {
             Expression* cond = parse_expression(stream);
@@ -290,7 +285,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
                 if_expr->otherwise = NULL;
                 stream->peek = t;
             }
-            expr->type = IF_EXPR;
+            expr->kind = IF_EXPR;
             expr->expr = if_expr;
         } else if (strcmp(name, "while") == 0) {
             Expression* cond = parse_expression(stream);
@@ -298,7 +293,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
             WhileExpr* while_expr = malloc(sizeof(WhileExpr));
             while_expr->condition = cond;
             while_expr->body = body;
-            expr->type = WHILE_EXPR;
+            expr->kind = WHILE_EXPR;
             expr->expr = while_expr;
         } else {
             Token* t = next_token(stream);
@@ -308,25 +303,23 @@ Expression* __parse_expresslet(TokenStream* stream) {
                 if (strcmp(name, "true") == 0) {
                     Token* tok = malloc(sizeof(Token));
                     tok->type = NUMERAL;
-                    tok->string = "1";
-                    expr->type = LITERAL_EXPR;
+                    tok->string = "1bool";
+                    expr->kind = LITERAL_EXPR;
                     expr->expr = tok;
                     free(name);
                 } else if (strcmp(name, "false") == 0) {
                     Token* tok = malloc(sizeof(Token));
                     tok->type = NUMERAL;
-                    tok->string = "0";
-                    expr->type = LITERAL_EXPR;
+                    tok->string = "0bool";
+                    expr->kind = LITERAL_EXPR;
                     expr->expr = tok;
                     free(name);
                 } else {
-                    expr->type = VARIABLE_EXPR;
+                    expr->kind = VARIABLE_EXPR;
                     expr->expr = name;
                 }
             } else {
-                usize args_len = 0;
-                usize capacity = 0;
-                Expression** args = NULL;
+                ExpressionList args = list_new();
                 t = next_token(stream);
                 if (t == NULL) unexpected_eof(stream);
                 if (t->type == SNOWFLAKE && strcmp(t->string, ")") == 0) {
@@ -335,7 +328,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
                     stream->peek = t;
                     while (1) {
                         Expression* e = parse_expression(stream);
-                        list_append(e, args, args_len, capacity);
+                        list_append(&args, e);
                         t = next_token(stream);
                         if (t == NULL) unexpected_eof(stream);
                         if (t->type == SNOWFLAKE && strcmp(t->string, ")") == 0) {
@@ -350,8 +343,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
                 FunctionCall* call = malloc(sizeof(FunctionCall));
                 call->name = name;
                 call->args = args;
-                call->args_c = args_len;
-                expr->type = FUNC_CALL_EXPR;
+                expr->kind = FUNC_CALL_EXPR;
                 expr->expr = call;
             }
         }
@@ -366,7 +358,8 @@ Expression* __parse_expresslet(TokenStream* stream) {
         fa->object = expr;
         fa->field = field; 
         expr = malloc(sizeof(Expression));
-        expr->type = FIELD_ACCESS_EXPR;
+        expr->src_line = stream->line;
+        expr->kind = FIELD_ACCESS_EXPR;
         expr->expr = fa;
     } else {
         stream->peek = t;
@@ -380,21 +373,23 @@ Expression* __parse_expression(TokenStream* stream) {
     if (t->type == IDENTIFIER && strcmp(t->string, "return") == 0) {
         Expression* expr = malloc(sizeof(Expression));
         drop_token(t);
-        expr->type = RETURN_EXPR;
+        expr->kind = RETURN_EXPR;
         expr->expr = parse_expression(stream);
+        expr->src_line = stream->line;
         return expr;
     }
     if (t->type == IDENTIFIER && strcmp(t->string, "let") == 0) {
         Expression* expr = malloc(sizeof(Expression));
+        expr->src_line = stream->line;
         drop_token(t);
         t = next_token(stream);
         if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-        char* name = t->string;
+        str name = t->string;
         free(t);
         t = next_token(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
         drop_token(t);
-        char* type = parse_type_value(stream);
+        str type = parse_type_value(stream);
         VarDecl* vd = malloc(sizeof(VarDecl));
         vd->name = name;
         vd->type = type;
@@ -406,7 +401,7 @@ Expression* __parse_expression(TokenStream* stream) {
             stream->peek = t;
             vd->value = NULL;
         }
-        expr->type = VAR_DECL_EXPR;
+        expr->kind = VAR_DECL_EXPR;
         expr->expr = vd;
         return expr;
     }
@@ -414,17 +409,18 @@ Expression* __parse_expression(TokenStream* stream) {
     if (t->type == SNOWFLAKE && strcmp(t->string, "&") == 0) {
         drop_token(t);
         expr = malloc(sizeof(Expression));
-        expr->type = REF_EXPR;
+        expr->kind = REF_EXPR;
         expr->expr = parse_expresslet(stream);
     } else if (t->type == SNOWFLAKE && strcmp(t->string, "*") == 0) {
         drop_token(t);
         expr = malloc(sizeof(Expression));
-        expr->type = DEREF_EXPR;
+        expr->kind = DEREF_EXPR;
         expr->expr = parse_expresslet(stream);
     } else {
         stream->peek = t;
         expr = parse_expresslet(stream);
     }
+    expr->src_line = stream->line;
     t = next_token(stream);
     if (t->type == SNOWFLAKE && strcmp(t->string, ")") == 0) {
         stream->peek = t;
@@ -454,21 +450,22 @@ Expression* __parse_expression(TokenStream* stream) {
         assign->target = expr;
         assign->value = parse_expression(stream);
         expr = malloc(sizeof(Expression));
-        expr->type = ASSIGN_EXPR;
+        expr->src_line = stream->line;
+        expr->kind = ASSIGN_EXPR;
         expr->expr = assign;
         return expr;
     } 
     binop: { }
-    char* op = NULL;
+    str op = NULL;
     usize op_len = 0;
     usize op_cap = 0;
     while (t->type == SNOWFLAKE && (t->string[0] == '=' || t->string[0] == '!' || t->string[0] == '&' || t->string[0] == '|' || t->string[0] == '>' || t->string[0] == '<' || t->string[0] == '+' || t->string[0] == '-' || t->string[0] == '*' || t->string[0] == '/' || t->string[0] == '%')) {
-        list_append(t->string[0], op, op_len, op_cap);
+        list_append_raw(t->string[0], op, op_len, op_cap);
         free(t);
         t = next_token(stream);
     }
     stream->peek = t;
-    list_append('\0', op, op_len, op_cap);
+    list_append_raw('\0', op, op_len, op_cap);
     if (op_len == 1) {
         return expr; // no binop
     }
@@ -483,7 +480,8 @@ Expression* __parse_expression(TokenStream* stream) {
     binop->op = op;
     binop->precedence = precedence;
     expr = malloc(sizeof(Expression));
-    expr->type = BINOP_EXPR;
+    expr->src_line = stream->line;
+    expr->kind = BINOP_EXPR;
     expr->expr = binop;
     return expr;
 }
@@ -499,17 +497,18 @@ Block* __parse_block(TokenStream* stream) {
     if (t == NULL) unexpected_eof(stream);
     usize expr_len = 0;
     usize capacity = 0;
-    Expression** exprs = NULL;
+    ExpressionList exprs = list_new();
     
     while (t->type != SNOWFLAKE || strcmp(t->string, "}") != 0) {
         stream->peek = t;
         Expression* expr = parse_expression(stream);
+        expr->src_line = stream->line;
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ";") != 0) {
             unexpected_token_error(t, stream);
         }
-        list_append(expr, exprs, expr_len, capacity);
+        list_append(&exprs, expr);
         drop_token(t);
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
@@ -517,7 +516,6 @@ Block* __parse_block(TokenStream* stream) {
     drop_token(t);
     Block* block = malloc(sizeof(Block));
     block->exprs = exprs;
-    block->expr_c = expr_len;
     return block;
 }
 
@@ -530,7 +528,7 @@ TypeDef* __parse_type_def(TokenStream* stream) {
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-    char* name = t->string;
+    str name = t->string;
     free(t);
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
@@ -546,23 +544,19 @@ TypeDef* __parse_type_def(TokenStream* stream) {
     drop_token(t);
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
-    usize fields_len = 0;
-    usize fields_cap = 0;
-    char** fields = NULL;
-    usize fields_t_len = 0;
-    usize fields_t_cap = 0;
-    char** fields_t = NULL;
+    StringList fields = list_new();
+    StringList fields_t = list_new();
     while (t->type != SNOWFLAKE || strcmp(t->string, "}") != 0) {
         if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-        char* field = t->string;
+        str field = t->string;
         free(t);
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
         drop_token(t);
-        char* field_t = parse_type_value(stream);
-        list_append(field, fields, fields_len, fields_cap);
-        list_append(field_t, fields_t, fields_t_len, fields_t_cap);
+        str field_t = parse_type_value(stream);
+        list_append(&fields, field);
+        list_append(&fields_t, field_t);
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
         if (t->type == SNOWFLAKE && strcmp(t->string, ",") == 0) {
@@ -574,12 +568,11 @@ TypeDef* __parse_type_def(TokenStream* stream) {
     drop_token(t);
     Struct* s = malloc(sizeof(Struct));
     usize l = strlen(name);
-    char* sname = malloc(l + 1);
+    str sname = malloc(l + 1);
     strcpy(sname, name);
     sname[l] = '\0';
     s->name = sname;
     s->fields = fields;
-    s->fields_c = fields_len;
     s->fields_t = fields_t;
     Type* type = malloc(sizeof(Type));
     type->type = TYPE_STRUCT;
@@ -599,30 +592,26 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-    char* name = t->string;
+    str name = t->string;
     free(t);
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type != SNOWFLAKE || strcmp(t->string, "(") != 0) unexpected_token_error(t, stream);
     drop_token(t);
-    usize args_len = 0;
-    usize args_capacity = 0;
-    usize args_t_len = 0;
-    usize args_t_capacity = 0;
-    char** args = NULL;
-    char** args_t = NULL;
+    StringList args = list_new();
+    StringList args_t = list_new();
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     while (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) {
         if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-        list_append(t->string, args, args_len, args_capacity);
+        list_append(&args, t->string);
         free(t);
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
         drop_token(t);
-        char* ty = parse_type_value(stream);
-        list_append(ty, args_t, args_t_len, args_t_capacity);
+        str ty = parse_type_value(stream);
+        list_append(&args_t, ty);
         t = next_token(stream);
         if (t->type == SNOWFLAKE && strcmp(t->string, ",") == 0) {
             drop_token(t);
@@ -632,84 +621,95 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
     drop_token(t);
 
     t = next_token(stream);
+    if (t == NULL) unexpected_eof(stream);
 
     FunctionDef* func = malloc(sizeof(FunctionDef));
-
     if (t->type == SNOWFLAKE && strcmp(t->string, "-") == 0) {
         drop_token(t);
-        drop_token(next_token(stream)); // im lazy
+        t = next_token(stream);
+        if (t == NULL) unexpected_eof(stream);
+        if (t->type != SNOWFLAKE || strcmp(t->string, ">") != 0) unexpected_token_error(t, stream);
+        drop_token(t);
         func->ret_t = parse_type_value(stream);
     } else {
         stream->peek = t;
         func->ret_t = NULL;
     }
 
-    Block* body = parse_block(stream);
+    Block* body = NULL;
 
-    if (func->ret_t == NULL) {
-        Expression* ret_value = malloc(sizeof(Expression));
-        ret_value->type = STRUCT_LITERAL;
-        ret_value->expr = "unit";
-        Expression* ret = malloc(sizeof(Expression));
-        ret->type = RETURN_EXPR;
-        ret->expr = ret_value;
+    t = next_token(stream);
+    if (t == NULL) unexpected_eof(stream);
+    if (t->type != SNOWFLAKE || strcmp(t->string, ";") != 0) {
+        stream->peek = t;
+        
+        body = parse_block(stream);
 
-        // the capacity is buullshit but shhh
-        usize fake_cap = body->expr_c;
-        list_append(ret, body->exprs, body->expr_c, fake_cap);
-        func->ret_t = "unit";
+        if (func->ret_t == NULL) {
+            Expression* ret_value = malloc(sizeof(Expression));
+            ret_value->src_line = stream->line;
+            ret_value->kind = STRUCT_LITERAL;
+            ret_value->expr = "unit";
+            Expression* ret = malloc(sizeof(Expression));
+            ret->src_line = stream->line;
+            ret->kind = RETURN_EXPR;
+            ret->expr = ret_value;
+
+            list_append(&(body->exprs), ret);
+            func->ret_t = "unit";
+        }
+    } else {
+        drop_token(t);
     }
 
     func->name = name;
     func->body = body;
-    func->args_c = args_len;
     func->args_t = args_t;
     func->args = args;
     return func;
 }
 
 typedef struct Module {
-    FunctionDef** funcs;
-    usize funcs_c;
-    TypeDef** types;
-    usize types_c;
+    FunctionDefList funcs;
+    TypeDefList types;
 } Module;
 
 void drop_module(Module* module) {
-    for (usize i = 0;i < module->funcs_c;i++) {
-        drop_function_def(module->funcs[i]);
-    }
-    for (usize i = 0;i < module->types_c;i++) {
-        drop_type_def(module->types[i]);
-    }
-    free(module->funcs);
-    free(module->types);
+    list_foreach(&(module->funcs), drop_function_def);
+    list_foreach(&(module->types), drop_type_def);
     free(module);
 }
 
-Type* find_type(Module* module, char* type) {
+Type* find_type(Module* module, str type) {
     if (type[0] == '&') {
         Type* ty = malloc(sizeof(Type));
         ty->type = TYPE_POINTER;
         ty->ty = find_type(module, type+1);
         return ty;
     }
-    for (usize i = 0;i < module->types_c;i++) {
-        if (strcmp(type, module->types[i]->name) == 0) {
-            return module->types[i]->type;
+    for (usize i = 0;i < module->types.length;i++) {
+        if (strcmp(type, module->types.elements[i]->name) == 0) {
+            return module->types.elements[i]->type;
         }
     }
-    printf("No such type `%s`", type);
+    printf("No such type `%s`\n", type);
     exit(1);
 }
 
-Module* parse_module(TokenStream* stream) {
-    FunctionDef** funcs = NULL;
-    usize funcs_len = 0;
-    usize funcs_capacity = 0;
-    TypeDef** types = NULL;
-    usize types_len = 0;
-    usize types_capacity = 0;
+FunctionDef* find_func(Module* module, str func) {
+    for (usize i = 0;i < module->funcs.length;i++) {
+        if (strcmp(func, module->funcs.elements[i]->name) == 0) {
+            return module->funcs.elements[i];
+        }
+    }
+    printf("No such function `%s`\n", func);
+    exit(1);
+}
+
+#define parse_module(stream)  TRACE(_parse_module(stream))
+Module* _parse_module(TokenStream* stream) {
+    FunctionDefList funcs = list_new();
+    TypeDefList types = list_new();
     while (1) {
         Token* t = next_token(stream);
         if (t == NULL) break;
@@ -719,10 +719,10 @@ Module* parse_module(TokenStream* stream) {
             t = next_token(stream);
             if (t == NULL) unexpected_eof(stream);
             if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-            char* fname = malloc(strlen(t->string) + 5);
+            str fname = malloc(strlen(t->string) + 4);
             strcpy(fname, t->string);
             strcpy(fname+strlen(t->string), ".kdo");
-            fname[strlen(t->string) + 5] = '\0';
+            fname[strlen(t->string) + 4] = '\0';
             drop_token(t);
             t = next_token(stream);
             if (t == NULL) unexpected_eof(stream);
@@ -733,32 +733,27 @@ Module* parse_module(TokenStream* stream) {
             TokenStream* stream = new_tokenstream(source);
             Module* module = parse_module(stream);
             drop_tokenstream(stream);
-            for (usize i = 0;i < module->funcs_c;i++) {
-                list_append(module->funcs[i], funcs, funcs_len, funcs_capacity);
-            }
-            for (usize i = 0;i < module->types_c;i++) {
-                list_append(module->types[i], types, types_len, types_capacity);
-            }
+            list_extend(&funcs, &(module->funcs));
+            list_extend(&types, &(module->types));
             printf("finished importing %s\n", fname);
         } else if (strcmp(t->string, "fn") == 0) {
             stream->peek = t;
             FunctionDef* func = parse_function_def(stream);
-            printf("    parsed function `%s` with %lld args and %lld expressions\n", func->name, func->args_c, func->body->expr_c);
-            list_append(func, funcs, funcs_len, funcs_capacity);
+            if (func->body == NULL) printf("    parsed function definition `%s` with %lld args\n", func->name, func->args.length);
+            else printf("    parsed function `%s` with %lld args and %lld expressions\n", func->name, func->args.length, func->body->exprs.length);
+            list_append(&funcs, func);
         } else if (strcmp(t->string, "type") == 0) {
             stream->peek = t;
             TypeDef* tydef = parse_type_def(stream);
             printf("    parsed type `%s`\n", tydef->name);
-            list_append(tydef, types, types_len, types_capacity);
+            list_append(&types, tydef);
         } else {
             unexpected_token_error(t, stream);
         }
     }
-    printf("parsed %lld functions and %lld types\n", funcs_len, types_len);
+    printf("parsed %lld functions and %lld types\n", funcs.length, types.length);
     Module* module = malloc(sizeof(Module));
     module->funcs = funcs;
-    module->funcs_c = funcs_len;
     module->types = types;
-    module->types_c = types_len;
     return module;
 }

@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void write_code(FILE* dest, const char* format, ...) {
+void write_code(FILE* dest, const str format, ...) {
     va_list argptr;
     va_start(argptr, format);
     vfprintf(dest, format, argptr);
@@ -27,7 +27,7 @@ typedef struct Writer {
     bool gen_main;
 } Writer;
 
-Writer* new_writer(char* name, FILE* code, FILE* header, bool gen_main) {
+Writer* new_writer(str name, FILE* code, FILE* header, bool gen_main) {
     Writer* writer = malloc(sizeof(Writer));
     writer->code = code;
     writer->header = header;
@@ -46,7 +46,7 @@ void drop_writer(Writer* writer) {
 
 void finalize_transpile(Writer* writer) {
     if (writer->gen_main) {
-        write_code(writer->code, "\n\n#undef main\n\nint main(int arg_c, char* arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
+        write_code(writer->code, "\n\n#undef main\n\nint main(int arg_c, str arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
     }
 }
 
@@ -54,14 +54,14 @@ void transpile_block(Module* module, Writer *writer, Block* block, usize indent)
 
 void transpile_expression(Module* module, Writer* writer, Expression* expr, usize indent) {
     // write_code(writer->code, "/* %d */", expr->type);
-    switch (expr->type) {
+    switch (expr->kind) {
         case FUNC_CALL_EXPR:
             {
                 FunctionCall* call = expr->expr;
                 write_code(writer->code, "%s(", call->name);
-                for (usize i = 0;i < call->args_c;i++) {
+                for (usize i = 0;i < call->args.length;i++) {
                     if (i > 0) write_code(writer->code, ", ");
-                    transpile_expression(module, writer, call->args[i], indent);
+                    transpile_expression(module, writer, call->args.elements[i], indent);
                 }
                 write_code(writer->code, ")");
             }
@@ -114,7 +114,7 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
             break;
         case VARIABLE_EXPR:
             {
-                char* name = expr->expr;
+                str name = expr->expr;
                 write_code(writer->code, name);
             }
             break;
@@ -123,7 +123,7 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
         case RETURN_EXPR:
             {
                 Expression* inner = expr->expr;
-                switch (expr->type) {
+                switch (expr->kind) {
                     case REF_EXPR:
                         write_code(writer->code, "(&");
                         break;
@@ -137,7 +137,7 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
                         fprintf(stderr, "Unreachabe case reached");
                 }
                 transpile_expression(module, writer, inner, indent);
-                switch (expr->type) {
+                switch (expr->kind) {
                     case REF_EXPR:
                     case DEREF_EXPR:
                         write_code(writer->code, ")");
@@ -148,7 +148,7 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
             break;
         case STRUCT_LITERAL:
             {
-                char* s = expr->expr;
+                str s = expr->expr;
                 write_code(writer->code, "(struct %s) { }", s);
             }
             break;
@@ -175,7 +175,8 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
             {
                 FieldAccess* fa = expr->expr;
                 transpile_expression(module, writer, fa->object, indent + 1);
-                write_code(writer->code, ".");
+                if (fa->object->type[0] == '&') write_code(writer->code, "->");
+                else write_code(writer->code, ".");
                 transpile_expression(module, writer, fa->field, indent + 1);
             }
             break;
@@ -194,9 +195,9 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
 
 void transpile_block(Module* module, Writer *writer, Block* block, usize indent) {
     write_code(writer->code, "{\n");
-    for (usize i = 0;i < block->expr_c;i++) {
+    for (usize i = 0;i < block->exprs.length;i++) {
         write_indent(writer->code, indent + 1);
-        transpile_expression(module, writer, block->exprs[i], indent + 1);
+        transpile_expression(module, writer, block->exprs.elements[i], indent + 1);
         write_code(writer->code, ";\n");
     }
     write_indent(writer->code, indent);
@@ -209,35 +210,35 @@ void transpile_function(Writer* writer, Module* module, FunctionDef* func) {
     write_type(module, writer->code, ret_t);
     write_code(writer->header, " %s(", func->name);
     write_code(writer->code, " %s(", func->name);
-    if (func->args_c == 0) {
+    if (func->args.length == 0) {
         write_code(writer->header, "void");
         write_code(writer->code, "void");
     } else {
-        for (usize i = 0;i < func->args_c;i++) {
+        for (usize i = 0;i < func->args.length;i++) {
             if (i > 0) {
                 write_code(writer->header, ", ");
                 write_code(writer->code, ", ");
             }
-            Type* arg = find_type(module, func->args_t[i]);
+            Type* arg = find_type(module, func->args_t.elements[i]);
             write_type(module, writer->header, arg);
             write_type(module, writer->code, arg);
-            write_code(writer->header, " %s", func->args[i]);
-            write_code(writer->code, " %s", func->args[i]);
+            write_code(writer->header, " %s", func->args.elements[i]);
+            write_code(writer->code, " %s", func->args.elements[i]);
         }
     }
     write_code(writer->header, ");\n");
     write_code(writer->code, ") ");
-    transpile_block(module, writer, func->body, 0);
+    if (func->body != NULL) transpile_block(module, writer, func->body, 0);
 }
 
-void transpile_struct_def(Writer* writer, Module* module, char* name, Struct* s) {
+void transpile_struct_def(Writer* writer, Module* module, str name, Struct* s) {
     write_code(writer->header, "struct %s;\n", name);
-    if (s->fields_c > 0) {
+    if (s->fields.length > 0) {
         write_code(writer->code, "struct %s {\n", name);
-        for (usize j = 0;j < s->fields_c;j++) {
+        for (usize j = 0;j < s->fields.length;j++) {
             write_code(writer->code, "    ");
-            write_type(module, writer->code, find_type(module, s->fields_t[j]));
-            write_code(writer->code, " %s;\n", s->fields[j]);
+            write_type(module, writer->code, find_type(module, s->fields_t.elements[j]));
+            write_code(writer->code, " %s;\n", s->fields.elements[j]);
         }
         write_code(writer->code, "};\n", name);
     } else {
@@ -246,8 +247,8 @@ void transpile_struct_def(Writer* writer, Module* module, char* name, Struct* s)
 }
 
 void transpile_module(Writer* writer, Module* module) {
-    for (usize i = 0;i < module->types_c;i++) {
-        TypeDef* tdef = module->types[i];
+    for (usize i = 0;i < module->types.length;i++) {
+        TypeDef* tdef = module->types.elements[i];
         if (tdef->type->type == TYPE_STRUCT) {
             Struct* s = (Struct*)tdef->type->ty;
             transpile_struct_def(writer, module, tdef->name, s);
@@ -257,8 +258,8 @@ void transpile_module(Writer* writer, Module* module) {
     write_code(writer->header, "\n");
     write_code(writer->code, "\n");
 
-    for (usize i = 0;i < module->funcs_c;i++) {
-        FunctionDef* func = module->funcs[i];
+    for (usize i = 0;i < module->funcs.length;i++) {
+        FunctionDef* func = module->funcs.elements[i];
         transpile_function(writer, module, func);
         
         write_code(writer->code, "\n\n");

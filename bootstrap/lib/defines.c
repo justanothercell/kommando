@@ -2,6 +2,8 @@
 
 // #define __TRACE__
 
+#define __TRACE_ALLOC__
+
 static int trace_indent = 0;
 
 #ifdef __TRACE__
@@ -17,6 +19,34 @@ static int trace_indent = 0;
     })
 #else
     #define TRACE(expr) expr
+#endif
+
+#ifdef __TRACE_ALLOC__
+    #include <stdlib.h>
+    #include <stdio.h>
+    
+    #define malloc(thing) ({ \
+        usize size = thing; \
+        void* ptr = malloc(size); \
+        FILE *memtrace = fopen("MEMTRACE.txt", "a"); \
+        fprintf(memtrace, "MALLOC %s (%lld) @ %p | %s:%d\n", #thing, size, ptr, __FILENAME__, __LINE__); \
+        fclose(memtrace); \
+        ptr; \
+    })
+    #define realloc(addr, size) ({ \
+        usize s = size; \
+        void* addr_after = realloc(addr, s); \
+        FILE *memtrace = fopen("MEMTRACE.txt", "a"); \
+        fprintf(memtrace, "REALLOC %s @ %p with %s (%lld) -> @ %p | %s:%d\n", #addr, addr, #size, s, addr_after, __FILENAME__, __LINE__); \
+        fclose(memtrace); \
+        addr_after; \
+    })
+    #define free(addr) ({ \
+        FILE *memtrace = fopen("MEMTRACE.txt", "a"); \
+        fprintf(memtrace, "FREE %s @ %p | %s:%d\n", #addr, addr, __FILENAME__, __LINE__); \
+        fclose(memtrace); \
+        free(addr); \
+    })
 #endif
 
 #ifndef __WIN32__
@@ -63,6 +93,9 @@ typedef long f64;
 typedef u8 bool;
 #define true 1
 #define false 0
+
+typedef char* str;
+typedef void* any;
 
 // MANUAL
 #ifdef __LITTLE_ENDIAN__
