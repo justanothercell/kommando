@@ -23,6 +23,7 @@ void push_frame(ScopeStack* stack) {
 
 void drop_loal_scope(LocalScope frame) {
     list_foreach(&frame, drop_variable);
+    free(frame.elements);
 }
 
 void pop_frame(ScopeStack* stack) {
@@ -44,18 +45,15 @@ str get_var_type(ScopeStack* stack, str name) {
     exit(1);
 }
 
-str copy_str(str s) {
-    usize len = strlen(s);
-    str t = malloc(len + 1);
-    strcpy(t, s);
-    t[len] = '\0';
-    return t;
-}
-
 void assert_type_match(str type1, str type2, usize loc) {
-    if (type1[0] == '&' && type2[0] == '&') return;
+    if (type1[0] == '&' && type2[0] == '&') {
+        assert_type_match(type1 + 1, type2 + 1, loc);
+        return;
+    }
+    if (strcmp(type1, "any") == 0) return;
+    if (strcmp(type2, "any") == 0) return;
     if (strcmp(type1, type2) != 0) {
-        printf("Types `%s` and `%s` do not match (near %lld)\n", type1, type2, loc + 1);
+        printf("Types `%s` and `%s` do not match (near line %lld)\n", type1, type2, loc + 1);
         exit(1);
     }
 }
@@ -79,7 +77,7 @@ void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expr
             deref:
             switch (t->type) {
                 case TYPE_PRIMITIVE:
-                    fprintf(stderr, "primitive `%s` has no such field `%s` (near %lld)\n", parent_type, field_name, field->src_line + 1);
+                    fprintf(stderr, "primitive `%s` has no such field `%s` (near line %lld)\n", parent_type, field_name, field->src_line + 1);
                     exit(1);
                 case TYPE_STRUCT: {
                     Struct* s = t->ty;
@@ -89,7 +87,7 @@ void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expr
                             goto found;
                         }
                     }
-                    fprintf(stderr, "struct `%s` (`%s`) has no such field `%s` (near %lld)\n", s->name, parent_type, field_name, field->src_line + 1);
+                    fprintf(stderr, "struct `%s` (`%s`) has no such field `%s` (near line %lld)\n", s->name, parent_type, field_name, field->src_line + 1);
                     exit(1);
                     found: {}
                 } break;
@@ -104,41 +102,53 @@ void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expr
     }
 }
 
-void infer_types_expression(Module* module, ScopeStack* stack, Expression* expr) {
+#define infer_types_expression(module, stack, expr) TRACEV(__infer_types_expression(module, stack, expr))
+void __infer_types_expression(Module* module, ScopeStack* stack, Expression* expr) {
     switch (expr->kind) {
         case FUNC_CALL_EXPR: {
             FunctionCall* fc = expr->expr;
             FunctionDef* func = find_func(module, fc->name);
-            if (func->args.length != fc->args.length) {
-                fprintf(stderr, "called function with %lld args but expected %lld (near %lld)", fc->args.length, func->args.length, expr->src_line);
-                exit(1);
+            if (func->is_variadic) {
+                if (func->args.length > fc->args.length) {
+                    fprintf(stderr, "called variadic function with %lld args but expected at least %lld (near line %lld)", fc->args.length, func->args.length, expr->src_line);
+                    exit(1);
+                }
+            } else {
+                if (func->args.length != fc->args.length) {
+                    fprintf(stderr, "called function with %lld args but expected %lld (near line %lld)", fc->args.length, func->args.length, expr->src_line);
+                    exit(1);
+                }
             }
             for (int i = 0;i < fc->args.length;i++) {
                 infer_types_expression(module, stack, fc->args.elements[i]);
-                assert_type_match(fc->args.elements[i]->type, func->args_t.elements[i], fc->args.elements[i]->src_line);
+                if (i < func->args.length) assert_type_match(fc->args.elements[i]->type, func->args_t.elements[i], fc->args.elements[i]->src_line);
             }
             expr->type = copy_str(func->ret_t);
         } break;
         case BLOCK_EXPR: {
             infer_types_block(module, stack, expr->expr);
-            expr->type = "unit";
+            expr->type = copy_str("unit");
         } break;
         case IF_EXPR: {
             IfExpr* if_expr = expr->expr;
             infer_types_expression(module, stack, if_expr->condition);
             assert_type_match(if_expr->condition->type, "bool", expr->src_line);
             infer_types_block(module, stack, if_expr->then);
-            infer_types_block(module, stack, if_expr->otherwise);
-            expr->type = "unit";
+            if (if_expr->otherwise != NULL) infer_types_block(module, stack, if_expr->otherwise);
+            expr->type = copy_str("unit");
         } break;
         case WHILE_EXPR: {
-            expr->type = "unit";
+            WhileExpr* while_expr = expr->expr;
+            infer_types_expression(module, stack, while_expr->condition);
+            assert_type_match(while_expr->condition->type, "bool", expr->src_line);
+            infer_types_block(module, stack, while_expr->body);
+            expr->type = copy_str("unit");
         } break;
         case LITERAL_EXPR: {
             Token* lit = expr->expr;
             switch (lit->type) {
                 case STRING:
-                    expr->type = "&char";
+                    expr->type = copy_str("&char");
                     break;
                 case NUMERAL: {
                     usize len = strlen(lit->string);
@@ -149,7 +159,7 @@ void infer_types_expression(Module* module, ScopeStack* stack, Expression* expr)
                             goto end;
                         }
                     }
-                    expr->type = "i32";
+                    expr->type = copy_str("i32");
                     end: {}
                 } break;
                 default:
@@ -163,21 +173,29 @@ void infer_types_expression(Module* module, ScopeStack* stack, Expression* expr)
         } break;
         case RETURN_EXPR: {
             infer_types_expression(module, stack, expr->expr);
-            expr->type = "unit";
+            expr->type = copy_str("unit");
         } break;
         case STRUCT_LITERAL: {
-            fprintf(stderr, "unreachable: STRUCT_LITERAL infer\n");
-            exit(1);
+            if (strcmp(expr->expr, "unit") == 0) {
+                expr->type = copy_str("unit");
+            } else {
+                fprintf(stderr, "todo: STRUCT_LITERAL infer (%lld)\n", expr->src_line + 1);
+                exit(1);   
+            }
         } break;
         case REF_EXPR: {
             infer_types_expression(module, stack, expr->expr);
             str inner = ((Expression*)expr->expr)->type;
-            expr->type = copy_str(inner+1);
+            usize len = strlen(inner);
+            expr->type = malloc(len + 2);
+            expr->type[0] = '&';
+            strcpy(expr->type + 1, inner);
+            expr->type[len + 1] = '\0';
         } break;
         case DEREF_EXPR: {
             infer_types_expression(module, stack, expr->expr);
             str inner = ((Expression*)expr->expr)->type;
-            expr->type = copy_str(inner+1);
+            expr->type = copy_str(inner + 1);
         } break;
         case VAR_DECL_EXPR: {
             VarDecl* vd = expr->expr;
@@ -186,13 +204,14 @@ void infer_types_expression(Module* module, ScopeStack* stack, Expression* expr)
                 assert_type_match(vd->value->type, vd->type, expr->src_line);
             }
             register_var(stack, vd->name, vd->type);
-            expr->type = "unit";
+            expr->type = copy_str("unit");
         } break;
         case ASSIGN_EXPR: {
             Assign* ass = expr->expr;
             infer_types_expression(module, stack, ass->target);
             infer_types_expression(module, stack, ass->value);
             assert_type_match(ass->target->type, ass->value->type, expr->src_line);
+            expr->type = copy_str("unit");
         } break;
         case FIELD_ACCESS_EXPR: {
             FieldAccess* fa = expr->expr;
@@ -207,9 +226,9 @@ void infer_types_expression(Module* module, ScopeStack* stack, Expression* expr)
             assert_type_match(bo->lhs->type, bo->rhs->type, expr->src_line);
             if (strcmp(bo->op, "&&") == 0 || strcmp(bo->op, "||") == 0) {
                 assert_type_match(bo->lhs->type, "bool", expr->src_line);
-                expr->type = "bool";
+                expr->type = copy_str("bool");
             } else if (bo->op[0] == '!' || bo->op[0] == '=' || bo->op[0] == '>' || bo->op[0] == '<') {
-                expr->type = "bool";
+                expr->type = copy_str("bool");
             } else {
                 expr->type = copy_str(bo->lhs->type);
             } 
@@ -240,6 +259,8 @@ void infer_types(Module* module) {
     for (usize i = 0;i < module->funcs.length;i++) {
         if (module->funcs.elements[i]->body == NULL) continue; 
         infer_types_fn(module, &stack, module->funcs.elements[i]);
+        drop_temp_types();
         printf("    inferred types for function `%s`\n", module->funcs.elements[i]->name);
     }
+    free(stack.elements);
 }

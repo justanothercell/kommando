@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.c"
+#include <string.h>
 
 #define list_append(list_ptr, element) list_append_raw(element, (list_ptr)->elements, (list_ptr)->length, (list_ptr)->capacity)
 
@@ -50,3 +51,11 @@
     } Name
 
 LIST(StringList, char*);
+
+str copy_str(str s) {
+    usize len = strlen(s);
+    str t = malloc(len + 1);
+    strcpy(t, s);
+    t[len] = '\0';
+    return t;
+}

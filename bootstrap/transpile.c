@@ -33,8 +33,12 @@ Writer* new_writer(str name, FILE* code, FILE* header, bool gen_main) {
     writer->header = header;
     writer->gen_main = gen_main;
 
-    write_code(header, "#pragma once\n\n#define main __entry__\n\n", name);
-    write_code(code, "#include <stdio.h>\n#include <stdlib.h>\n\n#include \"%s.h\"\n\n#define main __entry__\n\n", name);
+    write_code(header, "#pragma once\n\n#define __offset(a, b) ((a)+(b))\n\n");
+    write_code(code, "#include <stdio.h>\n#include <stdlib.h>\n\n#include \"%s.h\"\n\n", name);
+    if (gen_main) {
+    write_code(header, "#define main __entry__\n\n", name);
+    write_code(code, "#define main __entry__\n\n", name);
+    }
     return writer;
 }
 
@@ -46,7 +50,7 @@ void drop_writer(Writer* writer) {
 
 void finalize_transpile(Writer* writer) {
     if (writer->gen_main) {
-        write_code(writer->code, "\n\n#undef main\n\nint main(int arg_c, str arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
+        write_code(writer->code, "\n\n#undef main\n\nint main(int arg_c, char* arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
     }
 }
 
@@ -228,7 +232,7 @@ void transpile_function(Writer* writer, Module* module, FunctionDef* func) {
     }
     write_code(writer->header, ");\n");
     write_code(writer->code, ") ");
-    if (func->body != NULL) transpile_block(module, writer, func->body, 0);
+    transpile_block(module, writer, func->body, 0);
 }
 
 void transpile_struct_def(Writer* writer, Module* module, str name, Struct* s) {
@@ -252,6 +256,7 @@ void transpile_module(Writer* writer, Module* module) {
         if (tdef->type->type == TYPE_STRUCT) {
             Struct* s = (Struct*)tdef->type->ty;
             transpile_struct_def(writer, module, tdef->name, s);
+            drop_temp_types();
         }
     }
 
@@ -260,8 +265,10 @@ void transpile_module(Writer* writer, Module* module) {
 
     for (usize i = 0;i < module->funcs.length;i++) {
         FunctionDef* func = module->funcs.elements[i];
-        transpile_function(writer, module, func);
-        
-        write_code(writer->code, "\n\n");
+        if (func->body != NULL) {
+            transpile_function(writer, module, func);
+            write_code(writer->code, "\n\n");
+            drop_temp_types();
+        }
     }
 }

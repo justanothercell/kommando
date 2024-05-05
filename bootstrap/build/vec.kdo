@@ -1,0 +1,45 @@
+type Vec = struct {
+    capacity: usize,
+    length: usize,
+    elements: &&any
+}
+
+fn Vec_new() -> Vec {
+    let vec: Vec;
+    vec.capacity = 0usize;
+    vec.length = 0usize;
+    vec.elements = NULL;
+    return vec;
+}
+
+fn Vec_push(vec: &Vec, element: &any) {
+    if (*vec).length >= (*vec).capacity {
+        (*vec).capacity = ((*vec).capacity + 1usize) * 2usize;
+        (*vec).elements = realloc((*vec).elements, ((*vec).capacity) * 8usize);
+    };
+    *__offset((*vec).elements, (*vec).length) = element;
+    (*vec).length = (*vec).length + 1usize;
+}
+
+fn Vec_iter(vec: &Vec) -> VecIter {
+    let iter: VecIter;
+    iter.vec = vec;
+    iter.index = 0usize;    
+    return iter;
+}
+
+type VecIter = struct {
+    vec: &Vec,
+    index: usize
+}
+
+fn VecIter_next(iter: &VecIter, out_element: &&any) -> bool {
+    let vec: &Vec = (*iter).vec;
+    if (*vec).length > (*iter).index {
+        *out_element = __offset((*vec).elements, (*iter).index);
+        (*iter).index = (*iter).index + 1usize;
+        return true;
+    };
+    *out_element = NULL;
+    return false;
+}

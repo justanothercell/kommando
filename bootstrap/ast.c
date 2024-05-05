@@ -72,7 +72,7 @@ typedef struct VarDecl {
 void drop_expression(Expression* expression);
 
 void drop_var_decl(VarDecl* vd) {
-    drop_expression(vd->value);
+    if (vd->value != NULL) drop_expression(vd->value);
     free(vd->name);
     free(vd->type);
     free(vd);
@@ -93,19 +93,20 @@ void drop_binop(BinOp* op) {
 
 void drop_field_access(FieldAccess* fa) {
     drop_expression(fa->object);
-    drop_expression(fa->object);
+    drop_expression(fa->field);
     free(fa);
 }
 
 void drop_block(Block* block) {
     list_foreach(&(block->exprs), drop_expression);
+    free(block->exprs.elements);
     free(block);
 }
 
 void drop_if_expr(IfExpr* if_expr) {
     drop_expression(if_expr->condition);
     drop_block(if_expr->then);
-    drop_block(if_expr->otherwise);
+    if (if_expr->otherwise != NULL) drop_block(if_expr->otherwise);
     free(if_expr);
 }
 
@@ -127,6 +128,7 @@ typedef struct FunctionCall {
 
 void drop_function_call(FunctionCall* call) {
     list_foreach(&(call->args), drop_expression);
+    free(call->args.elements);
     free(call);
 }
 
@@ -171,6 +173,12 @@ void drop_expression(Expression* expr) {
             drop_binop((BinOp*) expr->expr);
             break;
     }
+    if ((usize)(expr->type) > 0x0010000000000000) {
+        printf("caught!\n");
+        printf("%u\n", expr->kind);
+        printf("%s\n", expr->type);
+        exit(1);
+    }
     free(expr->type);
     free(expr);
 }
@@ -181,14 +189,17 @@ typedef struct FunctionDef {
     str ret_t;
     StringList args_t;
     StringList args;
+    bool is_variadic;
 } FunctionDef;
 
 void drop_function_def(FunctionDef* func) {
-    drop_block(func->body);
+    if (func->body != NULL) drop_block(func->body);
     free(func->name);
     free(func->ret_t);
     list_foreach(&(func->args), free);
     list_foreach(&(func->args_t), free);
+    free(func->args.elements);
+    free(func->args_t.elements);
     free(func);
 }
 
@@ -250,6 +261,7 @@ Expression* __parse_subscript(TokenStream* stream) {
 #define parse_expresslet(stream) TRACE(__parse_expresslet(stream))
 Expression* __parse_expresslet(TokenStream* stream) {
     Expression* expr = malloc(sizeof(Expression));
+
     expr->src_line = stream->line;
     Token* t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
@@ -259,6 +271,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
         expr->expr = parse_block(stream);
     } else if (t->type == SNOWFLAKE && strcmp(t->string, "(") == 0) {
         drop_token(t);
+        free(expr);
         expr = parse_expression(stream);
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
@@ -303,14 +316,14 @@ Expression* __parse_expresslet(TokenStream* stream) {
                 if (strcmp(name, "true") == 0) {
                     Token* tok = malloc(sizeof(Token));
                     tok->type = NUMERAL;
-                    tok->string = "1bool";
+                    tok->string = copy_str("1bool");
                     expr->kind = LITERAL_EXPR;
                     expr->expr = tok;
                     free(name);
                 } else if (strcmp(name, "false") == 0) {
                     Token* tok = malloc(sizeof(Token));
                     tok->type = NUMERAL;
-                    tok->string = "0bool";
+                    tok->string = copy_str("0bool");
                     expr->kind = LITERAL_EXPR;
                     expr->expr = tok;
                     free(name);
@@ -600,10 +613,21 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
     drop_token(t);
     StringList args = list_new();
     StringList args_t = list_new();
+    FunctionDef* func = malloc(sizeof(FunctionDef));
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     while (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) {
-        if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
+        if (t->type != IDENTIFIER) {
+            if (t->type == SNOWFLAKE && strcmp(t->string, "*") == 0) {
+                drop_token(t);
+                t = next_token(stream);
+                if (t == NULL) unexpected_eof(stream);
+                if (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) unexpected_token_error(t, stream);
+                drop_token(t);
+                goto va_args;
+            }
+            unexpected_token_error(t, stream);
+        }
         list_append(&args, t->string);
         free(t);
         t = next_token(stream);
@@ -619,11 +643,13 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
         } else if (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) unexpected_token_error(t, stream);
     }
     drop_token(t);
-
+    goto args_done;
+    va_args:
+        func->is_variadic = true;
+    args_done:
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
 
-    FunctionDef* func = malloc(sizeof(FunctionDef));
     if (t->type == SNOWFLAKE && strcmp(t->string, "-") == 0) {
         drop_token(t);
         t = next_token(stream);
@@ -649,17 +675,18 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
             Expression* ret_value = malloc(sizeof(Expression));
             ret_value->src_line = stream->line;
             ret_value->kind = STRUCT_LITERAL;
-            ret_value->expr = "unit";
+            ret_value->expr = copy_str("unit");
             Expression* ret = malloc(sizeof(Expression));
             ret->src_line = stream->line;
             ret->kind = RETURN_EXPR;
             ret->expr = ret_value;
-
             list_append(&(body->exprs), ret);
-            func->ret_t = "unit";
         }
     } else {
         drop_token(t);
+    }
+    if (func->ret_t == NULL) {
+        func->ret_t = copy_str("unit");
     }
 
     func->name = name;
@@ -677,14 +704,25 @@ typedef struct Module {
 void drop_module(Module* module) {
     list_foreach(&(module->funcs), drop_function_def);
     list_foreach(&(module->types), drop_type_def);
+    free(module->funcs.elements);
+    free(module->types.elements);
     free(module);
 }
 
+static TypeList TEMP_TYPES = list_new();
+void drop_temp_types() {
+    list_foreach(&TEMP_TYPES, free);
+    free(TEMP_TYPES.elements);
+    TEMP_TYPES.elements = NULL;
+    TEMP_TYPES.length = 0;
+    TEMP_TYPES.capacity = 0;
+}
 Type* find_type(Module* module, str type) {
     if (type[0] == '&') {
         Type* ty = malloc(sizeof(Type));
         ty->type = TYPE_POINTER;
         ty->ty = find_type(module, type+1);
+        list_append(&TEMP_TYPES, ty);
         return ty;
     }
     for (usize i = 0;i < module->types.length;i++) {
@@ -735,7 +773,11 @@ Module* _parse_module(TokenStream* stream) {
             drop_tokenstream(stream);
             list_extend(&funcs, &(module->funcs));
             list_extend(&types, &(module->types));
+            free(module->funcs.elements);
+            free(module->types.elements);
+            free(module);
             printf("finished importing %s\n", fname);
+            free(fname);
         } else if (strcmp(t->string, "fn") == 0) {
             stream->peek = t;
             FunctionDef* func = parse_function_def(stream);

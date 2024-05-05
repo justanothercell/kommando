@@ -82,9 +82,11 @@ int main(int argc, str* argv) {
 
     mkdir(OUT_DIR);
     if (chdir("build") != 0) {
+        free(OUT_DIR);
         printf("`cd build` failed\n");
         exit(1);
     }
+    free(OUT_DIR);
 
     FILE *code = fopen(OUT_C_FILE, "w");
     FILE *header = fopen(OUT_H_FILE, "w");
@@ -92,6 +94,8 @@ int main(int argc, str* argv) {
     transpile_module(writer, module);
     finalize_transpile(writer);
     drop_writer(writer);
+    drop_module(module);
+    drop_temp_types();
 
     if (to_exe) {
         printf("compiling generated c...\n");
@@ -100,20 +104,24 @@ int main(int argc, str* argv) {
         const str BUILD_CMD_TEMPLATE = "gcc %s -Wall -o %s.exe";
         str command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
         sprintf(command, BUILD_CMD_TEMPLATE, OUT_C_FILE, OUTNAME);
+        free(OUT_C_FILE);
+        free(OUT_H_FILE);
 #else
         const str BUILD_CMD_TEMPLATE = "gcc %s -Wall -o %s";
         str command = malloc(sizeof(char) * (strlen(BUILD_CMD_TEMPLATE) + strlen(OUT_C_FILE) + strlen(OUTNAME) + 1));
         sprintf(command, BUILD_CMD_TEMPLATE, OUT_C_FILE, OUTNAME);
 #endif
         if (system(command) != 0) {
+            free(command);
             printf("compilation failed\n");
             exit(1);
         }
+        free(command);
 
         printf("compilation finished successfully.\n");
     }
     if (run) {
         int return_code = system(OUTNAME);
-        printf("program exited with code %d.", return_code);
+        printf("program exited with code %d.\n", return_code);
     }
 }

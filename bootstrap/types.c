@@ -7,6 +7,7 @@
 #include <string.h>
 
 typedef struct Type Type;
+LIST(TypeList, Type*);
 typedef struct Module Module;
 typedef struct FunctionDef FunctionDef;
 LIST(FunctionDefList, FunctionDef*);
@@ -24,6 +25,8 @@ typedef struct Struct {
 void drop_struct(Struct* s) {
     list_foreach(&(s->fields), free);
     list_foreach(&(s->fields_t), free);
+    free(s->fields.elements);
+    free(s->fields_t.elements);
     free(s->name);
     free(s);
 }
@@ -47,6 +50,7 @@ Type* field_type(Module* module, Struct* s, str field) {
 }
 
 typedef enum PrimType {
+    TStr,
     TAny,
     TU8,
     TU16,
@@ -103,6 +107,7 @@ void drop_type_def(TypeDef* tydef) {
 
 usize sizeof_primitive(PrimType pt) {
     switch (pt) {
+        case TStr:      return sizeof(str);
         case TAny: fprintf(stderr, "`any` is unsized, use as reference instead: `&any`"); exit(1);
         case TU8:       return sizeof(u8);
         case TU16:      return sizeof(u16);
@@ -144,6 +149,7 @@ usize sizeof_type(Module* module, Type* type) {
 
 void write_primitive(FILE* dest, PrimType pt) {
     switch (pt) {
+        case TStr:      write_code(dest, "char*"); return;
         case TAny:      write_code(dest, "void"); return;
         case TU8:       write_code(dest, "unsigned char"); return;
         case TU16:      write_code(dest, "unsigned short int"); return;
@@ -184,24 +190,25 @@ void register_primitive(str type_name, PrimType t, TypeDefList* types) {
     type->type = TYPE_PRIMITIVE;
     type->ty = p;
     TypeDef* tdef = malloc(sizeof(TypeDef));
-    tdef->name = type_name;
+    tdef->name = copy_str(type_name);
     tdef->type = type;
     list_append(types, tdef);
 }
 
 void register_builtin_types(TypeDefList* types) {
     Struct* s = malloc(sizeof(Struct));
-    s->name = "unit";
+    s->name = copy_str("unit");
     s->fields = (StringList)list_new();
     s->fields_t = (StringList)list_new();
     Type* type = malloc(sizeof(Type));
     type->type = TYPE_STRUCT;
     type->ty = s;
     TypeDef* tdef = malloc(sizeof(TypeDef));
-    tdef->name = "unit";
+    tdef->name = copy_str("unit");
     tdef->type = type;
     list_append(types, tdef);
 
+    register_primitive("str", TStr, types);
     register_primitive("any", TAny, types);
     register_primitive("u8", TU8, types);
     register_primitive("u16", TU16, types);

@@ -2,7 +2,7 @@
 
 // #define __TRACE__
 
-#define __TRACE_ALLOC__
+// #define __TRACE_ALLOC__
 
 static int trace_indent = 0;
 
@@ -11,40 +11,51 @@ static int trace_indent = 0;
         for (int i = 0;i < trace_indent;i++) { printf("| "); } \
         printf("*>call %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
         trace_indent++; \
-        void* out = expr; \
+        typeof(expr) out = expr; \
         trace_indent--; \
         for (int i = 0;i < trace_indent;i++) { printf("| "); } \
         printf("*<exit %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
         out; \
     })
+    #define TRACEV(expr) ({ \
+        for (int i = 0;i < trace_indent;i++) { printf("| "); } \
+        printf("*>call %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
+        trace_indent++; \
+        expr; \
+        trace_indent--; \
+        for (int i = 0;i < trace_indent;i++) { printf("| "); } \
+        printf("*<exit %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
+    })
 #else
     #define TRACE(expr) expr
+    #define TRACEV(expr) expr
 #endif
 
 #ifdef __TRACE_ALLOC__
     #include <stdlib.h>
     #include <stdio.h>
-    
+    static FILE* MEMTRACE = NULL;
+
     #define malloc(thing) ({ \
         usize size = thing; \
         void* ptr = malloc(size); \
-        FILE *memtrace = fopen("MEMTRACE.txt", "a"); \
-        fprintf(memtrace, "MALLOC %s (%lld) @ %p | %s:%d\n", #thing, size, ptr, __FILENAME__, __LINE__); \
-        fclose(memtrace); \
+        if (MEMTRACE == NULL) MEMTRACE = fopen("MEMTRACE.txt", "w"); \
+        fprintf(MEMTRACE, "MALLOC %s (%lld) @ %p | %s:%d\n", #thing, size, ptr, __FILENAME__, __LINE__); \
+        fflush(MEMTRACE); \
         ptr; \
     })
     #define realloc(addr, size) ({ \
         usize s = size; \
         void* addr_after = realloc(addr, s); \
-        FILE *memtrace = fopen("MEMTRACE.txt", "a"); \
-        fprintf(memtrace, "REALLOC %s @ %p with %s (%lld) -> @ %p | %s:%d\n", #addr, addr, #size, s, addr_after, __FILENAME__, __LINE__); \
-        fclose(memtrace); \
+        if (MEMTRACE == NULL) MEMTRACE = fopen("MEMTRACE.txt", "w"); \
+        fprintf(MEMTRACE, "REALLOC %s @ %p with %s (%lld) -> @ %p | %s:%d\n", #addr, addr, #size, s, addr_after, __FILENAME__, __LINE__); \
+        fflush(MEMTRACE); \
         addr_after; \
     })
     #define free(addr) ({ \
-        FILE *memtrace = fopen("MEMTRACE.txt", "a"); \
-        fprintf(memtrace, "FREE %s @ %p | %s:%d\n", #addr, addr, __FILENAME__, __LINE__); \
-        fclose(memtrace); \
+        if (MEMTRACE == NULL) MEMTRACE = fopen("MEMTRACE.txt", "w"); \
+        fprintf(MEMTRACE, "FREE %s @ %p | %s:%d\n", #addr, addr, __FILENAME__, __LINE__); \
+        fflush(MEMTRACE); \
         free(addr); \
     })
 #endif

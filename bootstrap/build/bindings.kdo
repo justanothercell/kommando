@@ -1,0 +1,7 @@
+fn malloc(size: usize) -> &any;
+fn realloc(ptr: &any, size: usize) -> &any;
+fn free(ptr: &any);
+
+fn __offset(a: &any, b: usize) -> &any;
+
+fn printf(*);
