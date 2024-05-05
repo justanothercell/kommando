@@ -1,43 +1,14 @@
-#pragma once
+#include "tokens.h"
 
-#include "lib/defines.c"
-#include "lib/list.c"
+#include "lib/defines.h"
+#include "lib/list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define unexpected_token_error(t, stream) { \
-    fprintf(stderr, "Unexpected token %s `%s` in line %lld column %lld during %s %s:%d\n", TOKENTYPE_STRING[t->type], t->string, stream->line + 1, stream->column, __func__, __FILENAME__, __LINE__); \
-    exit(1); \
-}
-
-#define unexpected_eof(stream) { \
-    fprintf(stderr, "Unexpected EOF during %s@%s:%d", __func__, __FILENAME__, __LINE__); \
-    exit(1); \
-}
-
-#define print_token(t) printf("%s: %s\n", TOKENTYPE_STRING[t->type], t->string)
-
-typedef enum TokenType {
-    STRING,
-    NUMERAL,
-    IDENTIFIER,
-    SNOWFLAKE
-} TokenType;
-
 static const char *TOKENTYPE_STRING[] = {
     "STRING", "NUMERAL", "IDENTIFIER", "SNOWFLAKE"
 };
-
-typedef struct Token {
-    TokenType type;
-    str string;
-} Token;
-
-#define drop_token(token) ({ \
-    free((token)->string); \
-    free(token); \
-})
 
 bool is_alphabetic(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -46,14 +17,6 @@ bool is_alphabetic(char c) {
 bool is_numeric(char c) {
     return c >= '0' && c <= '9';
 }
-
-typedef struct TokenStream {
-    FILE* fptr;
-    str peek_char;
-    Token* peek;
-    usize line;
-    usize column;
-} TokenStream;
 
 TokenStream* new_tokenstream(FILE* fptr) {
     TokenStream* stream = malloc(sizeof(TokenStream));
@@ -72,19 +35,6 @@ void drop_tokenstream(TokenStream* stream) {
     free(stream->peek);
     free(stream);
 }
-
-#ifdef __TRACE__
-    #define next_token(stream) ({ \
-        Token* t = __next_token(stream); \
-        for (int i = 0;i < trace_indent;i++) { printf("| "); } \
-        if (t == NULL) printf("*-token: %s %s:%d EOF\n", __func__, __FILENAME__, __LINE__); \
-        else printf("*-token: %s %s:%d %s: %s in line %lld column %lld\n", __func__, __FILENAME__, __LINE__, TOKENTYPE_STRING[t->type], t->string, stream->line + 1, stream->column); \
-        t; \
-    })
-#else
-    #define next_token(stream) __next_token(stream)
-#endif
-
 
 Token* __next_token(TokenStream* stream) {
     if (stream->peek != NULL) {

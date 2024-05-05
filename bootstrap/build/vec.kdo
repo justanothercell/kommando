@@ -1,11 +1,11 @@
-type Vec = struct {
+type Vec<T> = struct {
     capacity: usize,
     length: usize,
-    elements: &&any
+    elements: &T
 }
 
-fn Vec_new() -> Vec {
-    let vec: Vec;
+fn Vec_new() -> Vec<T> {
+    let vec: Vec<T>;
     vec.capacity = 0usize;
     vec.length = 0usize;
     vec.elements = NULL;
@@ -13,12 +13,16 @@ fn Vec_new() -> Vec {
 }
 
 fn Vec_push(vec: &Vec, element: &any) {
-    if (*vec).length >= (*vec).capacity {
-        (*vec).capacity = ((*vec).capacity + 1usize) * 2usize;
-        (*vec).elements = realloc((*vec).elements, ((*vec).capacity) * 8usize);
+    if vec.length >= vec.capacity {
+        vec.capacity = (vec.capacity + 1usize) * 2usize;
+        vec.elements = realloc(vec.elements, (vec.capacity) * 8usize);
     };
-    *__offset((*vec).elements, (*vec).length) = element;
-    (*vec).length = (*vec).length + 1usize;
+    *__offset(vec.elements, vec.length) = element;
+    vec.length = vec.length + 1usize;
+}
+
+fn Vec_get(vec: &Vec, index: usize) -> &any {
+    return __offset(vec.elements, index);
 }
 
 fn Vec_iter(vec: &Vec) -> VecIter {
@@ -34,10 +38,9 @@ type VecIter = struct {
 }
 
 fn VecIter_next(iter: &VecIter, out_element: &&any) -> bool {
-    let vec: &Vec = (*iter).vec;
-    if (*vec).length > (*iter).index {
-        *out_element = __offset((*vec).elements, (*iter).index);
-        (*iter).index = (*iter).index + 1usize;
+    if iter.vec.length > iter.index {
+        *out_element = __offset(iter.vec.elements, iter.index);
+        iter.index = iter.index + 1usize;
         return true;
     };
     *out_element = NULL;

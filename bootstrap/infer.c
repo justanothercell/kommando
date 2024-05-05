@@ -1,20 +1,17 @@
-#include "ast.c"
+#include "infer.h"
+
+#include "ast.h"
+
+#include "lib/str.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct Variable {
-    str name;
-    str type;
-} Variable;
 
 void drop_variable(Variable var) {
     free(var.name);
     free(var.type);
 }
-
-LIST(LocalScope, Variable);
-LIST(ScopeStack, LocalScope);
 
 void push_frame(ScopeStack* stack) {
     LocalScope frame = list_new();
@@ -63,17 +60,17 @@ void register_var(ScopeStack* stack, str name, str type) {
     list_append(&(stack->elements[stack->length-1]), var);
 }
 
-void infer_types_block(Module* module, ScopeStack* stack, Block* block);
-
 void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expression* field) {
     switch (field->kind) {
         case FIELD_ACCESS_EXPR: {
-            fprintf(stderr, "your kind confuses me, expression (infer_field_access)");
-            exit(1);
+            FieldAccess* fa = field->expr;
+            infer_field_access(module, stack, parent_type, fa->object);
+            infer_field_access(module, stack, fa->object->type, fa->field);
+            field->type = copy_str(fa->field->type);
         } break;
         case VARIABLE_EXPR: {
             str field_name = field->expr;
-            Type* t = find_type(module, parent_type);
+            Type* t = find_type(module, parent_type, field->src_line);
             deref:
             switch (t->type) {
                 case TYPE_PRIMITIVE:
@@ -92,7 +89,7 @@ void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expr
                     found: {}
                 } break;
                 case TYPE_POINTER:
-                    t = find_type(module, parent_type + 1);
+                    t = find_type(module, parent_type + 1, field->src_line);
                     goto deref;
             }
         } break;
@@ -102,12 +99,11 @@ void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expr
     }
 }
 
-#define infer_types_expression(module, stack, expr) TRACEV(__infer_types_expression(module, stack, expr))
 void __infer_types_expression(Module* module, ScopeStack* stack, Expression* expr) {
     switch (expr->kind) {
         case FUNC_CALL_EXPR: {
             FunctionCall* fc = expr->expr;
-            FunctionDef* func = find_func(module, fc->name);
+            FunctionDef* func = find_func(module, fc->name, expr->src_line);
             if (func->is_variadic) {
                 if (func->args.length > fc->args.length) {
                     fprintf(stderr, "called variadic function with %lld args but expected at least %lld (near line %lld)", fc->args.length, func->args.length, expr->src_line);

@@ -1,6 +1,8 @@
-#pragma once
+#include "transpile.h"
 
-#include "ast.c"
+#include "ast.h"
+#include "types.h"
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -20,12 +22,6 @@ void write_indent(FILE* dest, usize indent) {
         write_code(dest, "    ");
     }
 }
-
-typedef struct Writer {
-    FILE* code;
-    FILE* header;
-    bool gen_main;
-} Writer;
 
 Writer* new_writer(str name, FILE* code, FILE* header, bool gen_main) {
     Writer* writer = malloc(sizeof(Writer));
@@ -53,8 +49,6 @@ void finalize_transpile(Writer* writer) {
         write_code(writer->code, "\n\n#undef main\n\nint main(int arg_c, char* arg_v[]) {\n    __entry__();\n    return 0;\n}\n\n");
     }
 }
-
-void transpile_block(Module* module, Writer *writer, Block* block, usize indent);
 
 void transpile_expression(Module* module, Writer* writer, Expression* expr, usize indent) {
     // write_code(writer->code, "/* %d */", expr->type);
@@ -159,7 +153,7 @@ void transpile_expression(Module* module, Writer* writer, Expression* expr, usiz
         case VAR_DECL_EXPR:
             {
                 VarDecl* vd = expr->expr;
-                write_type(module, writer->code, find_type(module, vd->type));
+                write_type(module, writer->code, find_type(module, vd->type, expr->src_line));
                 write_code(writer->code, " %s", vd->name);
                 if (vd->value != NULL) {
                     write_code(writer->code, " = ");
@@ -209,7 +203,7 @@ void transpile_block(Module* module, Writer *writer, Block* block, usize indent)
 }
 
 void transpile_function(Writer* writer, Module* module, FunctionDef* func) {
-    Type* ret_t = find_type(module, func->ret_t);
+    Type* ret_t = find_type(module, func->ret_t, func->src_line);
     write_type(module, writer->header, ret_t);
     write_type(module, writer->code, ret_t);
     write_code(writer->header, " %s(", func->name);
@@ -223,7 +217,7 @@ void transpile_function(Writer* writer, Module* module, FunctionDef* func) {
                 write_code(writer->header, ", ");
                 write_code(writer->code, ", ");
             }
-            Type* arg = find_type(module, func->args_t.elements[i]);
+            Type* arg = find_type(module, func->args_t.elements[i], func->src_line);
             write_type(module, writer->header, arg);
             write_type(module, writer->code, arg);
             write_code(writer->header, " %s", func->args.elements[i]);
@@ -241,7 +235,7 @@ void transpile_struct_def(Writer* writer, Module* module, str name, Struct* s) {
         write_code(writer->code, "struct %s {\n", name);
         for (usize j = 0;j < s->fields.length;j++) {
             write_code(writer->code, "    ");
-            write_type(module, writer->code, find_type(module, s->fields_t.elements[j]));
+            write_type(module, writer->code, find_type(module, s->fields_t.elements[j], s->src_line));
             write_code(writer->code, " %s;\n", s->fields.elements[j]);
         }
         write_code(writer->code, "};\n", name);

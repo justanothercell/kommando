@@ -1,12 +1,15 @@
-#pragma once
+#ifndef LIB_DEFINES_H
+#define LIB_DEFINES_H
+
+#include <stdbool.h>
 
 // #define __TRACE__
 
 // #define __TRACE_ALLOC__
 
-static int trace_indent = 0;
-
 #ifdef __TRACE__
+    static int trace_indent = 0;
+    
     #define TRACE(expr) ({ \
         for (int i = 0;i < trace_indent;i++) { printf("| "); } \
         printf("*>call %s from %s %s:%d\n", #expr, __func__, __FILENAME__, __LINE__); \
@@ -101,10 +104,6 @@ typedef unsigned long long int u64;
 typedef float f32;
 typedef long f64;
 
-typedef u8 bool;
-#define true 1
-#define false 0
-
 typedef char* str;
 typedef void* any;
 
@@ -113,4 +112,6 @@ typedef void* any;
     #define __ENDIANESS__ "little"
 #else
     #define __ENDIUANESS__ "big"
+#endif
+
 #endif

@@ -1,18 +1,21 @@
-#include "lib/defines.c"
+#include "lib/defines.h"
+#include "lib/os.h"
 
-#include "tokens.c"
-#include "ast.c"
-#include "transpile.c"
+#include "lib/str.c"
 
 #ifdef __WIN32__
     #include <io.h>
 #endif
 
+#include "ast.h"
+#include "infer.h"
+#include "tokens.h"
+#include "transpile.h"
+#include "types.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "lib/os.c"
-#include "types.c"
-#include "infer.c"
+
 
 int main(int argc, str* argv) {
     if (argc < 3) {

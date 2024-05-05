@@ -1,26 +1,12 @@
-#pragma once
+#include "types.h"
 
-#include "lib/defines.c"
-#include "lib/list.c"
+#include "lib/defines.h"
+#include "lib/list.h"
+#include "lib/str.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct Type Type;
-LIST(TypeList, Type*);
-typedef struct Module Module;
-typedef struct FunctionDef FunctionDef;
-LIST(FunctionDefList, FunctionDef*);
-void write_code(FILE* dest, const str format, ...);
-void drop_type(Type* type);
-usize sizeof_type(Module* module, Type* type);
-Type* find_type(Module* module, str type);
-
-typedef struct Struct {
-    StringList fields;
-    StringList fields_t;
-    str name;
-} Struct;
 
 void drop_struct(Struct* s) {
     list_foreach(&(s->fields), free);
@@ -31,52 +17,23 @@ void drop_struct(Struct* s) {
     free(s);
 }
 
-usize field_offset(Module* module, Struct* s, str field) {
+usize field_offset(Module* module, Struct* s, str field, usize src_line) {
     usize offset = 0;
     for (usize i = 0;i < s->fields.length;i++) {
         if (strcmp(field, s->fields.elements[i]) == 0) return true;
-        offset += sizeof_type(module, find_type(module, s->fields_t.elements[i]));
+        offset += sizeof_type(module, find_type(module, s->fields_t.elements[i], src_line), src_line);
     }
     return offset;
 }
 
-Type* field_type(Module* module, Struct* s, str field) {
+Type* field_type(Module* module, Struct* s, str field, usize src_line) {
     for (usize i = 0;i < s->fields.length;i++) {
         if (strcmp(field, s->fields.elements[i]) == 0) {
-            return find_type(module, s->fields_t.elements[i]);
+            return find_type(module, s->fields_t.elements[i], src_line);
         }
     }
     return false;
 }
-
-typedef enum PrimType {
-    TStr,
-    TAny,
-    TU8,
-    TU16,
-    TU32,
-    TU64,
-    TI8,
-    TI16,
-    TI32,
-    TI64,
-    TF32,
-    TF64,
-    TBool,
-    TUsize,
-    TIsize
-} PrimType;
-
-typedef enum TypeT {
-    TYPE_PRIMITIVE,
-    TYPE_STRUCT,
-    TYPE_POINTER
-} TypeT;
-
-typedef struct Type {
-    TypeT type;
-    any ty;
-} Type;
 
 void drop_type(Type* type) {
     switch (type->type) {
@@ -93,22 +50,22 @@ void drop_type(Type* type) {
     free(type);
 }
 
-typedef struct TypeDef {
-    str name;
-    Type* type;
-} TypeDef;
-LIST(TypeDefList, TypeDef*);
-
 void drop_type_def(TypeDef* tydef) {
     free(tydef->name);
     drop_type(tydef->type);
+    list_foreach(&(tydef->generics), free);
+    free(tydef->generics.elements);
     free(tydef);
+}
+
+void drop_type_value(TypeValue* value) {
+    free(value);
 }
 
 usize sizeof_primitive(PrimType pt) {
     switch (pt) {
         case TStr:      return sizeof(str);
-        case TAny: fprintf(stderr, "`any` is unsized, use as reference instead: `&any`"); exit(1);
+        case TAny:      fprintf(stderr, "`any` is unsized, use as reference instead: `&any`"); exit(1);
         case TU8:       return sizeof(u8);
         case TU16:      return sizeof(u16);
         case TU32:      return sizeof(u32);
@@ -126,7 +83,7 @@ usize sizeof_primitive(PrimType pt) {
     return 0;
 }
 
-usize sizeof_type(Module* module, Type* type) {
+usize sizeof_type(Module* module, Type* type, usize src_line) {
     switch (type->type) {
         case TYPE_PRIMITIVE:
             return sizeof_primitive(*(PrimType*)type->ty);
@@ -137,7 +94,7 @@ usize sizeof_type(Module* module, Type* type) {
             for (usize i = 0;i < s->fields.length;i++) {
                 usize f_size = 0;
                 Type* f_type = NULL;
-                size += sizeof_type(module, find_type(module, s->fields_t.elements[i]));
+                size += sizeof_type(module, find_type(module, s->fields_t.elements[i], src_line), src_line);
             }
             return true;
         }
@@ -192,20 +149,22 @@ void register_primitive(str type_name, PrimType t, TypeDefList* types) {
     TypeDef* tdef = malloc(sizeof(TypeDef));
     tdef->name = copy_str(type_name);
     tdef->type = type;
+    tdef->generics = (StrList)list_new();
     list_append(types, tdef);
 }
 
 void register_builtin_types(TypeDefList* types) {
     Struct* s = malloc(sizeof(Struct));
     s->name = copy_str("unit");
-    s->fields = (StringList)list_new();
-    s->fields_t = (StringList)list_new();
+    s->fields = (StrList)list_new();
+    s->fields_t = (StrList)list_new();
     Type* type = malloc(sizeof(Type));
     type->type = TYPE_STRUCT;
     type->ty = s;
     TypeDef* tdef = malloc(sizeof(TypeDef));
     tdef->name = copy_str("unit");
     tdef->type = type;
+    tdef->generics = (StrList)list_new();
     list_append(types, tdef);
 
     register_primitive("str", TStr, types);

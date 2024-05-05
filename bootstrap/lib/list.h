@@ -1,7 +1,9 @@
-#pragma once
+#ifndef LIB_LIST_H
+#define LIB_LIST_H
 
-#include "defines.c"
+#include "defines.h"
 #include <string.h>
+#include <stdlib.h>
 
 #define list_append(list_ptr, element) list_append_raw(element, (list_ptr)->elements, (list_ptr)->length, (list_ptr)->capacity)
 
@@ -50,12 +52,6 @@
         Type* elements; \
     } Name
 
-LIST(StringList, char*);
+LIST(StrList, char*);
 
-str copy_str(str s) {
-    usize len = strlen(s);
-    str t = malloc(len + 1);
-    strcpy(t, s);
-    t[len] = '\0';
-    return t;
-}
+#endif
