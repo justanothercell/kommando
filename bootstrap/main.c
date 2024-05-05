@@ -7,11 +7,11 @@
     #include <io.h>
 #endif
 
-#include "ast.h"
-#include "infer.h"
-#include "tokens.h"
-#include "transpile.h"
-#include "types.h"
+#include "ast.c"
+#include "infer.c"
+#include "tokens.c"
+#include "transpile.c"
+#include "types.c"
 
 #include <stdio.h>
 #include <string.h>
