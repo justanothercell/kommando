@@ -1,6 +1,7 @@
 #include "str.h"
 
 #include "defines.h"
+
 #include <stdlib.h>
 #include <string.h>
 

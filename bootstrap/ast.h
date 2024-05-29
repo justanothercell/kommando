@@ -1,6 +1,8 @@
 #ifndef AST_H
 #define AST_H
 
+#include "lib/defines.h"
+
 #include "tokens.h"
 #include "types.h"
 
@@ -24,7 +26,7 @@ typedef enum ExprType {
 typedef struct Expression {
     ExprType kind;
     any expr;
-    str type;
+    TypeValue* type;
     usize src_line;
 } Expression;
 
@@ -60,7 +62,7 @@ typedef struct IfExpr {
 
 typedef struct VarDecl {
     Expression* value;
-    str type;
+    TypeValue* type;
     str name;
 } VarDecl;
 
@@ -72,16 +74,19 @@ typedef struct WhileExpr {
 typedef struct FunctionCall {
     str name;
     ExpressionList args;
+    TypeValueList generics;
 } FunctionCall;
 
 typedef struct FunctionDef {
     str name;
     Block* body;
-    str ret_t;
-    StrList args_t;
+    TypeValue* ret_t;
     StrList args;
+    TypeValueList args_t;
     bool is_variadic;
     usize src_line;
+    StrList generics;
+    GenericsMappingList mappings;
 } FunctionDef;
 LIST(FunctionDefList, FunctionDef*);
 
@@ -125,6 +130,12 @@ Expression* __parse_expresslet(TokenStream* stream);
 #define parse_type_def(stream) TRACE(__parse_type_def(stream))
 TypeDef* __parse_type_def(TokenStream* stream);
 
+#define parse_generics_def(stream) TRACE(__parse_generics_def(stream))
+StrList __parse_generics_def(TokenStream* stream);
+
+#define parse_generics_call(stream) TRACE(__parse_generics_call(stream))
+TypeValueList __parse_generics_call(TokenStream* stream);
+
 #define parse_function_def(stream) TRACE(__parse_function_def(stream))
 FunctionDef* __parse_function_def(TokenStream* stream);
 
@@ -135,11 +146,9 @@ typedef struct Module {
 
 void drop_module(Module* module);
 
-static TypeList TEMP_TYPES;
-void drop_temp_types();
-Type* find_type(Module* module, str type, usize src_line);
+TypeDef* find_type_def(Module* module, TypeValue* type);
 
-FunctionDef* find_func(Module* module, str func, usize src_line);
+FunctionDef* find_func_def(Module* module, FunctionCall* func, usize src_line);
 
 #define parse_module(stream)  TRACE(_parse_module(stream))
 Module* _parse_module(TokenStream* stream);

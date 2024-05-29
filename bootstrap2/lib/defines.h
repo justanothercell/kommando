@@ -2,16 +2,11 @@
 #define LIB_DEFINES_H
 
 #include <stdbool.h>
+#include <stdio.h>
+
+#define lambda(ret_type, _body) ({ ret_type f1234567890 _body; f1234567890; })
 
 // #define __TRACE__
-
-#define __TRACE_ALLOC__
-
-// #define __TRACE_EXIT__
-
-#ifdef __TRACE_EXIT__
-
-#endif
 
 #ifdef __TRACE__
     static int trace_indent = 0;
@@ -40,48 +35,6 @@
     #define TRACEV(expr) expr
 #endif
 
-#ifdef __TRACE_ALLOC__
-    #include <stdlib.h>
-    #include <stdio.h>
-    
-    extern FILE* MEMTRACE;
-
-    #define malloc(thing) ({ \
-        usize size1234567890 = thing; \
-        void* ptr1234567890 = malloc(size1234567890); \
-        if (MEMTRACE == NULL) MEMTRACE = fopen("MEMTRACE.txt", "w"); \
-        fprintf(MEMTRACE, "MALLOC %p (%lld) | %s:%d\n", ptr1234567890, size1234567890, __FILENAME__, __LINE__); \
-        fflush(MEMTRACE); \
-        ptr1234567890; \
-    })
-    #define realloc(addr, size) ({ \
-        usize s1234567890 = size; \
-        typeof(addr) a1234567890 = addr; \
-        void* addr_after1234567890 = realloc(a1234567890, s1234567890); \
-        if (MEMTRACE == NULL) MEMTRACE = fopen("MEMTRACE.txt", "w"); \
-        fprintf(MEMTRACE, "REALLOC %p to %p (%lld) | %s:%d\n", a1234567890, addr_after1234567890, s1234567890, __FILENAME__, __LINE__)/* NOLINT(use-after-free)*/; \
-        fflush(MEMTRACE); \
-        addr_after1234567890; \
-    })
-    #define free(addr) ({ \
-        void* a1234567890 = addr; \
-        if (MEMTRACE == NULL) MEMTRACE = fopen("MEMTRACE.txt", "w"); \
-        fprintf(MEMTRACE, "FREE %p | %s:%d\n", a1234567890, __FILENAME__, __LINE__); \
-        fflush(MEMTRACE); \
-        free(a1234567890); \
-    })
-#endif
-
-#ifndef __WIN32__
-    #define __WIN32__
-#endif
-#ifndef __x86_64__
-    #define __x86_64__
-#endif
-#ifndef __LITTLE_ENDIAN__
-    #define __LITTLE_ENDIAN__
-#endif
-
 #ifdef __WIN32__
     #define __PATH_SEP__ '\\'
 #else
@@ -90,15 +43,42 @@
 
 #define __FILENAME__ (strrchr(__FILE__, __PATH_SEP__) ? strrchr(__FILE__, __PATH_SEP__) + 1 : __FILE__)
 
+#define FORMATTER(expr) (_Generic((expr), \
+                i8: "%c", \
+                u8: "%c", \
+                i16: "%d", \
+                u16: "%u", \
+                int: "%i", \
+                i32: "%ld", \
+                u32: "%lu", \
+                i64: "%lld", \
+                u64: "%llu", \
+                str: "%s", \
+                f32: "%f", \
+                f64: "%lf", \
+                default: "%p" \
+            ))
+
+#define fprint_prefix_raw(file, srcfile, line) fprintf(file, "[%s:%i] ", srcfile, line)
+#define fprint_prefix(file) fprint_prefix_raw(file, __FILENAME__, __LINE__)
+#define print_prefix() fprint_prefix(stdout)
+#define flog(file, fmt, ...) do { fprint_prefix(file); fprintf(file, fmt, ## __VA_ARGS__); fprintf(file, "\n"); } while(0)
+#define log(fmt, ...) flog(stdout, fmt, ## __VA_ARGS__)
+#define finfo(file, module, fmt, ...) do { fprint_prefix(file); fprintf(file, "[" module "] "); printf(fmt, ## __VA_ARGS__); fprintf(file, "\n"); } while(0)
+#define info(module, fmt, ...) finfo(stdout, module, fmt, ## __VA_ARGS__)
+#define fdebug(file, expr) ({ typeof(expr) result = expr; fprint_prefix(file); fprintf(file, FORMATTER(result), result); fprintf(file, "\n"); result; })
+#define debug(...) fdebug(stdout, __VA_ARGS__)
+
 #ifdef __x86_64__
-    #define __TARGET_BITS__ 64
+    #define __TARGET_BYTES__ 8
     typedef signed long long int isize;
 typedef unsigned long long int usize;
 #else
-    #define __TARGET_BITS__ 32
+    #define __TARGET_BYTES__ 4
     typedef signed long int isize;
 typedef unsigned long int usize;
 #endif
+#define __TARGET_BITS__ (__TARGET_BYTES__ * 8)
 
 typedef signed char i8;
 typedef signed short int i16;
@@ -111,7 +91,7 @@ typedef unsigned long int u32;
 typedef unsigned long long int u64;
 
 typedef float f32;
-typedef long f64;
+typedef double f64;
 
 typedef char* str;
 typedef void* any;

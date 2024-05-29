@@ -7,11 +7,10 @@ total = 0
 
 for trace in traces:
     try:
-        trace = trace.strip()
         kind, data = trace.split(' ', 1)
         if kind == 'MALLOC':
             data, loc = data.split('|')
-            origin, addr = data.split('@')
+            addr, size = data.split(' ', 1)
             if addr == '0000000000000000':
                 raise Exception(f'invalid alloc (null): `{trace}` of {addr}')
             elif addr in memory:
@@ -20,8 +19,7 @@ for trace in traces:
             total_memory[addr.strip()] = trace
             total += 1
         elif kind == 'FREE':
-            data, loc = data.rsplit('|', 1)
-            origin, addr = data.split('@')
+            addr, loc = data.rsplit('|', 1)
             addr = addr.strip()
             if addr != '0000000000000000':
                 if addr not in memory:
@@ -32,8 +30,8 @@ for trace in traces:
                 del memory[addr]
         elif kind == 'REALLOC': # REALLOC tok @ 0000017688AB1AE0 with (tok_cap) * sizeof('\0') (72) -> @ 0000017688AAF730 | tokens.c:134
             data, loc = data.split('|')
-            origin, addr_in_and_size, addr_out = data.split('@')
-            addr_in, size = addr_in_and_size.strip().split(' ', 1)
+            addr_in, addr_out_and_size = data.split(' to ')
+            addr_out, size = addr_out_and_size.strip().split(' ', 1)
             addr_in = addr_in.strip()
             addr_out = addr_out.strip()
             if addr_in != '0000000000000000':

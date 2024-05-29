@@ -1,10 +1,13 @@
 #include "ast.h"
 
+#include "lib/defines.h"
+
 #include "lib/list.h"
 #include "lib/str.h"
 
 #include "tokens.h"
 #include "types.h"
+#include "infer.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -60,6 +63,8 @@ void drop_while_expr(WhileExpr* while_expr) {
 void drop_function_call(FunctionCall* call) {
     list_foreach(&(call->args), drop_expression);
     free(call->args.elements);
+    list_foreach(&(call->generics), drop_type_value);
+    free(call->generics.elements);
     free(call);
 }
 
@@ -104,12 +109,6 @@ void drop_expression(Expression* expr) {
             drop_binop((BinOp*) expr->expr);
             break;
     }
-    if ((usize)(expr->type) > 0x0010000000000000) {
-        printf("caught!\n");
-        printf("%u\n", expr->kind);
-        printf("%s\n", expr->type);
-        exit(1);
-    }
     free(expr->type);
     free(expr);
 }
@@ -120,8 +119,12 @@ void drop_function_def(FunctionDef* func) {
     free(func->ret_t);
     list_foreach(&(func->args), free);
     list_foreach(&(func->args_t), free);
+    list_foreach(&(func->generics), free);
+    list_foreach(&(func->mappings), drop_generic_mapping);
     free(func->args.elements);
     free(func->args_t.elements);
+    free(func->generics.elements);
+    free(func->mappings.elements);
     free(func);
 }
 
@@ -139,23 +142,7 @@ TypeValue* __parse_type_value(TokenStream* stream) {
     if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
     str name = t->string;
     free(t);
-    TypeValueList generics = list_new();
-    t = next_token(stream);
-    if (t == NULL) unexpected_eof(stream);
-    if (t->type == SNOWFLAKE && strcmp(t->string, "<") == 0) {
-        drop_token(t);
-        while (t->type != SNOWFLAKE || strcmp(t->string, ">") != 0) {
-            TypeValue* g = parse_type_value(stream);
-            list_append(&generics, g);
-            t = next_token(stream);
-            if (t == NULL) unexpected_eof(stream);
-            if (t->type == SNOWFLAKE && strcmp(t->string, ",") == 0) drop_token(t);
-            else if (t->type != SNOWFLAKE || strcmp(t->string, ">") != 0) unexpected_token_error(t, stream);
-        }
-        drop_token(t);
-    } else {
-        stream->peek = t;
-    }
+    TypeValueList generics = parse_generics_call(stream);
     TypeValue* ty = malloc(sizeof(TypeValue));
     ty->generics = generics;
     ty->indirection = indirection;
@@ -244,7 +231,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
         } else {
             Token* t = next_token(stream);
             if (t == NULL) unexpected_eof(stream);
-            if (t->type != SNOWFLAKE || strcmp(t->string, "(") != 0) {
+            if (t->type != SNOWFLAKE || (strcmp(t->string, "(") != 0 && strcmp(t->string, ":") != 0)) {
                 stream->peek = t;
                 if (strcmp(name, "true") == 0) {
                     Token* tok = malloc(sizeof(Token));
@@ -265,6 +252,19 @@ Expression* __parse_expresslet(TokenStream* stream) {
                     expr->expr = name;
                 }
             } else {
+                TypeValueList generics = list_new();
+                if (t->type == SNOWFLAKE && strcmp(t->string, ":") == 0) {
+                    drop_token(t);
+                    t = next_token(stream);
+                    if (t == NULL) unexpected_eof(stream);
+                    if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
+                    drop_token(t);
+                    generics = parse_generics_call(stream);
+                    t = next_token(stream);
+                    if (t == NULL) unexpected_eof(stream);
+                }
+                if (t->type != SNOWFLAKE || strcmp(t->string, "(") != 0) unexpected_token_error(t, stream);
+                drop_token(t);
                 ExpressionList args = list_new();
                 t = next_token(stream);
                 if (t == NULL) unexpected_eof(stream);
@@ -274,6 +274,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
                     stream->peek = t;
                     while (1) {
                         Expression* e = parse_expression(stream);
+                        printf("%p\n", e);
                         list_append(&args, e);
                         t = next_token(stream);
                         if (t == NULL) unexpected_eof(stream);
@@ -287,6 +288,7 @@ Expression* __parse_expresslet(TokenStream* stream) {
                     }
                 }
                 FunctionCall* call = malloc(sizeof(FunctionCall));
+                call->generics = generics;
                 call->name = name;
                 call->args = args;
                 expr->kind = FUNC_CALL_EXPR;
@@ -335,7 +337,7 @@ Expression* __parse_expression(TokenStream* stream) {
         t = next_token(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
         drop_token(t);
-        str type = parse_type_value(stream);
+        TypeValue* type = parse_type_value(stream);
         VarDecl* vd = malloc(sizeof(VarDecl));
         vd->name = name;
         vd->type = type;
@@ -417,9 +419,9 @@ Expression* __parse_expression(TokenStream* stream) {
     }
     if (strcmp(op, "=") == 0) { // artifact from the jump
         free(op);
-        op = "==";
+        op = copy_str("==");
     }
-    usize precedence;
+    usize precedence = 0;
     BinOp* binop = malloc(sizeof(BinOp));
     binop->lhs = expr;
     binop->rhs = parse_expression(stream);
@@ -441,8 +443,6 @@ Block* __parse_block(TokenStream* stream) {
     drop_token(t);
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
-    usize expr_len = 0;
-    usize capacity = 0;
     ExpressionList exprs = list_new();
     
     while (t->type != SNOWFLAKE || strcmp(t->string, "}") != 0) {
@@ -465,19 +465,9 @@ Block* __parse_block(TokenStream* stream) {
     return block;
 }
 
-TypeDef* __parse_type_def(TokenStream* stream) {
-    usize start_line = stream->line;
-    Token* t = next_token(stream);
-    if (t == NULL) unexpected_eof(stream);
-    if (t->type != IDENTIFIER || strcmp(t->string, "type") != 0) unexpected_token_error(t, stream);
-    drop_token(t);
-    t = next_token(stream);
-    if (t == NULL) unexpected_eof(stream);
-    if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
-    str name = t->string;
-    free(t);
+StrList __parse_generics_def(TokenStream* stream) {
     StrList generics = list_new();
-    t = next_token(stream);
+    Token* t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type == SNOWFLAKE && strcmp(t->string, "<") == 0) {
         drop_token(t);
@@ -499,6 +489,45 @@ TypeDef* __parse_type_def(TokenStream* stream) {
         t = next_token(stream);
         if (t == NULL) unexpected_eof(stream);
     }
+    stream->peek = t;
+    return generics;
+}
+
+TypeValueList __parse_generics_call(TokenStream* stream) {
+    TypeValueList generics = list_new();
+    Token* t = next_token(stream);
+    if (t == NULL) unexpected_eof(stream);
+    if (t->type == SNOWFLAKE && strcmp(t->string, "<") == 0) {
+        drop_token(t);
+        while (t->type != SNOWFLAKE || strcmp(t->string, ">") != 0) {
+            TypeValue* g = parse_type_value(stream);
+            list_append(&generics, g);
+            t = next_token(stream);
+            if (t == NULL) unexpected_eof(stream);
+            if (t->type == SNOWFLAKE && strcmp(t->string, ",") == 0) drop_token(t);
+            else if (t->type != SNOWFLAKE || strcmp(t->string, ">") != 0) unexpected_token_error(t, stream);
+        }
+        drop_token(t);
+    } else {
+        stream->peek = t;
+    }
+    return generics;
+}
+
+TypeDef* __parse_type_def(TokenStream* stream) {
+    usize start_line = stream->line;
+    Token* t = next_token(stream);
+    if (t == NULL) unexpected_eof(stream);
+    if (t->type != IDENTIFIER || strcmp(t->string, "type") != 0) unexpected_token_error(t, stream);
+    drop_token(t);
+    t = next_token(stream);
+    if (t == NULL) unexpected_eof(stream);
+    if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
+    str name = t->string;
+    free(t);
+    StrList generics = parse_generics_def(stream);
+    t = next_token(stream);
+    if (t == NULL) unexpected_eof(stream);
     if (t->type != SNOWFLAKE || strcmp(t->string, "=") != 0) unexpected_token_error(t, stream);
     drop_token(t);
     t = next_token(stream);
@@ -512,7 +541,7 @@ TypeDef* __parse_type_def(TokenStream* stream) {
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     StrList fields = list_new();
-    StrList fields_t = list_new();
+    TypeValueList fields_t = list_new();
     while (t->type != SNOWFLAKE || strcmp(t->string, "}") != 0) {
         if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
         str field = t->string;
@@ -521,7 +550,7 @@ TypeDef* __parse_type_def(TokenStream* stream) {
         if (t == NULL) unexpected_eof(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
         drop_token(t);
-        str field_t = parse_type_value(stream);
+        TypeValue* field_t = parse_type_value(stream);
         list_append(&fields, field);
         list_append(&fields_t, field_t);
         t = next_token(stream);
@@ -549,6 +578,7 @@ TypeDef* __parse_type_def(TokenStream* stream) {
     tydef->name = name;
     tydef->type = type;
     tydef->generics = generics;
+    tydef->mappings = (GenericsMappingList)list_new();
     return tydef;
 }
 
@@ -563,13 +593,15 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
     if (t->type != IDENTIFIER) unexpected_token_error(t, stream);
     str name = t->string;
     free(t);
+    StrList generics = parse_generics_def(stream);
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     if (t->type != SNOWFLAKE || strcmp(t->string, "(") != 0) unexpected_token_error(t, stream);
     drop_token(t);
     StrList args = list_new();
-    StrList args_t = list_new();
+    TypeValueList args_t = list_new();
     FunctionDef* func = malloc(sizeof(FunctionDef));
+    func->is_variadic = false;
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
     while (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) {
@@ -579,8 +611,8 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
                 t = next_token(stream);
                 if (t == NULL) unexpected_eof(stream);
                 if (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) unexpected_token_error(t, stream);
-                drop_token(t);
-                goto va_args;
+                func->is_variadic = true;
+                break;
             }
             unexpected_token_error(t, stream);
         }
@@ -590,7 +622,7 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
         if (t == NULL) unexpected_eof(stream);
         if (t->type != SNOWFLAKE || strcmp(t->string, ":") != 0) unexpected_token_error(t, stream);
         drop_token(t);
-        str ty = parse_type_value(stream);
+        TypeValue* ty = parse_type_value(stream);
         list_append(&args_t, ty);
         t = next_token(stream);
         if (t->type == SNOWFLAKE && strcmp(t->string, ",") == 0) {
@@ -599,10 +631,6 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
         } else if (t->type != SNOWFLAKE || strcmp(t->string, ")") != 0) unexpected_token_error(t, stream);
     }
     drop_token(t);
-    goto args_done;
-    va_args:
-        func->is_variadic = true;
-    args_done:
     t = next_token(stream);
     if (t == NULL) unexpected_eof(stream);
 
@@ -642,7 +670,7 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
         drop_token(t);
     }
     if (func->ret_t == NULL) {
-        func->ret_t = copy_str("unit");
+        func->ret_t = new_type_value("unit", stream->line);
     }
 
     func->name = name;
@@ -650,6 +678,8 @@ FunctionDef* __parse_function_def(TokenStream* stream) {
     func->args_t = args_t;
     func->args = args;
     func->src_line = start_line;
+    func->generics = generics;
+    func->mappings = (GenericsMappingList)list_new();
     return func;
 }
 
@@ -661,38 +691,105 @@ void drop_module(Module* module) {
     free(module);
 }
 
-static TypeList TEMP_TYPES = list_new();
-void drop_temp_types() {
-    list_foreach(&TEMP_TYPES, free);
-    free(TEMP_TYPES.elements);
-    TEMP_TYPES.elements = NULL;
-    TEMP_TYPES.length = 0;
-    TEMP_TYPES.capacity = 0;
-}
-Type* find_type(Module* module, str type, usize src_line) {
-    if (type[0] == '&') {
-        Type* ty = malloc(sizeof(Type));
-        ty->type = TYPE_POINTER;
-        ty->ty = find_type(module, type+1, src_line);
-        list_append(&TEMP_TYPES, ty);
-        return ty;
-    }
+TypeDef* find_type_def(Module* module, TypeValue* type) {
     for (usize i = 0;i < module->types.length;i++) {
-        if (strcmp(type, module->types.elements[i]->name) == 0) {
-            return module->types.elements[i]->type;
+        if (strcmp(type->name, module->types.elements[i]->name) == 0) {
+            TypeDef* td = module->types.elements[i];
+            if (td->generics.length != type->generics.length) {
+                printf("Type `");
+                fprint_type_value(stderr, type);
+                printf("` is expected to have %lld generic parameters: <", td->generics.length);
+                for (usize j = 0;j < td->generics.length;j++) {
+                    if (j > 0) fprintf(stderr, ", ");
+                    fprintf(stderr, "%s", td->generics.elements[i]);
+                }
+                printf("> but got %lld (near line %lld)\n", type->generics.length, type->src_line + 1);
+                exit(1);            
+            }
+            if (td->generics.length > 0) {
+                for (usize j = 0;j < td->mappings.length;j++) {
+                    for (usize k = 0;k < td->generics.length;k++) {
+                        if (!type_match(td->mappings.elements[j].elements[k]->type, type->generics.elements[k])) {
+                            goto mismatch;
+                        }
+                    }
+                    goto exists;
+                    mismatch: {}
+                }
+                GenericsMapping mapping = list_new();
+                for (usize k = 0;k < td->generics.length;k++) {
+                    GenericValue* gv = malloc(sizeof(GenericValue));
+                    gv->name = copy_str(td->generics.elements[k]);
+                    gv->type = type->generics.elements[k];
+                    list_append(&mapping, gv);
+                }
+                list_append(&(td->mappings), mapping);
+                printf("    registered new generic variant: ");
+                usize i = type->indirection;
+                type->indirection = 0;
+                fprint_type_value(stdout, type);
+                type->indirection = i;
+                printf(" for ");
+                fprint_type(stdout, td);
+                printf(" (%lld)\n", td->mappings.length);
+                exists: {}
+            }
+            if (td->type->type == TYPE_STRUCT) {
+                Struct* s = td->type->ty;
+                for (usize j = 0;j < s->fields_t.length;j++) {
+                    if (td->generics.length == 0) find_type_def(module, s->fields_t.elements[j]);
+                    else find_type_def(module, degenerify(s->fields_t.elements[j], &td->generics, &type->generics, type->src_line));
+                }
+            }
+            return td;
         }
     }
-    printf("No such type `%s` (near line %lld)\n", type, src_line + 1);
+    printf("No such type `");
+    fprint_type_value(stderr, type);
+    printf("` (near line %lld)\n", type->src_line + 1);
     exit(1);
 }
 
-FunctionDef* find_func(Module* module, str func, usize src_line) {
+FunctionDef* find_func_def(Module* module, FunctionCall* func, usize src_line) {
     for (usize i = 0;i < module->funcs.length;i++) {
-        if (strcmp(func, module->funcs.elements[i]->name) == 0) {
-            return module->funcs.elements[i];
+        if (strcmp(func->name, module->funcs.elements[i]->name) == 0) {
+            FunctionDef* def = module->funcs.elements[i];
+            if (func->generics.length != def->generics.length) {
+                fprintf(stderr, "Invalid number of generics `");
+                fprint_func_value(stderr, func);
+                fprintf(stderr, "` (near line %lld) for `", src_line);
+                fprint_func(stderr, def);
+                fprintf(stderr, "` (near line %lld)\n", def->src_line);            
+            }
+            if (def->generics.length > 0) {
+                for (usize j = 0;j < def->mappings.length;j++) {
+                    for (usize k = 0;k < def->generics.length;k++) {
+                        if (!type_match(def->mappings.elements[j].elements[k]->type, func->generics.elements[k])) {
+                            goto mismatch;
+                        }
+                    }
+                    goto exists; 
+                    mismatch: {}
+                }
+                GenericsMapping mapping = list_new();
+                for (usize k = 0;k < def->generics.length;k++) {
+                    GenericValue* gv = malloc(sizeof(GenericValue));
+                    gv->name = copy_str(def->generics.elements[k]);
+                    gv->type = func->generics.elements[k];
+                    list_append(&mapping, gv);
+                }
+                list_append(&def->mappings, mapping);
+                printf("    registered new generic variant: ");
+                fprint_func_value(stdout, func);
+                printf("\n");
+                exists: {}
+            }
+            return def;
         }
     }
-    printf("No such function `%s` (near line %lld)\n", func, src_line);
+    fprintf(stderr, "No such function `");
+    fprint_func_value(stderr, func);
+    fprintf(stderr, "` (near line %lld)\n", src_line);
     exit(1);
 }
 
@@ -732,13 +829,18 @@ Module* _parse_module(TokenStream* stream) {
         } else if (strcmp(t->string, "fn") == 0) {
             stream->peek = t;
             FunctionDef* func = parse_function_def(stream);
-            if (func->body == NULL) printf("    parsed function definition `%s` with %lld args\n", func->name, func->args.length);
-            else printf("    parsed function `%s` with %lld args and %lld expressions\n", func->name, func->args.length, func->body->exprs.length);
+            if (func->body == NULL) printf("    parsed function definition `");
+            else printf("    parsed function `");
+            fprint_func(stdout, func);
+            if (func->body == NULL) printf("`\n");
+            else printf("` with %lld expressions\n", func->body->exprs.length);
             list_append(&funcs, func);
         } else if (strcmp(t->string, "type") == 0) {
             stream->peek = t;
             TypeDef* tydef = parse_type_def(stream);
-            printf("    parsed type `%s`\n", tydef->name);
+            printf("    parsed type `");
+            fprint_type(stdout, tydef);
+            printf("`\n");
             list_append(&types, tydef);
         } else {
             unexpected_token_error(t, stream);

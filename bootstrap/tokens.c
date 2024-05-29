@@ -1,12 +1,13 @@
 #include "tokens.h"
 
 #include "lib/defines.h"
+
 #include "lib/list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const char *TOKENTYPE_STRING[] = {
+const char* TOKENTYPE_STRING[] = {
     "STRING", "NUMERAL", "IDENTIFIER", "SNOWFLAKE"
 };
 

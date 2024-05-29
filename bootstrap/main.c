@@ -1,17 +1,17 @@
 #include "lib/defines.h"
-#include "lib/os.h"
 
-#include "lib/str.c"
+#include "lib/str.h"
+
+#include "tokens.h"
+#include "ast.h"
+#include "infer.h"
+#include "transpile.h"
+
+#include <stdlib.h>
 
 #ifdef __WIN32__
     #include <io.h>
 #endif
-
-#include "ast.c"
-#include "infer.c"
-#include "tokens.c"
-#include "transpile.c"
-#include "types.c"
 
 #include <stdio.h>
 #include <string.h>
@@ -33,7 +33,7 @@ int main(int argc, str* argv) {
 
     str INPUT_FILE = NULL;
     str OUTNAME = NULL;
-    str OUT_DIR = ".";
+    str OUT_DIR = copy_str(".");
 
     for (int i = 1;i < argc;i++) {
         if (strlen(argv[i]) == 0) continue; 
@@ -61,6 +61,15 @@ int main(int argc, str* argv) {
         }
     }
 
+    if (INPUT_FILE == NULL) {
+        printf("No input file specified.\n");
+        exit(1);
+    }
+    if (OUTNAME == NULL) {
+        printf("No output file specified.\n");
+        exit(1);
+    }
+
     to_exe |= run;
 
     printf("compilign with flags: exe=%u, main=%u, run=%u\n", to_exe, gen_main, run);
@@ -73,6 +82,7 @@ int main(int argc, str* argv) {
     FILE *source = fopen(INPUT_FILE, "r");
     TokenStream* stream = new_tokenstream(source);
     Module* module = parse_module(stream);
+    printf("parsed module.\n");
     drop_tokenstream(stream);
 
     usize tlen = module->types.length;
@@ -84,9 +94,9 @@ int main(int argc, str* argv) {
     printf("inferred and propagated types\n");
 
     mkdir(OUT_DIR);
-    if (chdir("build") != 0) {
+    if (chdir(OUT_DIR) != 0) {
+        printf("`cd %s` failed\n", OUT_DIR);
         free(OUT_DIR);
-        printf("`cd build` failed\n");
         exit(1);
     }
     free(OUT_DIR);
@@ -96,9 +106,9 @@ int main(int argc, str* argv) {
     Writer* writer = new_writer(OUTNAME, code, header, gen_main);
     transpile_module(writer, module);
     finalize_transpile(writer);
+    printf("transpiled.\n");
     drop_writer(writer);
     drop_module(module);
-    drop_temp_types();
 
     if (to_exe) {
         printf("compiling generated c...\n");
@@ -115,8 +125,8 @@ int main(int argc, str* argv) {
         sprintf(command, BUILD_CMD_TEMPLATE, OUT_C_FILE, OUTNAME);
 #endif
         if (system(command) != 0) {
-            free(command);
             printf("compilation failed\n");
+            free(command);
             exit(1);
         }
         free(command);

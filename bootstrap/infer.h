@@ -1,6 +1,8 @@
 #ifndef INFER_H
 #define INFER_H
 
+#include "lib/defines.h"
+
 #include "ast.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +10,7 @@
 
 typedef struct Variable {
     str name;
-    str type;
+    TypeValue* type;
 } Variable;
 
 void drop_variable(Variable var);
@@ -22,20 +24,24 @@ void drop_loal_scope(LocalScope frame);
 
 void pop_frame(ScopeStack* stack);
 
-str get_var_type(ScopeStack* stack, str name);
+TypeValue* get_var_type(ScopeStack* stack, str name);
 
-void assert_type_match(str type1, str type2, usize loc);
+void assert_type_match(TypeValue* type1, TypeValue* type2);
+bool type_match(TypeValue* type1, TypeValue* type2);
 
-void register_var(ScopeStack* stack, str name, str type);
+void register_var(ScopeStack* stack, str name, TypeValue* type);
 
-void infer_field_access(Module* module, ScopeStack* stack, str parent_type, Expression* field);
+void infer_field_access(Module* module, ScopeStack* stack, TypeValue* parent_type, Expression* field);
 
-#define infer_types_expression(module, stack, expr) TRACEV(__infer_types_expression(module, stack, expr))
-void __infer_types_expression(Module* module, ScopeStack* stack, Expression* expr);
+TypeValue* degenerify(TypeValue* value, StrList* generics, TypeValueList* mapping, usize src_line);
+TypeValue* degenerify_mapping(TypeValue* value, GenericsMapping* mapping, usize src_line);
 
-void infer_types_block(Module* module, ScopeStack* stack, Block* block);
+#define infer_types_expression(module, stack, expr, mapping) TRACEV(__infer_types_expression(module, stack, expr, mapping))
+void __infer_types_expression(Module* module, ScopeStack* stack, Expression* expr, GenericsMapping* mapping);
 
-void infer_types_fn(Module* module, ScopeStack* stack, FunctionDef* fn);
+void infer_types_block(Module* module, ScopeStack* stack, Block* block, GenericsMapping* mapping);
+
+void infer_types_fn(Module* module, ScopeStack* stack, FunctionDef* fn, GenericsMapping* mapping);
 
 void infer_types(Module* module);
 

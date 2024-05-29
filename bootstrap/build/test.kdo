@@ -19,18 +19,18 @@ fn main() {
     printf("blue: %u\n", color.blue);
     printf("blue from ref: %u\n", (*cref).blue);
 
-    let vec: Vec<u8> = Vec_new();
+    let vec: Vec<u8> = Vec_new::<u8>();
     let i: u8 = 1u8;
     while i != 0u8 {
-        let e: &u8 = malloc(1usize);
-        *e = i;
-        Vec_push(&vec, e);
+        Vec_push::<u8>(&vec, i);
         i = i * 2u8;
     };
 
-    let iter: VecIter = Vec_iter(&vec);
-    let element: &u8 = NULL;
-    while VecIter_next(&iter, &element) {
-        printf("iter: %u\n", *element);
+    let iter: VecIter<u8> = Vec_iter::<u8>(&vec);
+    let element: u8;
+    while VecIter_next::<u8>(&iter, &element) {
+        printf("iter: %u\n", element);
     };
+    VecIter_drop::<u8>(iter);
+    Vec_drop::<u8>(vec);
 }

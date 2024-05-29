@@ -1,7 +1,17 @@
 fn malloc(size: usize) -> &any;
+fn malloc_type<T>() -> &T {
+    return malloc(type_size::<T>());
+}
+
 fn realloc(ptr: &any, size: usize) -> &any;
 fn free(ptr: &any);
 
-fn __offset(a: &any, b: usize) -> &any;
+fn __index(a: &any, b: usize) -> any;
 
-fn printf(*);
+fn printf(format: &char, *);
+
+fn sizeof(value: any) -> usize;
+fn type_size<T>() -> usize {
+    let value: T;
+    return sizeof(value);
+}

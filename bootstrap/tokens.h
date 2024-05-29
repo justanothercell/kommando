@@ -2,11 +2,12 @@
 #define TOKENS_H
 
 #include "lib/defines.h"
+
 #include "lib/list.h"
 #include <stdio.h>
 
 #define unexpected_token_error(t, stream) { \
-    fprintf(stderr, "Unexpected token %s `%s` in line %lld column %lld during %s %s:%d\n", TOKENTYPE_STRING[t->type], t->string, stream->line + 1, stream->column, __func__, __FILENAME__, __LINE__); \
+    fprintf(stderr, "Unexpected token %s (%u) `%s` in line %lld column %lld during %s %s:%d\n", TOKENTYPE_STRING[t->type], t->type, t->string, stream->line + 1, stream->column, __func__, __FILENAME__, __LINE__); \
     exit(1); \
 }
 
@@ -24,7 +25,7 @@ typedef enum TokenType {
     SNOWFLAKE
 } TokenType;
 
-static const char *TOKENTYPE_STRING[4];
+extern const char *TOKENTYPE_STRING[4];
 
 typedef struct Token {
     TokenType type;
