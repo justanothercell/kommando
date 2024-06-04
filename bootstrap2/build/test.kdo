@@ -1,0 +1,5 @@
+fn main() { // main
+    printf("hello, world");
+}
+
+/* block comment */
