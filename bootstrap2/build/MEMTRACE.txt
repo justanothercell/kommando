@@ -1,0 +1,114 @@
+MALLOC 0x62f6617d4488 4 @ ../lib/gc.c:29
+REALLOC (nil) 0x62f6617d54b8 48 @ ../lib/gc.c:35
+FREE 0x62f6617d4488 @ ../lib/gc.c:58
+MALLOC 0x62f6617d66f8 71 @ ../lib/gc.c:29
+MALLOC 0x62f6617d56e8 16 @ ../lib/gc.c:29
+MALLOC 0x62f6617d5718 40 @ ../lib/gc.c:29
+REALLOC 0x62f6617d54b8 0x62f6617d5758 144 @ ../lib/gc.c:35
+MALLOC 0x62f6617d54b8 48 @ ../lib/gc.c:29
+REALLOC 0x62f6617d54b8 0x62f6617d5808 144 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5808 0x62f6617d5808 336 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5808 0x62f6617d5808 720 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5808 0x62f6617d5808 1488 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5808 0x62f6617d5808 3024 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5808 0x62f6617d6758 6096 @ ../lib/gc.c:47
+REALLOC 0x62f6617d6758 0x62f6617d6758 12240 @ ../lib/gc.c:47
+MALLOC 0x62f6617d5808 32 @ ../lib/gc.c:29
+MALLOC 0x62f6617d5848 64 @ ../lib/gc.c:29
+MALLOC 0x62f6617d58a8 16 @ ../lib/gc.c:29
+REALLOC 0x62f6617d5758 0x62f6617d58d8 336 @ ../lib/gc.c:35
+MALLOC 0x62f6617d5a48 40 @ ../lib/gc.c:29
+MALLOC 0x62f6617d54b8 48 @ ../lib/gc.c:29
+REALLOC 0x62f6617d54b8 0x62f6617d5a88 144 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5a88 0x62f6617d5a88 336 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5a88 0x62f6617d5a88 720 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5a88 0x62f6617d5a88 1488 @ ../lib/gc.c:47
+REALLOC 0x62f6617d5a88 0x62f6617d9748 3024 @ ../lib/gc.c:47
+REALLOC 0x62f6617d9748 0x62f6617d9748 6096 @ ../lib/gc.c:47
+REALLOC 0x62f6617d9748 0x62f6617d9748 12240 @ ../lib/gc.c:47
+MALLOC 0x62f6617d4488 2 @ ../lib/gc.c:29
+REALLOC 0x62f6617d4488 0x62f6617d5a88 24 @ ../lib/gc.c:47
+MALLOC 0x62f6617d5ab8 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617d4488 2 @ ../lib/gc.c:29
+REALLOC 0x62f6617d4488 0x62f6617d4488 6 @ ../lib/gc.c:47
+MALLOC 0x62f6617d5b38 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617d5bb8 88 @ ../lib/gc.c:29
+MALLOC 0x62f6617d5c28 2 @ ../lib/gc.c:29
+REALLOC 0x62f6617d58d8 0x62f6617d5c48 720 @ ../lib/gc.c:35
+MALLOC 0x62f6617d5f38 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617d5fb8 2 @ ../lib/gc.c:29
+MALLOC 0x62f6617d5fd8 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617d6058 2 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc738 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc7b8 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc838 2 @ ../lib/gc.c:29
+REALLOC 0x62f6617dc838 0x62f6617dc838 6 @ ../lib/gc.c:47
+REALLOC 0x62f6617dc838 0x62f6617dc838 56 @ ../lib/gc.c:47
+MALLOC 0x62f6617dc888 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc908 16 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc938 88 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc9a8 2 @ ../lib/gc.c:29
+MALLOC 0x62f6617dc9c8 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dca48 32 @ ../lib/gc.c:29
+MALLOC 0x62f6617dca88 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dcb08 2 @ ../lib/gc.c:29
+REALLOC 0x62f6617dcb08 0x62f6617dcb08 6 @ ../lib/gc.c:47
+REALLOC 0x62f6617dcb08 0x62f6617dcb08 14 @ ../lib/gc.c:47
+MALLOC 0x62f6617dcb38 96 @ ../lib/gc.c:29
+REALLOC 0x62f6617d5c48 0x62f6617dcbb8 1488 @ ../lib/gc.c:35
+MALLOC 0x62f6617dd1a8 16 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd1d8 2 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd1f8 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd278 32 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd2b8 16 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd2e8 2 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd308 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd388 2 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd3a8 96 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd428 32 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd468 16 @ ../lib/gc.c:29
+MALLOC 0x62f6617dd498 32 @ ../lib/gc.c:29
+FREE 0x62f6617d66f8 @ ../lib/gc.c:107
+FREE 0x62f6617dd498 @ ../lib/gc.c:107
+FREE 0x62f6617dd468 @ ../lib/gc.c:107
+FREE 0x62f6617dd428 @ ../lib/gc.c:107
+FREE 0x62f6617dd3a8 @ ../lib/gc.c:107
+FREE 0x62f6617dd388 @ ../lib/gc.c:107
+FREE 0x62f6617dd308 @ ../lib/gc.c:107
+FREE 0x62f6617dd2e8 @ ../lib/gc.c:107
+FREE 0x62f6617dd2b8 @ ../lib/gc.c:107
+FREE 0x62f6617dd278 @ ../lib/gc.c:107
+FREE 0x62f6617dd1f8 @ ../lib/gc.c:107
+FREE 0x62f6617dd1d8 @ ../lib/gc.c:107
+FREE 0x62f6617dd1a8 @ ../lib/gc.c:107
+FREE 0x62f6617dcb38 @ ../lib/gc.c:107
+FREE 0x62f6617dcb08 @ ../lib/gc.c:107
+FREE 0x62f6617dca88 @ ../lib/gc.c:107
+FREE 0x62f6617dca48 @ ../lib/gc.c:107
+FREE 0x62f6617dc9c8 @ ../lib/gc.c:107
+FREE 0x62f6617dc9a8 @ ../lib/gc.c:107
+FREE 0x62f6617dc938 @ ../lib/gc.c:107
+FREE 0x62f6617dc908 @ ../lib/gc.c:107
+FREE 0x62f6617dc888 @ ../lib/gc.c:107
+FREE 0x62f6617dc838 @ ../lib/gc.c:107
+FREE 0x62f6617dc7b8 @ ../lib/gc.c:107
+FREE 0x62f6617dc738 @ ../lib/gc.c:107
+FREE 0x62f6617d6058 @ ../lib/gc.c:107
+FREE 0x62f6617d5fd8 @ ../lib/gc.c:107
+FREE 0x62f6617d5fb8 @ ../lib/gc.c:107
+FREE 0x62f6617d5f38 @ ../lib/gc.c:107
+FREE 0x62f6617d5c28 @ ../lib/gc.c:107
+FREE 0x62f6617d5bb8 @ ../lib/gc.c:107
+FREE 0x62f6617d5b38 @ ../lib/gc.c:107
+FREE 0x62f6617d4488 @ ../lib/gc.c:107
+FREE 0x62f6617d5ab8 @ ../lib/gc.c:107
+FREE 0x62f6617d5a88 @ ../lib/gc.c:107
+FREE 0x62f6617d9748 @ ../lib/gc.c:107
+FREE 0x62f6617d5a48 @ ../lib/gc.c:107
+FREE 0x62f6617d58a8 @ ../lib/gc.c:107
+FREE 0x62f6617d5848 @ ../lib/gc.c:107
+FREE 0x62f6617d5808 @ ../lib/gc.c:107
+FREE 0x62f6617d6758 @ ../lib/gc.c:107
+FREE 0x62f6617d5718 @ ../lib/gc.c:107
+FREE 0x62f6617d56e8 @ ../lib/gc.c:107
+FREE 0x62f6617dcbb8 @ ../lib/gc.c:145
