@@ -1,3 +1,2 @@
-rm compiler
-./compile.sh
-./compiler test.kdo test -cr
+./build.sh
+./compiler hello.kdo test -cr

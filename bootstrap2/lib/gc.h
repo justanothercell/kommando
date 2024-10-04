@@ -8,8 +8,10 @@ void* gc_realloc(void* ptr, usize size);
 void gc_free(void* ptr);
 
 void gc_begin();
-
 void gc_end();
 void gc_collect();
+
+void gc_enable();
+void gc_disable();
 
 #endif

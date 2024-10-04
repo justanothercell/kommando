@@ -1,3 +1,0 @@
-typedef enum Instruction {
-    
-} Instruction;
