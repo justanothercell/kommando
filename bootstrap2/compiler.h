@@ -9,12 +9,13 @@ typedef struct CompilerOptions {
     str source;
     str outname;
     str out_dir;
+    str c_compiler;
     bool run;
     bool raw;
     bool compile;
 } CompilerOptions;
 
 CompilerOptions build_args(StrList* args);
-void compile(str file, str source);
+void compile(str file, str source, str out_name, str c_compiler);
  
 #endif

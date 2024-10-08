@@ -2,6 +2,7 @@
 #include "list.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 str copy_str(str s) {
@@ -93,8 +94,9 @@ u32 str_hash_seed(str str, u32 seed) {
     hash = ((hash << 5) + hash) + (seed >> 24) % 256;
 
     char c;
-    while ((c = *str++))
+    while ((c = *str++)) {
         hash = ((hash << 5) + hash) + c;
+    }
 
     return hash;
 }

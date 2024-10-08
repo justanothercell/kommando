@@ -4,6 +4,7 @@
 #include "lib.h"
 #include "lib/enum.h"
 #include "lib/list.h"
+#include "lib/map.h"
 #include "token.h"
 
 typedef struct Identifier {
@@ -24,6 +25,7 @@ void fprint_path(FILE* file, Path* path);
 typedef struct TypeDef {
     Identifier* name;
     IdentList generics;
+    str extern_ref;
 } TypeDef;
 typedef struct TypeValue TypeValue;
 LIST(TypeValueList, TypeValue*);
@@ -73,15 +75,18 @@ typedef struct BinOp {
     Span op_span;
 } BinOp;
 
+typedef struct FuncDef FuncDef;
 typedef struct FuncCall {
     Path* name;
     ExpressionList arguments;
+    FuncDef* def;
 } FuncCall;
 
 typedef struct Block {
     ExpressionList expressions;
     bool yield_last;
     Span span;
+    TypeValue* res;
 } Block;
 
 typedef struct LetExpr {
@@ -106,12 +111,29 @@ typedef struct Argument {
     TypeValue* type;
 } Argument;
 LIST(ArgumentList, Argument*);
+typedef struct FuncUsage {
+    Map* generics;
+    FuncDef* context;
+} FuncUsage;
+str funcusage_to_key(FuncUsage* fu);
 typedef struct FuncDef {
     Identifier* name;
     Block* body;
     TypeValue* return_type;
     ArgumentList args;
+    Map* generic_uses;
+    bool no_mangle;
     bool is_variadic;
 } FuncDef;
+
+ENUM(ModuleItemType,
+    MIT_FUNCTION,
+    MIT_STRUCT
+);
+
+typedef struct ModuleItem {
+    void* item;
+    ModuleItemType type;
+} ModuleItem;
 
 #endif

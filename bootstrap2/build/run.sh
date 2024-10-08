@@ -1,2 +1,2 @@
 ./build.sh
-./compiler hello.kdo test -cr
+./compiler hello.kdo hello -cr

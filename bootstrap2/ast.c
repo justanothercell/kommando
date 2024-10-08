@@ -2,6 +2,9 @@
 #include "lib.h"
 #include "lib/defines.h"
 #include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
+#include "token.h"
 #include <stdio.h>
 
 Path* path_new(bool absolute, IdentList elements) {
@@ -51,4 +54,14 @@ void fprint_typevalue(FILE* file, TypeValue* tval) {
         }));
         fputc('>', file);
     }
+}
+
+str funcusage_to_key(FuncUsage* fu) {
+    return to_str_writer(stream, {
+        fprintf(stream, "#");
+        map_foreach(fu->generics, lambda(void, (str key, TypeValue* tv) {
+            fprintf(stream, "%s:%p", key, tv->def);
+            fprintf(stream, ";");
+        }));
+    });
 }

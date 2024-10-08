@@ -1,6 +1,8 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "../lib.h"
+#include "defines.h"
 
 
 Map* map_new() {
@@ -18,6 +20,14 @@ void* map_get(Map* map, str key) {
         if (str_eq(bucket->elements[i].key, key)) return bucket->elements[i].value;
     }
     return NULL;
+}
+
+usize map_size(Map* map) {
+    usize size = 0;
+    for(usize i = 0;i < map->buckets.length;i++) {
+        size += map->buckets.elements[i].length;
+    }
+    return size;
 }
 
 bool map_contains(Map* map, str key) {

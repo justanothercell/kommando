@@ -1,3 +1,4 @@
 fn main() {
-    puts("hello, world\n");
+    ::std::Ref<::std::u8> message = "hello, world";
+    ::std::puts(message);
 }

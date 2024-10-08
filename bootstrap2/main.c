@@ -1,10 +1,11 @@
-#include "lib.h"
+#include <stdio.h>
+#include <stdlib.h>
 
+#include "lib.h"
 #include "compiler.h"       
 #include "lib/defines.h"
 #include "lib/gc.h"
 #include "lib/str.h"
-#include <stdio.h>
 
 void cleanup_quit(str file, usize line, int code) {
     gc_end();
@@ -22,7 +23,11 @@ int main(int argc, char* argv[]) {
     args.elements = argv;
 
     CompilerOptions options = build_args(&args);
-    compile(options.source, read_file_to_string((options.source)));
+    compile(options.source, read_file_to_string((options.source)), options.outname, options.c_compiler);
+
+    if (options.run) {
+        system(to_str_writer(stream, fprintf(stream, "./%s", options.outname)));
+    }
 
     quit(0);
 }

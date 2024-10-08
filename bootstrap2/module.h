@@ -6,8 +6,7 @@
 
 typedef struct Module {
     Path* path;
-    Map* functions;
-    Map* types;
+    Map* items;
     PathList imports;
     bool resolved;
 } Module;
@@ -20,6 +19,7 @@ typedef struct Program {
 Module* gen_std();
 
 Identifier* gen_identifier(str name);
+TypeValue* gen_typevalue(str typevalue);
 Path* gen_path(str path);
 
 #endif

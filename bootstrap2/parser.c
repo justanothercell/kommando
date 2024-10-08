@@ -4,6 +4,7 @@
 #include "lib/exit.h"
 #include "lib/gc.h"
 #include "lib/list.h"
+#include "lib/map.h"
 #include "lib/str.h"
 #include "module.h"
 #include "token.h"
@@ -25,8 +26,7 @@ bool double_double_colon(TokenStream* stream) {
 Module* parse_module_contents(TokenStream* stream, Path* path) {
     Module* module = gc_malloc(sizeof(Module));
     module->imports = list_new(PathList);
-    module->functions = map_new();
-    module->types = map_new();
+    module->items = map_new();
     module->path = path;
     module->resolved = false;
 
@@ -35,7 +35,10 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         stream->peek = t;
         if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
-            map_put(module->functions, function->name->name, function);
+            ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
+            mi->item = function;
+            mi->type = MIT_FUNCTION;
+            map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "type", IDENTIFIER)) {
             todo("Type defintition parsing");
         } else {
@@ -174,7 +177,7 @@ Expression* parse_expression(TokenStream* stream) {
         if (t->type == SNOWFLAKE) {
             if (str_eq("+", t->string) || str_eq("-", t->string) || str_eq("*", t->string) || str_eq("/", t->string)
              || str_eq("|", t->string) || str_eq("&", t->string) || str_eq("^", t->string) || str_eq("!", t->string)
-             || str_eq("%", t->string) || str_eq(">", t->string) || str_eq("<", t->string) || str_eq("=", t->string))    {
+             || str_eq("%", t->string) || str_eq(">", t->string) || str_eq("<", t->string) || str_eq("=", t->string)) {
                 Token* n = next_token(stream);
                 if (n->type == SNOWFLAKE) {
                     str s = t->string;
@@ -353,5 +356,6 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->return_type = return_type;
     func->args = arguments;
     func->is_variadic = false;
+    func->generic_uses = map_new();
     return func;
 }

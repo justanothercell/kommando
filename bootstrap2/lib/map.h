@@ -22,6 +22,7 @@ bool map_contains(Map* map, str key);
 void* map_get(Map* map, str key);
 void* map_remove(Map* map, str key);
 void* map_put(Map* map, str key, void* value);
+usize map_size(Map* map);
 
 #define map_foreach(map_ptr, function) ({ \
     for (usize i = 0;i < (map_ptr)->buckets.length;i++) { \
