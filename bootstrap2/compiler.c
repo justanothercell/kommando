@@ -120,5 +120,5 @@ void compile(str file, str source, str out_name, str c_compiler) {
     fclose(header_file);
     fclose(code_file);
 
-    system(to_str_writer(stream, fprintf(stream, "%s %s -o %s", c_compiler, code_file_name, out_name)));
+    system(to_str_writer(stream, fprintf(stream, "%s -Wall %s -o %s", c_compiler, code_file_name, out_name)));
 }

@@ -22,7 +22,6 @@
             span.left.line + 1, ir1234567890 - il1234567890, span.left.source+il1234567890, padding1234567890, indicator1234567890 \
         ); \
     } else { \
-        log("%s", message); \
         panic(title " during %s: " message " @ %s", __func__, ##__VA_ARGS__, to_str_writer(out, fprint_span(out, &span))); \
     } \
 } while (0)

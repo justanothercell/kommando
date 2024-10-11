@@ -1,29 +1,44 @@
 #include "ast.h"
 #include "lib.h"
+#include "lib/debug.h"
+#include "lib/defines.h"
+#include "lib/gc.h"
 #include "lib/map.h"
 #include "lib/str.h"
 #include "module.h"
 #include "parser.h"
 #include "token.h"
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind) {
     str full_name = to_str_writer(stream, fprint_path(stream, path));
     Identifier* name = path->elements.elements[path->elements.length-1];
-    if (!path->absolute) todo("relative type paths");
     path->elements.length -= 1;
     str pathstr = to_str_writer(stream, fprint_path(stream, path));
-    Module* item_module = map_get(program->modules, pathstr);
-    Span s;
-    s.left = path->elements.elements[0]->span.left;
-    s.right = name->span.right;
-    if (item_module == NULL) spanned_error("Unable to resolve item", s, "no such module %s for item %s of kind %s", pathstr, name->name, ModuleItemType__NAMES[kind]);
-    ModuleItem* item = map_get(item_module->items, name->name);
-    if (item == NULL) spanned_error("Unable to resolve type", name->span, "no such item %s of kind %s", full_name, ModuleItemType__NAMES[kind]);
+    void* ret_item;
+
+    if (path->absolute) {
+        Module* item_module = map_get(program->modules, pathstr);
+        Span s;
+        s.left = path->elements.elements[0]->span.left;
+        s.right = name->span.right;
+        if (item_module == NULL) spanned_error("Unable to resolve item", s, "no such module %s for item %s of kind %s", pathstr, name->name, ModuleItemType__NAMES[kind]);
+        ModuleItem* item = map_get(item_module->items, name->name);
+        if (item == NULL) spanned_error("Unable to resolve item", name->span, "no such item %s of kind %s", full_name, ModuleItemType__NAMES[kind]);
+        if (item->type != kind) spanned_error("Wrong item kind", s, "%s should resolve to %s but got %s", full_name, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[item->type]);
+        ret_item = item->item;
+    } else {
+        if (path->elements.length > 0) spanned_error("Unable to resolve item", name->span, "relative paths may onöy be of this module");
+        ModuleItem* item = map_get(module->items, name->name);
+        if (item == NULL) spanned_error("Unable to resolve item", name->span, "no such item %s of kind %s", full_name, ModuleItemType__NAMES[kind]);
+        if (item->type != kind) spanned_error("Wrong item kind", name->span, "%s should resolve to %s but got %s", full_name, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[item->type]);
+        ret_item = item->item;
+    }
+    
     path->elements.length += 1;
-    if (item->type != kind) spanned_error("Wrong item kind", s, "%s should resolve to %s but got %s", full_name, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[item->type]);
-    return item->item;
+    return ret_item;
 }
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval) {
     if (tval->def != NULL) return;
@@ -67,10 +82,19 @@ static VarBox* var_register(VarList* vars, Variable* var) {
 }
 void resolve_block(Program* program, Module* module, FuncDef* func, Block* block, VarList* vars);
 void resolve_expr(Program* program, Module* module, FuncDef* func, Expression* expr, VarList* vars) {
-    log("resolving %s", ExprType__NAMES[expr->type]);
     switch (expr->type) {
         case EXPR_BIN_OP: {
-            todo("resolve EXPR_BIN_OP");
+            BinOp* op = expr->expr;
+            resolve_expr(program, module, func, op->lhs, vars);
+            resolve_expr(program, module, func, op->rhs, vars);
+            assert_types_equal(program, module, op->lhs->resolved->type, op->rhs->resolved->type, op->op_span);
+            if (str_eq(op->op, ">") || str_eq(op->op, "<") || str_eq(op->op, ">=") || str_eq(op->op, "<=") || str_eq(op->op, "!=") || str_eq(op->op, "==")) {
+                expr->resolved = gc_malloc(sizeof(TVBox));
+                expr->resolved->type = gen_typevalue("::std::bool", &op->op_span);
+                resolve_typevalue(program, module, expr->resolved->type);
+            } else {
+                expr->resolved = op->lhs->resolved;
+            }
         } break;
         case EXPR_FUNC_CALL: {
             FuncCall* fc = expr->expr;
@@ -81,15 +105,17 @@ void resolve_expr(Program* program, Module* module, FuncDef* func, Expression* e
             fu->generics = map_new();
             str fukey = funcusage_to_key(fu);
             if (!map_contains(fd->generic_uses, fukey)) {
-                log("new usage key for %s: %s", fukey, func->name->name);
                 map_put(fd->generic_uses, fukey, fu);
             }
             fc->def = fd;
-            if (fd->is_variadic) todo("variadic function call resolution");
-            if (fd->args.length != fc->arguments.length) spanned_error("Argument count mismatch", expr->span, "expected %llu args, got %llu", fd->args.length, fc->arguments.length);
+            if (fd->is_variadic) {
+                if (fd->args.length > fc->arguments.length) spanned_error("Too few args for variadic function", expr->span, "expected at least %llu args, got %llu", fd->args.length, fc->arguments.length);
+            } else {
+                if (fd->args.length != fc->arguments.length) spanned_error("Argument count mismatch", expr->span, "expected %llu args, got %llu", fd->args.length, fc->arguments.length);
+            }
             list_foreach_i(&fc->arguments, lambda(void, (usize i, Expression* arg) {
                 resolve_expr(program, module, func, arg, vars);
-                assert_types_equal(program, module, arg->resolved->type, fd->args.elements[i]->type, arg->span);
+                if (i < fd->args.length) assert_types_equal(program, module, arg->resolved->type, fd->args.elements[i]->type, arg->span);
             }));
             expr->resolved = gc_malloc(sizeof(TVBox));
             expr->resolved->type = fd->return_type;
@@ -99,11 +125,18 @@ void resolve_expr(Program* program, Module* module, FuncDef* func, Expression* e
             switch (lit->type) {
                 case STRING: {
                     expr->resolved = gc_malloc(sizeof(TVBox));
-                    expr->resolved->type = gen_typevalue("::std::Ptr<::std::u8> ");
+                    expr->resolved->type = gen_typevalue("::std::c_const_str_ptr", &expr->span);
                     resolve_typevalue(program, module, expr->resolved->type);
                 } break;
                 case NUMERAL: {
-                    todo("NUMERAL literal");
+                    str num = lit->string;
+                    str ty = "i32";
+                    for (usize i = 0;i < strlen(num);i++) {
+                        if (num[i] == 'u' || num[i] == 'i') ty = num + i;
+                    }
+                    expr->resolved = gc_malloc(sizeof(TVBox));
+                    expr->resolved->type = gen_typevalue(to_str_writer(stream, fprintf(stream, "::std::%s", ty)), &expr->span);
+                    resolve_typevalue(program, module, expr->resolved->type);
                 } break; 
                 default:
                     unreachable("invalid literal type %s", TokenType__NAMES[lit->type]);
@@ -116,24 +149,39 @@ void resolve_expr(Program* program, Module* module, FuncDef* func, Expression* e
         } break;
         case EXPR_VARIABLE: {
             Variable* var = expr->expr;
-            var_find(vars, var);
-            todo("resolve EXPR_VARIABLE");
+            VarBox* vb = var_find(vars, var);
+            var->id = vb->id;
+            expr->resolved = vb->resolved;
         } break;
         case EXPR_LET: {
             LetExpr* let = expr->expr;
+
             VarBox* v = var_register(vars, let->var);
-            expr->resolved = v->resolved;
-            if (let->value != NULL) {
-                resolve_expr(program, module, func, let->value, vars);
+            let->var->id = v->id;
+            resolve_expr(program, module, func, let->value, vars);
+            v->resolved = let->value->resolved;
+            if (let->type == NULL) {
+                let->type = let->value->resolved->type;
+            } else {
+                resolve_typevalue(program, module, let->type);
+                assert_types_equal(program, module, let->type, let->value->resolved->type, expr->span);
             }
-            todo("resolve EXPR_LET");
+
+            expr->resolved = gc_malloc(sizeof(TVBox));
+            expr->resolved->type = gen_typevalue("::std::unit", &expr->span);
+            resolve_typevalue(program, module, expr->resolved->type);
         } break;
         case EXPR_CONDITIONAL: {
             Conditional* cond = expr->expr;
             resolve_expr(program, module, func, cond->cond, vars);
+            TypeValue* bool_ty = gen_typevalue("::std::bool", &cond->cond->span);
+            resolve_typevalue(program, module, bool_ty);
+            assert_types_equal(program, module, cond->cond->resolved->type, bool_ty, cond->cond->span);
             resolve_block(program, module, func, cond->then, vars);
             resolve_block(program, module, func, cond->otherwise, vars);
-            todo("resolve EXPR_CONDITIONAL");
+            assert_types_equal(program, module, cond->then->res, cond->otherwise->res, expr->span);
+            expr->resolved = gc_malloc(sizeof(TVBox));
+            expr->resolved->type = cond->then->res;
         } break;
         case EXPR_WHILE_LOOP: {
             WhileLoop* wl = expr->expr;
@@ -166,7 +214,7 @@ void resolve_block(Program* program, Module* module, FuncDef* func, Block* block
         yield_ty = block->expressions.elements[block->expressions.length-1]->resolved;
     } else {
         yield_ty = gc_malloc(sizeof(TVBox));
-        yield_ty->type = gen_typevalue("::std::unit");
+        yield_ty->type = gen_typevalue("::std::unit", &block->span);
         resolve_typevalue(program, module, yield_ty->type);
     }
     block->res = yield_ty->type;
@@ -176,13 +224,15 @@ void resolve_block(Program* program, Module* module, FuncDef* func, Block* block
 
 void resolve_funcdef(Program* program, Module* module, FuncDef* func) {
     if (func->return_type == NULL) {
-        func->return_type = gen_typevalue("::std::unit");
+        func->return_type = gen_typevalue("::std::unit", &func->name->span);
     }
     resolve_typevalue(program, module, func->return_type);
     if (func->body != NULL) {
         VarList vars = list_new(VarList);
         list_foreach(&func->args, lambda(void, (Argument* arg) {
             VarBox* v = var_register(&vars, arg->var);
+            v->resolved->type = arg->type;
+            resolve_typevalue(program, module, v->resolved->type);
         }));
         resolve_block(program, module, func, func->body, &vars);
         assert_types_equal(program, module, func->body->res, func->return_type, func->name->span);

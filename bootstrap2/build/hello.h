@@ -9,9 +9,12 @@ typedef struct unit unit;
 typedef struct unit {
 } unit;
 
-// ::std::puts#
-int32_t puts();
+// ::::fib#
+uint32_t fib0x583bc9cec098(uint32_t n0);
 
 // ::::main#
-struct unit main0x56fb46551908();
+struct unit main0x583bc9ce1b08();
+
+// ::::printf#
+int32_t printf(const char* fmt0, ...);
 

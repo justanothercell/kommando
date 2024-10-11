@@ -19,7 +19,7 @@ typedef struct Program {
 Module* gen_std();
 
 Identifier* gen_identifier(str name);
-TypeValue* gen_typevalue(str typevalue);
+TypeValue* gen_typevalue(str typevalue, Span* span);
 Path* gen_path(str path);
 
 #endif

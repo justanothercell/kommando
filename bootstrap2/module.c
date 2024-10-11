@@ -10,6 +10,7 @@
 #include "token.h"
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 Identifier* gen_identifier(str name) {
     TokenStream* stream = tokenstream_new("<generated>", name);
@@ -25,9 +26,12 @@ Path* gen_path(str path) {
     return p;
 }
 
-TypeValue* gen_typevalue(str typevalue) {
+TypeValue* gen_typevalue(str typevalue, Span* span) {
     TokenStream* stream = tokenstream_new("<generated>", typevalue);
     TypeValue* tv = parse_type_value(stream);
+    if (span != NULL) list_foreach(&tv->name->elements, lambda(void, (Identifier* ident) {
+        ident->span = *span;
+    }));
     if(try_next_token(stream) != NULL) panic("`%s` is not a valid type value", typevalue);
     return tv;
 }
@@ -37,7 +41,17 @@ TypeDef* gen_simple_type(str name) {
     TypeDef* td = gc_malloc(sizeof(TypeDef));
     td->name = ident;
     td->generics = list_new(IdentList);
+    td->extern_ref = NULL;
     return td;
+}
+
+void register_extern_type(Map* items, str name, str extern_ref) {
+    TypeDef* ty_i32 = gen_simple_type(name);
+    ty_i32->extern_ref = extern_ref;
+    ModuleItem* ty_i32_mi = gc_malloc(sizeof(ModuleItem));
+    ty_i32_mi->item = ty_i32;
+    ty_i32_mi->type = MIT_STRUCT;
+    map_put(items, name, ty_i32_mi);
 }
 
 Module* gen_std() {
@@ -47,55 +61,25 @@ Module* gen_std() {
     module->items = map_new();
     module->resolved = false;
 
-    FuncDef* puts = gc_malloc(sizeof(FuncDef));
-    puts->is_variadic = false;
-    puts->name = gen_identifier("puts");
-    puts->args = list_new(ArgumentList);
-    puts->body = NULL;
-    Argument* arg = gc_malloc(sizeof(Argument));
-    Variable* var = gc_malloc(sizeof(Variable));
-    var->id = 0;
-    var->name = gen_identifier("s");
-    arg->var = var;
-    arg->type = gen_typevalue("::std::Ptr<::std::u8> ");
-    list_append(&puts->args, arg);
-    puts->return_type = gen_typevalue("::std::i32");
-    puts->generic_uses = map_new();
-    ModuleItem* puts_mi = gc_malloc(sizeof(ModuleItem));
-    puts_mi->item = puts;
-    puts_mi->type = MIT_FUNCTION;
-    map_put(module->items, "puts", puts_mi);
+    register_extern_type(module->items, "bool", "bool");
+    register_extern_type(module->items, "opaque_ptr", "void*");
+    register_extern_type(module->items, "c_const_str_ptr", "const char*");
 
-    TypeDef* ty_i32 = gen_simple_type("i32");
-    ty_i32->extern_ref = "int32_t";
-    ModuleItem* ty_i32_mi = gc_malloc(sizeof(ModuleItem));
-    ty_i32_mi->item = ty_i32;
-    ty_i32_mi->type = MIT_STRUCT;
-    map_put(module->items, "i32", ty_i32_mi);
-    TypeDef* ty_bool = gen_simple_type("bool");
-    ty_bool->extern_ref = "bool";
-    ModuleItem* ty_bool_mi = gc_malloc(sizeof(ModuleItem));
-    ty_bool_mi->item = ty_bool;
-    ty_bool_mi->type = MIT_STRUCT;
-    map_put(module->items, "bool", ty_bool_mi);
-    TypeDef* ty_u8 = gen_simple_type("u8");
-    ty_u8->extern_ref = "uint8_t";
-    ModuleItem* ty_u8_mi = gc_malloc(sizeof(ModuleItem));
-    ty_u8_mi->item = ty_u8;
-    ty_u8_mi->type = MIT_STRUCT;
-    map_put(module->items, "u8", ty_u8_mi);
+    register_extern_type(module->items, "i8", "int8_t");
+    register_extern_type(module->items, "i16", "int16_t");
+    register_extern_type(module->items, "i32", "int32_t");
+    register_extern_type(module->items, "i64", "int64_t");
+
+    register_extern_type(module->items, "u8", "uint8_t");
+    register_extern_type(module->items, "u16", "uint16_t");
+    register_extern_type(module->items, "u32", "uint32_t");
+    register_extern_type(module->items, "u64", "uint64_t");
+
     TypeDef* ty_unit = gen_simple_type("unit");
     ModuleItem* ty_unit_mi = gc_malloc(sizeof(ModuleItem));
     ty_unit_mi->item = ty_unit;
     ty_unit_mi->type = MIT_STRUCT;
     map_put(module->items, "unit", ty_unit_mi);
-    TypeDef* ty_ptr = gen_simple_type("Ptr");
-    ty_ptr->extern_ref = "void*";
-    list_append(&ty_ptr->generics, gen_identifier("T"));
-    ModuleItem* ty_ptr_mi = gc_malloc(sizeof(ModuleItem));
-    ty_ptr_mi->item = ty_ptr_mi;
-    ty_ptr_mi->type = MIT_STRUCT;
-    map_put(module->items, "Ptr", ty_ptr_mi);
 
     return module;
 }

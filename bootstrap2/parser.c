@@ -63,14 +63,19 @@ Expression* parse_expresslet(TokenStream* stream) {
         var->name = name;
         let->var = var;
         t = next_token(stream);
+        if (token_compare(t, ":", SNOWFLAKE)) {
+            let->type = parse_type_value(stream);
+        } else {
+            let->type = NULL;
+            stream->peek = t;
+        }
+        t = next_token(stream);
         if (token_compare(t, "=", SNOWFLAKE)) {
             let->value = parse_expression(stream);
             end = let->value->span.right;
         } else {
-            let->value = NULL;
-            stream->peek = t;
+            spanned_error("Let binding needs value", t->span, "let binding needs to be assigned with a value: let %s = ...;", name);
         }
-        let->type = NULL;
         expression->expr = let;
         expression->type = EXPR_LET;
     } else if (token_compare(t, "return", IDENTIFIER)) {
@@ -104,6 +109,7 @@ Expression* parse_expresslet(TokenStream* stream) {
         t = next_token(stream);
         if (token_compare(t, "else", IDENTIFIER)) {
             conditional->otherwise = parse_block(stream);
+            end = conditional->otherwise->span.right;
         } else {
             conditional->otherwise = NULL;
             stream->peek = t;
@@ -321,9 +327,19 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     if (!token_compare(t, "(", SNOWFLAKE)) unexpected_token(t);
     t = next_token(stream);
     ArgumentList arguments = list_new(ArgumentList); 
+    bool variadic = false;
     if (!token_compare(t, ")", SNOWFLAKE)) {
         stream->peek = t;
         while (true) {
+            t = next_token(stream);
+            if (token_compare(t, "*", SNOWFLAKE)) {
+                variadic = true;
+                t = next_token(stream);
+                if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
+                break;
+            } else {
+                stream->peek = t;
+            }
             Argument* argument = gc_malloc(sizeof(Argument));
             Variable* var = gc_malloc(sizeof(Variable));
             var->id = 0;
@@ -341,21 +357,27 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     }
     TypeValue* return_type = NULL;
     t = next_token(stream);
+    Block* body = NULL;
+    if (token_compare(t, ";", SNOWFLAKE)) goto no_body;
     if (!token_compare(t, "{", SNOWFLAKE)) {
         if (!token_compare(t, "-", SNOWFLAKE))  unexpected_token(t);
         t = next_token(stream);
         if (!token_compare(t, ">", SNOWFLAKE))  unexpected_token(t);
         return_type = parse_type_value(stream);
+        t = next_token(stream);
+        if (token_compare(t, ";", SNOWFLAKE)) goto no_body;
+        stream->peek = t;
     } else {
         stream->peek = t;
     }
-    Block* body = parse_block(stream);
+    body = parse_block(stream);
+    no_body: {}
     FuncDef* func = gc_malloc(sizeof(FuncDef));
     func->body = body;
     func->name = name;
     func->return_type = return_type;
     func->args = arguments;
-    func->is_variadic = false;
+    func->is_variadic = variadic;
     func->generic_uses = map_new();
     return func;
 }

@@ -3,8 +3,8 @@
 
 #define ANSI_PREFIX "\x1b["
 #define ANSI_END "m"
-#define ANSI_RESET ANSI_PREFIX"0"
 
+#define ANSI_RESET "0"
 #define ANSI_RESET_SEQUENCE ANSI_PREFIX ANSI_RESET ANSI_END
 
 #define ANSI_BOLD      "1"
