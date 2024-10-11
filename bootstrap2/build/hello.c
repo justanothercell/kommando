@@ -2,32 +2,32 @@
 #include "hello.h"
 
 // ::::fib#
-uint32_t fib0x583bc9cec098(uint32_t n0) {
+uint32_t fib0x576c0ea04f88(uint32_t n0) {
     return ({
         ({
-            uint32_t temp327305250;
-            if ((n0 < 2)) temp327305250 = ({
+            uint32_t temp1401262337;
+            if ((n0 < 2)) temp1401262337 = ({
                 n0;
-            }); else temp327305250 = ({
-                (fib0x583bc9cec098((n0 - 1)) + fib0x583bc9cec098((n0 - 2)));
+            }); else temp1401262337 = ({
+                (fib0x576c0ea04f88((n0 - 1)) + fib0x576c0ea04f88((n0 - 2)));
             });
-            temp327305250;
+            temp1401262337;
         });
     });
 }
 
 // ::::main#
-struct unit main0x583bc9ce1b08() {
+struct unit main0x576c0e9fe9c8() {
     return ({
         const char* fmt0 = "hello %d\n";
         printf(fmt0, 42);
-        printf("10th fib: %u\n", fib0x583bc9cec098(10));
+        printf("10th fib: %u\n", fib0x576c0ea04f88(10));
         (struct unit) {};
     });
 }
 
 // c main entrypoint
 int main(int argc, char** argv) {
-    main0x583bc9ce1b08();
+    main0x576c0e9fe9c8();
     return 0;
 }

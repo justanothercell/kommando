@@ -10,10 +10,10 @@ typedef struct unit {
 } unit;
 
 // ::::fib#
-uint32_t fib0x583bc9cec098(uint32_t n0);
+uint32_t fib0x576c0ea04f88(uint32_t n0);
 
 // ::::main#
-struct unit main0x583bc9ce1b08();
+struct unit main0x576c0e9fe9c8();
 
 // ::::printf#
 int32_t printf(const char* fmt0, ...);
