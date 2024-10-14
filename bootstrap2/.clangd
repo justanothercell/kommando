@@ -1,2 +1,0 @@
-CompileFlags:
-  Add: [-D, __INTELLISENSE__, -Wall, -Wextra, -Wno-deprecated-non-prototype]
