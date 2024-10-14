@@ -1,0 +1,11 @@
+*
+!*.*
+!/**/
+*.c
+*.h
+*.exe
+*.obj
+*.bat
+*.o
+MEMTRACE.txt
+out.txt

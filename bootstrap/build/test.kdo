@@ -1,0 +1,36 @@
+use lib;
+
+type Color = struct {
+    red: u8,
+    green: u8,
+    blue: u8
+}
+
+fn main() {
+    let color: Color;
+    printf("color ptr: %p\n", &color);
+    let cref: &Color = &color;
+    printf("color ref: %p\n", cref);
+
+    color.red = 255u8;
+    color.green = 50u8;
+    color.blue = 200u8;
+
+    printf("blue: %u\n", color.blue);
+    printf("blue from ref: %u\n", (*cref).blue);
+
+    let vec: Vec<u8> = Vec_new::<u8>();
+    let i: u8 = 1u8;
+    while i != 0u8 {
+        Vec_push::<u8>(&vec, i);
+        i = i * 2u8;
+    };
+
+    let iter: VecIter<u8> = Vec_iter::<u8>(&vec);
+    let element: u8;
+    while VecIter_next::<u8>(&iter, &element) {
+        printf("iter: %u\n", element);
+    };
+    VecIter_drop::<u8>(iter);
+    Vec_drop::<u8>(vec);
+}

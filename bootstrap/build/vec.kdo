@@ -1,0 +1,56 @@
+type Vec<T> = struct {
+    capacity: usize,
+    length: usize,
+    elements: &T
+}
+
+fn Vec_new<T>() -> Vec<T> {
+    let vec: Vec<T>;
+    vec.capacity = 0usize;
+    vec.length = 0usize;
+    vec.elements = NULL;
+    return vec;
+}
+
+fn Vec_push<T>(vec: &Vec<T>, element: T) {
+    if vec.length >= vec.capacity {
+        vec.capacity = (vec.capacity + 1usize) * 2usize;
+        vec.elements = realloc(vec.elements, vec.capacity * type_size::<T>());
+    };
+    __index(vec.elements, vec.length) = element;
+    vec.length = vec.length + 1usize;
+}
+
+fn Vec_get<T>(vec: &Vec<T>, index: usize) -> &T {
+    return &__index(vec.elements, index);
+}
+
+fn Vec_iter<T>(vec: &Vec<T>) -> VecIter<T> {
+    let iter: VecIter<T>;
+    iter.vec = vec;
+    iter.index = 0usize;    
+    return iter;
+}
+
+fn Vec_drop<T>(vec: Vec<T>) {
+    free(vec.elements);
+}
+
+type VecIter<T> = struct {
+    vec: &Vec<T>,
+    index: usize
+}
+
+fn VecIter_next<T>(iter: &VecIter<T>, out_element: &T) -> bool {
+    if iter.vec.length > iter.index {
+        *out_element = __index(iter.vec.elements, iter.index);
+        iter.index = iter.index + 1usize;
+        return true;
+    };
+    *out_element = NULL;
+    return false;
+}
+
+fn VecIter_drop<T>(iter: VecIter<T>) {
+    
+}

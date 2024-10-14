@@ -1,0 +1,27 @@
+fn printf(fmt: ::std::c_const_str_ptr, *) -> ::std::i32;
+
+fn main() {
+    let number = 42u32;
+    let result = is_prime(number, 2u32);
+    if result != 0u32 {
+        printf("The number %u is prime.\n", result);
+    } else {
+        printf("The number %u is not prime.\n", number);
+    }
+}
+
+fn is_prime(n: ::std::u32, divisor: ::std::u32) -> ::std::u32 {
+    if n < 2u32 {
+        0u32
+    } else {
+        if divisor == n {
+            n
+        } else {
+            if n % divisor == 0u32 {
+                0u320u32
+            } else {
+                is_prime(n, divisor + 1u32)
+            }
+        }
+    }
+}
