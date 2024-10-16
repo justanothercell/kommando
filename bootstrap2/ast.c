@@ -47,21 +47,11 @@ void fprint_expression(FILE* file, Expression* expression) {
 
 void fprint_typevalue(FILE* file, TypeValue* tval) {
     fprint_path(file, tval->name);
-    if (tval->generics.length > 0) {
+    if (tval->generics != NULL && tval->generics->generics.length > 0) {
         fputc('<', file);
-        list_foreach_i(&tval->generics, lambda(void, (int i, TypeValue* generic) {
+        list_foreach_i(&tval->generics->generics, lambda(void, (int i, TypeValue* generic) {
             fprint_typevalue(file, generic);
         }));
-        fputc('>', file);
+        fputc('>', file);   
     }
-}
-
-str funcusage_to_key(FuncUsage* fu) {
-    return to_str_writer(stream, {
-        fprintf(stream, "#");
-        map_foreach(fu->generics, lambda(void, (str key, TypeValue* tv) {
-            fprintf(stream, "%s:%p", key, tv->def);
-            fprintf(stream, ";");
-        }));
-    });
 }

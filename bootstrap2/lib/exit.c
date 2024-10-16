@@ -24,6 +24,9 @@ void signal_handler(int signal) {
         case SIGSEGV:
             finfo(stderr, INTERRUPT_MODULE, "Caught signal SIGSEGV (%u)", signal);
             break;
+        case SIGFPE:
+            finfo(stderr, INTERRUPT_MODULE, "Caught signal SIGFPE (%u)", signal);
+            break;
         finfo(stderr, INTERRUPT_MODULE, "Caught signal (%u)", signal);
     }
     finfo(stderr, INTERRUPT_MODULE, "Stacktrace:");
@@ -37,6 +40,7 @@ void init_exit_handler(void (*exit_func)(str file, usize line, int code)) {
     EXIT_FUNC = exit_func;
     signal(SIGINT, signal_handler);
     signal(SIGSEGV, signal_handler);
+    signal(SIGFPE, signal_handler);
 }
 
 __attribute__((__noreturn__)) void __panic(str file, usize line, str fmt, ...) {

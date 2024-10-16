@@ -15,6 +15,7 @@ LIST(IdentList, Identifier*);
 typedef struct Path {
     IdentList elements;
     bool absolute;
+    bool ends_in_double_colon;
 } Path;
 LIST(PathList, Path*);
 Path* path_new(bool absolute, IdentList elements);
@@ -22,20 +23,32 @@ void path_append(Path* parent, Identifier* child);
 Path* path_join(Path* parent, Path* child);
 void fprint_path(FILE* file, Path* path);
 typedef struct TypeValue TypeValue;
+typedef struct GenericKeys GenericKeys;
 typedef struct Field {
     Identifier* name;
     TypeValue* type;
 } Field;
 typedef struct TypeDef {
     Identifier* name;
-    IdentList generics;
+    GenericKeys* generics;
     str extern_ref;
     Map* fields;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
+
+typedef struct GenericKeys {
+    Span span;
+    IdentList generics;
+} GenericKeys;
+
+typedef struct GenericValues {
+    Span span;
+    TypeValueList generics;
+} GenericValues;
+
 typedef struct TypeValue {
     Path* name;
-    TypeValueList generics;
+    GenericValues* generics;
     TypeDef* def;
 } TypeValue;
 void fprint_typevalue(FILE* file, TypeValue* tval);
@@ -58,7 +71,8 @@ ENUM(ExprType,
     EXPR_BREAK,    // typeof(expr) = Expression*
     EXPR_CONTINUE, // no data
     EXPR_FIELD_ACCESS,
-    EXPR_STRUCT_LITERAL
+    EXPR_STRUCT_LITERAL,
+    EXPR_C_INTRINSIC
 );
 
 typedef struct TVBox {
@@ -73,6 +87,13 @@ typedef struct Expression {
 } Expression;
 void fprint_expression(FILE* file, Expression* expression);
 LIST(ExpressionList, Expression*);
+
+typedef struct CIntrinsic {
+    Map* type_bindings;
+    Map* var_bindings;
+    str c_expr;
+    TypeValue* ret_ty;
+} CIntrinsic;
 
 typedef struct StructFieldLit {
     Identifier* name;
@@ -91,10 +112,13 @@ typedef struct BinOp {
 } BinOp;
 
 typedef struct FuncDef FuncDef;
+typedef struct FuncUsage FuncUsage;
 typedef struct FuncCall {
     Path* name;
     ExpressionList arguments;
+    GenericValues* generics;
     FuncDef* def;
+    FuncUsage* fu;
 } FuncCall;
 
 typedef struct Block {
@@ -133,9 +157,8 @@ typedef struct Argument {
 LIST(ArgumentList, Argument*);
 typedef struct FuncUsage {
     Map* generics;
-    FuncDef* context;
+    FuncDef* generic_use;
 } FuncUsage;
-str funcusage_to_key(FuncUsage* fu);
 typedef struct FuncDef {
     Identifier* name;
     Block* body;
@@ -144,6 +167,10 @@ typedef struct FuncDef {
     Map* generic_uses;
     bool no_mangle;
     bool is_variadic;
+    Map* resolved_generics;
+    Map* indirect_generics;
+    GenericKeys* generics;
+    bool head_resolved;
 } FuncDef;
 
 ENUM(ModuleItemType,
@@ -154,6 +181,7 @@ ENUM(ModuleItemType,
 typedef struct ModuleItem {
     void* item;
     ModuleItemType type;
+    Span span;
 } ModuleItem;
 
 #endif

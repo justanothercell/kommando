@@ -1,14 +1,17 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "transpiler_c.h"
 #include "ast.h"
 #include "lib/defines.h"
 #include "lib/exit.h"
+#include "lib/gc.h"
 #include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
 #include "module.h"
 #include "parser.h"
+#include "resolver.h"
 #include "token.h"
 
 str gen_c_fn_name(FuncDef* def, str fukey) {
@@ -16,8 +19,8 @@ str gen_c_fn_name(FuncDef* def, str fukey) {
         // if (map_size(def->) > 0) spanned_error("Generic extern function", def->name->span, "Extern functions may not be generic");
         return def->name->name;
     }
-    FuncUsage* fu = map_get(def->generic_uses, fukey);
-    return to_str_writer(stream, fprintf(stream,"%s%p", def->name->name, fu));
+    u32 hash = str_hash(fukey);
+    return to_str_writer(stream, fprintf(stream,"%s%lx", def->name->name, hash));
 }
 
 str gen_c_var_name(Variable* v) {
@@ -30,10 +33,15 @@ str gen_temp_c_name() {
 
 str gen_c_type_name(TypeValue* tv, FuncUsage* fu) {
     if (tv->def->extern_ref != NULL) {
-        if (tv->generics.elements > 0) spanned_error("Generic extern type", tv->def->name->span, "Extern types may not be generic");
+        if (tv->generics != NULL && tv->generics->generics.length > 0) spanned_error("Generic extern type", tv->def->name->span, "Extern types may not be generic");
         return tv->def->extern_ref;
     }
-    if (tv->generics.elements > 0) todo("Generic types");
+    if (tv->generics != NULL && tv->generics->generics.length > 0) todo("Generic types");
+    if (fu != NULL && fu->generic_use != NULL)  spanned_error("indirect generic type", tv->def->name->span, "Type is not concrete");
+    if (fu != NULL && fu->generics != NULL && !tv->name->absolute && tv->name->elements.length == 1 && map_contains(fu->generics, tv->name->elements.elements[0]->name)) {
+        TypeValue* concrete = map_get(fu->generics, tv->name->elements.elements[0]->name);
+        return gen_c_type_name(concrete, NULL);
+    }
     return to_str_writer(stream, fprintf(stream,"struct %s", tv->def->name->name));
 }
 
@@ -56,7 +64,23 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, str fuke
         } break;
         case EXPR_FUNC_CALL: {
             FuncCall* fc = expr->expr;
-            str c_fn_name = gen_c_fn_name(fc->def, fukey);
+            FuncUsage* fc_fu = fc->fu;
+            if (fc_fu->generic_use != NULL) {
+                FuncUsage* expanded = gc_malloc(sizeof(FuncUsage));
+                expanded->generic_use = NULL;
+                expanded->generics = map_new();
+                map_foreach(fc_fu->generics, lambda(void, (str key, TypeValue* tv) {
+                    str valkey = to_str_writer(s, fprint_typevalue(s, tv));
+                    if (map_contains(fu->generics, valkey)) {
+                        map_put(expanded->generics, key, map_get(fu->generics, valkey));
+                    } else {
+                        map_put(expanded->generics, key, tv);
+                    }
+                }));
+                fc_fu = expanded;
+            }
+            str key = funcusage_to_key(fc_fu);
+            str c_fn_name = gen_c_fn_name(fc->def, key);
             fprintf(code_stream, "%s(", c_fn_name);
             list_foreach_i(&fc->arguments, lambda(void, (usize i, Expression* arg) {
                 if (i > 0) fprintf(code_stream, ", ");
@@ -110,7 +134,11 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, str fuke
             fprintf(code_stream, ") %s = ", ret_var);
             transpile_block(code_stream, modkey, func, fukey, fu, cond->then, indent + 1);
             fprintf(code_stream, "; else %s = ", ret_var);
-            transpile_block(code_stream, modkey, func, fukey, fu, cond->otherwise, indent + 1);
+            if (cond->otherwise != NULL) {
+                transpile_block(code_stream, modkey, func, fukey, fu, cond->otherwise, indent + 1);
+            } else {
+                fprintf(code_stream, "(%s) {}", ret_ty);
+            }
             fprintf(code_stream, ";\n");
             fprint_indent(code_stream, indent + 1);
             fprintf(code_stream, "%s;\n", ret_var);
@@ -146,6 +174,42 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, str fuke
             }));
             fprintf(code_stream, " }");
         } break;
+        case EXPR_C_INTRINSIC: {
+            CIntrinsic* ci = expr->expr;
+            usize i = 0;
+            usize len = strlen(ci->c_expr);
+            char op = '\0';
+            while (i < len) {
+                char c = ci->c_expr[i++];
+                if (op != '\0') {
+                    if (op == '@') {
+                        str key = gc_malloc(2);
+                        key[0] = c;
+                        key[1] = '\0';
+                        TypeValue* tv = map_get(ci->type_bindings, key);
+                        if (tv == NULL) spanned_error("Invalid c intrinsic", expr->span, "intrinsic does not bind type @%s: `%s`", key, ci->c_expr);
+                        str c_ty = gen_c_type_name(tv, fu);
+                        fprintf(code_stream, "%s", c_ty);
+                    } else if (op == '$') {
+                        str key = gc_malloc(2);
+                        key[0] = c;
+                        key[1] = '\0';
+                        Variable* v = map_get(ci->var_bindings, key);
+                        if (v == NULL) spanned_error("Invalid c intrinsic", expr->span, "intrinsic does not bind variale $%s: `%s`", key, ci->c_expr);
+                        str c_var = gen_c_var_name(v);
+                        fprintf(code_stream, "%s", c_var);
+                    } else {
+                        unreachable();
+                    }
+                    op = '\0';
+                } else if (c == '@' || c == '$') {
+                    op = c;
+                } else {
+                    fputc(c, code_stream);
+                }
+            }
+            if (op != '\0') spanned_error("Invalid c intrinsic", expr->span, "intrinsic ended on operator: `%s`", ci->c_expr);
+        } break;
     }
 }
 
@@ -165,6 +229,28 @@ void transpile_block(FILE* code_stream, str modkey, FuncDef* func, str fukey, Fu
 }
 
 void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func, str fukey, FuncUsage* fu) {
+    if (fu->generic_use != NULL) {
+        map_foreach(fu->generic_use->generic_uses, lambda(void, (str inner_fukey, FuncUsage* inner_fu) {
+            FuncUsage* fu_concrete = gc_malloc(sizeof(FuncUsage));
+            fu_concrete->generic_use = inner_fu->generic_use;
+            fu_concrete->generics = map_new();
+            map_foreach(fu->generics, lambda(void, (str key, TypeValue* tv) {
+                str valkey = to_str_writer(s, fprint_typevalue(s, tv));
+                if (map_contains(inner_fu->generics, valkey)) {
+                    TypeValue* replacement =  map_get(inner_fu->generics, valkey);
+                    map_put(fu_concrete->generics, key, replacement);
+                } else {
+                    map_put(fu_concrete->generics, key, tv);
+                }
+            }));
+            str concrete_fukey = funcusage_to_key(fu_concrete);
+            if (!map_contains(func->generic_uses, concrete_fukey) && !map_contains(func->indirect_generics, concrete_fukey)) {
+                map_put(func->indirect_generics, concrete_fukey, fu_concrete);
+                transpile_function_generic_variant(header_stream, code_stream, modkey, func, concrete_fukey, fu_concrete);
+            }
+        }));
+        return;
+    }
     str c_fn_name = gen_c_fn_name(func, fukey);
     str c_ret_ty = gen_c_type_name(func->return_type, fu);
 
@@ -206,6 +292,7 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
 }
 
 void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func) {
+    func->indirect_generics = map_new();
     map_foreach(func->generic_uses, lambda(void, (str key, FuncUsage* fu) {
         transpile_function_generic_variant(header_stream, code_stream, modkey, func, key, fu);
     }));
@@ -267,9 +354,13 @@ void transpile_to_c(FILE* header_stream, FILE* code_stream, str header_name, Pro
     fprintf(header_stream, "#include <stdint.h>\n");
     fprintf(header_stream, "#include <stdbool.h>\n");
     fprintf(header_stream, "\n");
+    fprintf(header_stream, "\n");
 
     fprintf(code_stream, "/* File generated by kommando compiler. Do not modify. */\n");
     fprintf(code_stream, "#include \"%s\"\n", header_name);
+    fprintf(code_stream, "\n");
+    fprintf(code_stream, "static int __global__argc = 0;\n");
+    fprintf(code_stream, "static char** __global__argv = (void*)0;\n");
     fprintf(code_stream, "\n");
 
     map_foreach(program->modules, lambda(void, (str key, Module* mod) {
@@ -285,5 +376,11 @@ void transpile_to_c(FILE* header_stream, FILE* code_stream, str header_name, Pro
     ModuleItem* main_func_item = map_get(program->main_module->items, "main");
     FuncDef* main_func = main_func_item->item;
     FuncUsage* main_fu = map_get(main_func->generic_uses, "#"); // we know its this key
-    fprintf(code_stream, "// c main entrypoint\nint main(int argc, char** argv) {\n    main%p();\n    return 0;\n}\n", main_fu);
+    fprintf(code_stream, "// c main entrypoint\n");
+    fprintf(code_stream, "int main(int argc, char** argv) {\n");
+    fprintf(code_stream, "    __global__argc = argc;\n");
+    fprintf(code_stream, "    __global__argv = argv;\n");
+    fprintf(code_stream, "    %s();\n", gen_c_fn_name(main_func, funcusage_to_key(main_fu)));
+    fprintf(code_stream, "    return 0;\n");
+    fprintf(code_stream, "}\n");
 }

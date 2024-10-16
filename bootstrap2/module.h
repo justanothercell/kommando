@@ -9,6 +9,7 @@ typedef struct Module {
     Map* items;
     PathList imports;
     bool resolved;
+    bool in_resolution;
 } Module;
 
 typedef struct Program {

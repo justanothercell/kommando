@@ -108,11 +108,11 @@ void compile(CompilerOptions options) {
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
     Module* main = parse_module_contents(stream, path_new(true, list_new(IdentList)));
     ModuleItem* main_func_item = map_get(main->items, "main");
+    if (main_func_item == NULL) panic("no main function found");
     FuncDef* main_func = main_func_item->item;
-    if (main_func == NULL) panic("no main function found");
     FuncUsage* main_fu = gc_malloc(sizeof(FuncUsage));
-    main_fu->context = NULL;
-    main_fu->generics = map_new();
+    main_fu->generics = NULL;
+    main_fu->generic_use = NULL;
     map_put(main_func->generic_uses, funcusage_to_key(main_fu), main_fu);
     Module* std = gen_std();
 

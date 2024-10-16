@@ -50,7 +50,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     }
     TypeDef* type = gc_malloc(sizeof(TypeDef));
     type->extern_ref = NULL;
-    type->generics = list_new(IdentList);
+    type->generics = NULL;
     type->fields = fields;
     type->name = name;
 }
@@ -61,6 +61,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
     module->items = map_new();
     module->path = path;
     module->resolved = false;
+    module->in_resolution = false;
 
     while (has_next(stream)) {
         Token* t = next_token(stream);
@@ -70,12 +71,14 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
             mi->item = function;
             mi->type = MIT_FUNCTION;
+            mi->span = function->name->span;
             map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
             ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
             mi->item = type;
             mi->type = MIT_STRUCT;
+            mi->span = type->name->span;
             map_put(module->items, type->name->name, mi);
         } else {
             unexpected_token(t);
@@ -110,7 +113,7 @@ Expression* parse_expresslet(TokenStream* stream) {
             let->value = parse_expression(stream);
             end = let->value->span.right;
         } else {
-            spanned_error("Let binding needs value", t->span, "let binding needs to be assigned with a value: let %s = ...;", name);
+            spanned_error("Let binding needs value", t->span, "let binding needs to be assigned with a value: let %s = ...;", name->name);
         }
         expression->expr = let;
         expression->type = EXPR_LET;
@@ -163,6 +166,13 @@ Expression* parse_expresslet(TokenStream* stream) {
         stream->peek = t;
         Path* path = parse_path(stream);
         if (path->elements.length > 0) end = path->elements.elements[path->elements.length - 1]->span.right;
+        GenericValues* generics = NULL;
+        t = next_token(stream);
+        Token* gen_start = t;
+        stream->peek = t;
+        if (path->ends_in_double_colon && token_compare(t, "<", SNOWFLAKE)) {
+            generics = parse_generic_values(stream);
+        }
         t = next_token(stream);
         if (token_compare(t, "(", SNOWFLAKE)) {
             ExpressionList arguments = list_new(ExpressionList); 
@@ -182,9 +192,11 @@ Expression* parse_expresslet(TokenStream* stream) {
             FuncCall* call = gc_malloc(sizeof(FuncCall));
             call->name = path;
             call->arguments = arguments;
+            call->generics = generics;
             expression->expr = call;
-            expression->type = EXPR_FUNC_CALL;            
+            expression->type = EXPR_FUNC_CALL;       
         } else if (token_compare(t, "{", SNOWFLAKE)) {
+            if (generics != NULL) unexpected_token(t);
             Map* fields = map_new();
             t = next_token(stream);
             if (!token_compare(t, "}", SNOWFLAKE)) {
@@ -209,12 +221,13 @@ Expression* parse_expresslet(TokenStream* stream) {
             TypeValue* tv =gc_malloc(sizeof(TypeValue));
             tv->name = path;
             tv->def = NULL;
-            tv->generics = list_new(TypeValueList);
+            tv->generics = NULL;
             slit->type = tv;
             slit->fields = fields;
             expression->expr = slit;
             expression->type = EXPR_STRUCT_LITERAL;
         } else {
+            if (generics != NULL) unexpected_token(gen_start);
             if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s", to_str_writer(stream, fprint_path(stream, path)));
             stream->peek = t;
             Variable* var = gc_malloc(sizeof(Variable));
@@ -328,34 +341,32 @@ Expression* parse_expression(TokenStream* stream) {
 Path* parse_path(TokenStream* stream) {
     bool absolute = double_double_colon(stream);
     IdentList elements = list_new(IdentList);
+    bool ends_in_double_colon = false;
     do {
+        Token* t = next_token(stream);
+        stream->peek = t;
+        if (t->type != IDENTIFIER) {
+            ends_in_double_colon = true;
+            break;
+        }
         list_append(&elements, parse_identifier(stream));
     } while (double_double_colon(stream));
-    return path_new(absolute, elements);
+    Path* path = path_new(absolute, elements);
+    path->ends_in_double_colon = ends_in_double_colon;
+    return path;
 }
 
 TypeValue* parse_type_value(TokenStream* stream) {
     Path* name = parse_path(stream);
     TypeValue* tval = gc_malloc(sizeof(TypeValue));
     tval->name = name;
-    tval->generics = list_new(TypeValueList);
+    tval->generics = NULL;
     tval->def = NULL;
     Token* t = try_next_token(stream);
     if (t != NULL) {
+        stream->peek = t;
         if (token_compare(t, "<", SNOWFLAKE)) {
-            t = next_token(stream);
-            if (!token_compare(t, ">", SNOWFLAKE)) {
-                stream->peek = t;
-                while (true) {
-                    TypeValue* g = parse_type_value(stream);
-                    list_append(&tval->generics, g);
-                    t = next_token(stream);
-                    if (token_compare(t, ">", SNOWFLAKE)) break;
-                    if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
-                }
-            }
-        } else {
-            stream->peek = t;
+            tval->generics = parse_generic_values(stream);
         }
     }
     return tval;
@@ -408,11 +419,60 @@ empty: {}
     return block;
 }
 
+GenericKeys* parse_generic_keys(TokenStream* stream) {
+    Token* t = next_token(stream);
+    CodePoint left = t->span.left;
+    IdentList generics = list_new(IdentList);
+    if (!token_compare(t, "<", SNOWFLAKE)) unexpected_token(t);
+    t = next_token(stream);
+    if (!token_compare(t, ">", SNOWFLAKE)) {
+        stream->peek = t;
+        while (true) {    
+            Identifier* generic = parse_identifier(stream);
+            list_append(&generics, generic);
+            t = next_token(stream);
+            if (token_compare(t, ">", SNOWFLAKE)) break;
+            if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+        }
+    }
+    CodePoint right = t->span.right;
+    GenericKeys* keys = gc_malloc(sizeof(GenericKeys));
+    keys->generics = generics;
+    keys->span = from_points(&left, &right);
+    return keys;
+}
+
+GenericValues* parse_generic_values(TokenStream* stream) {
+    Token* t = next_token(stream);
+    GenericValues* generics = gc_malloc(sizeof(GenericValues));
+    generics->span.left = t->span.left;
+    generics->generics = list_new(TypeValueList);
+    t = next_token(stream);
+    if (!token_compare(t, ">", SNOWFLAKE)) {
+        stream->peek = t;
+        while (true) {
+            TypeValue* g = parse_type_value(stream);
+            list_append(&generics->generics, g);
+            t = next_token(stream);
+            if (token_compare(t, ">", SNOWFLAKE)) break;
+            if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+        }
+    }
+    generics->span.right = t->span.right;
+    return generics;
+}
+
 FuncDef* parse_function_definition(TokenStream* stream) {
     Token* t = next_token(stream);
     if (!token_compare(t, "fn", IDENTIFIER)) unexpected_token(t);
     Identifier* name = parse_identifier(stream);
+    GenericKeys* keys = NULL;
     t = next_token(stream);
+    if (token_compare(t, "<", SNOWFLAKE)) {
+        stream->peek = t;
+        keys = parse_generic_keys(stream);
+        t = next_token(stream);
+    }
     if (!token_compare(t, "(", SNOWFLAKE)) unexpected_token(t);
     t = next_token(stream);
     ArgumentList arguments = list_new(ArgumentList); 
@@ -468,5 +528,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->args = arguments;
     func->is_variadic = variadic;
     func->generic_uses = map_new();
+    func->generics = keys;
+    func->head_resolved = false;
     return func;
 }

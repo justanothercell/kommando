@@ -1,5 +1,12 @@
-fn printf(fmt: ::std::c_const_str_ptr, *) -> ::std::i32;
-fn fprintf(stream: ::std::opaque_ptr, fmt: ::std::c_const_str_ptr, *) -> ::std::i32;
+fn printf(fmt: std::c_const_str_ptr, *) -> std::i32;
+fn fprintf(stream: std::opaque_ptr, fmt: std::c_const_str_ptr, *) -> std::i32;
 
-fn fopen(path: ::std::c_const_str_ptr, mode: ::std::c_const_str_ptr) -> ::std::opaque_ptr;
-fn fclose(stream: ::std::opaque_ptr) -> ::std::i32;
+fn fopen(path: std::c_const_str_ptr, mode: std::c_const_str_ptr) -> std::opaque_ptr;
+fn fclose(stream: std::opaque_ptr) -> std::i32;
+
+fn exit(code: std::i32) -> std::c_void;
+
+// we do not have constants yet
+fn null() -> std::opaque_ptr {
+    std::typecast::<std::usize, std::opaque_ptr>(0usize)
+}

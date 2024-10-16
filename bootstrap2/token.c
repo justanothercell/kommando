@@ -37,7 +37,7 @@ Token* try_next_token(TokenStream* stream) {
         stream->peek = NULL;
         return t;
     }
-    TokenType type;
+    TokenType type = IDENTIFIER;
     String tok = list_new(String);
     char next = '\0';
     CodePoint start;
@@ -79,9 +79,10 @@ Token* try_next_token(TokenStream* stream) {
         while (true) {
             next = next_char(stream);
             if (next == '\0') goto eof;
-            if (next != '"') {
-                list_append(&tok, next);
-            } else break;
+            if (next == '"') {
+                break;
+            } 
+            list_append(&tok, next);
         }
     } else if (is_alphabetic(next) || is_numeric(next) || next == '_') {
         list_append(&tok, next);
@@ -100,7 +101,7 @@ Token* try_next_token(TokenStream* stream) {
         type = SNOWFLAKE;
     }
     eof:
-    if (tok.length == 0) return NULL;
+    if (tok.length == 0 && type != STRING) return NULL;
     list_append(&tok, '\0');
 
     Token* t = gc_malloc(sizeof(Token));

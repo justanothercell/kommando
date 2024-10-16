@@ -1,0 +1,46 @@
+fn identity<T>(input: T) -> T {
+    input
+}
+
+fn identity_not_indirectly_called<T>(input: T) -> T {
+    input
+}
+
+fn indirect<A, B>(a: A, b: B) {
+    identity::<A>(a);
+    identity::<B>(b);
+    identity_not_indirectly_called::<std::c_const_str_ptr>("no indirection here!");
+}
+
+fn indirect_indirect<A, B>(a: A, b: B) {
+    indirect::<A, B>(a, b);
+}
+
+fn donothing<T>() { }
+fn dosomething<T>() {
+    donothing::<T>();
+}
+
+fn main() {
+    // just checking that all these expand correctly...
+    donothing::<std::i64>();
+    dosomething::<std::u8>();
+
+    identity::<std::i64>(1i64);
+    identity::<std::c_const_str_ptr>("");
+    indirect::<std::u8, std::c_const_str_ptr>(0u8, "");
+    indirect::<std::u8, std::i8>(0u8, 0i8);
+    indirect_indirect::<std::u8, std::i8>(0u8, 0i8);
+    indirect_indirect::<std::u16, std::i16>(0u16, 0i16);
+    
+    // print out the c representation of a bunch of types and their sizes
+    print_typeinfo::<std::bool>();
+    print_typeinfo::<std::u32>();
+    print_typeinfo::<std::usize>();
+    print_typeinfo::<std::c_const_str_ptr>();
+    print_typeinfo::<std::unit>();
+}
+
+fn print_typeinfo<T>() {
+    c_api::printf("sizeof(%s) = %lu\n", std::c_typename::<T>(), std::sizeof::<T>());
+}

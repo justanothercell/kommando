@@ -1,0 +1,6 @@
+fn strcmp(str1: std::c_const_str_ptr, str2: std::c_const_str_ptr) -> std::i32;
+fn strlen(str: std::c_const_str_ptr) -> std::i32;
+
+fn streq(str1: std::c_const_str_ptr, str2: std::c_const_str_ptr) -> std::bool {
+    strcmp(str1, str2) == 0
+}

@@ -26,7 +26,9 @@ int main(int argc, char* argv[]) {
     compile(options);
 
     if (options.run) {
-        system(to_str_writer(stream, fprintf(stream, "./%s", options.outname)));
+        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RUN" ANSI_RESET_SEQUENCE, "Running program...");
+        i32 code = system(to_str_writer(stream, fprintf(stream, "./%s", options.outname)));
+        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RUN" ANSI_RESET_SEQUENCE, "Execution finished with code %lu", code);
     }
 
     quit(0);

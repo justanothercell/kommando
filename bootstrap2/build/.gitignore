@@ -9,3 +9,6 @@
 *.o
 MEMTRACE.txt
 out.txt
+!build
+!run
+!link_kdolib
