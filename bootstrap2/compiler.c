@@ -24,6 +24,7 @@ CompilerOptions build_args(StrList* args) {
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
+        printf("    ::lib::path=<path/to/lib_file.kdo>\n");
         quit(0);
     }
 
@@ -108,12 +109,8 @@ void compile(CompilerOptions options) {
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
     Module* main = parse_module_contents(stream, path_new(true, list_new(IdentList)));
     ModuleItem* main_func_item = map_get(main->items, "main");
-    if (main_func_item == NULL) panic("no main function found");
-    FuncDef* main_func = main_func_item->item;
-    FuncUsage* main_fu = gc_malloc(sizeof(FuncUsage));
-    main_fu->generics = NULL;
-    main_fu->generic_use = NULL;
-    map_put(main_func->generic_uses, funcusage_to_key(main_fu), main_fu);
+    if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
+
     Module* std = gen_std();
 
     program->main_module = main;
@@ -135,5 +132,6 @@ void compile(CompilerOptions options) {
     fclose(header_file);
     fclose(code_file);
 
-    system(to_str_writer(stream, fprintf(stream, "%s -Wall %s -o %s", options.c_compiler, code_file_name, options.outname)));
+    i32 r = system(to_str_writer(stream, fprintf(stream, "%s -Wall %s -o %s", options.c_compiler, code_file_name, options.outname)));
+    if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
 }

@@ -5,6 +5,7 @@
 #include "lib/enum.h"
 #include "lib/list.h"
 #include "lib/map.h"
+#include "lib/str.h"
 #include "token.h"
 
 typedef struct Identifier {
@@ -23,6 +24,7 @@ void path_append(Path* parent, Identifier* child);
 Path* path_join(Path* parent, Path* child);
 void fprint_path(FILE* file, Path* path);
 typedef struct TypeValue TypeValue;
+typedef struct FuncDef FuncDef;
 typedef struct GenericKeys GenericKeys;
 typedef struct Field {
     Identifier* name;
@@ -39,11 +41,17 @@ LIST(TypeValueList, TypeValue*);
 typedef struct GenericKeys {
     Span span;
     IdentList generics;
+    StrList generic_use_keys;
+    Map* generic_uses;
+    Map* resolved;
 } GenericKeys;
 
 typedef struct GenericValues {
     Span span;
     TypeValueList generics;
+    GenericKeys* generic_type_ctx;
+    GenericKeys* generic_func_ctx;
+    Map* resolved;
 } GenericValues;
 
 typedef struct TypeValue {
@@ -112,13 +120,11 @@ typedef struct BinOp {
 } BinOp;
 
 typedef struct FuncDef FuncDef;
-typedef struct FuncUsage FuncUsage;
 typedef struct FuncCall {
     Path* name;
     ExpressionList arguments;
     GenericValues* generics;
     FuncDef* def;
-    FuncUsage* fu;
 } FuncCall;
 
 typedef struct Block {
@@ -155,22 +161,14 @@ typedef struct Argument {
     TypeValue* type;
 } Argument;
 LIST(ArgumentList, Argument*);
-typedef struct FuncUsage {
-    Map* generics;
-    FuncDef* generic_use;
-} FuncUsage;
 typedef struct FuncDef {
     Identifier* name;
     Block* body;
     TypeValue* return_type;
     ArgumentList args;
-    Map* generic_uses;
     bool no_mangle;
     bool is_variadic;
-    Map* resolved_generics;
-    Map* indirect_generics;
     GenericKeys* generics;
-    bool head_resolved;
 } FuncDef;
 
 ENUM(ModuleItemType,
@@ -182,6 +180,6 @@ typedef struct ModuleItem {
     void* item;
     ModuleItemType type;
     Span span;
+    bool head_resolved;
 } ModuleItem;
-
 #endif

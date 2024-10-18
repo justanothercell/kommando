@@ -53,6 +53,7 @@ void register_extern_type(Map* items, str name, str extern_ref) {
     ty_mi->item = ty;
     ty_mi->type = MIT_STRUCT;
     ty_mi->span= ty->name->span;
+    ty_mi->head_resolved = false;
     map_put(items, name, ty_mi);
 }
 
@@ -74,6 +75,7 @@ void register_intrinsic(Map* items, str prototype, str intrinsic, Map* var_bindi
     mi->span = fd->name->span;
     mi->item = fd;
     mi->type = MIT_FUNCTION;
+    mi->head_resolved = false;
     map_put(items, fd->name->name, mi);
 }
 

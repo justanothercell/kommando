@@ -16,6 +16,8 @@ void __raw_free(void* ptr);
     #define malloc(size) debug_malloc((size), __FILE__, __LINE__)
     #define realloc(ptr, size) debug_realloc((ptr), (size), __FILE__, __LINE__)
     #define free(ptr) debug_free((ptr), __FILE__, __LINE__)
+#else
+    #include <malloc.h>
 #endif
 
 #endif

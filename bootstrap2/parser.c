@@ -30,6 +30,12 @@ TypeDef* parse_struct(TokenStream* stream) {
     Identifier* name = parse_identifier(stream);
     Map* fields = map_new();
     t = next_token(stream);
+    GenericKeys* keys = NULL;
+    if (token_compare(t, "<", SNOWFLAKE)) {
+        stream->peek = t;
+        keys = parse_generic_keys(stream);
+        t = next_token(stream);
+    }
     if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
     while (1) {
         t = next_token(stream);
@@ -50,7 +56,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     }
     TypeDef* type = gc_malloc(sizeof(TypeDef));
     type->extern_ref = NULL;
-    type->generics = NULL;
+    type->generics = keys;
     type->fields = fields;
     type->name = name;
 }
@@ -72,6 +78,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->item = function;
             mi->type = MIT_FUNCTION;
             mi->span = function->name->span;
+            mi->head_resolved = false;
             map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
@@ -79,6 +86,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->item = type;
             mi->type = MIT_STRUCT;
             mi->span = type->name->span;
+            mi->head_resolved = false;
             map_put(module->items, type->name->name, mi);
         } else {
             unexpected_token(t);
@@ -196,7 +204,6 @@ Expression* parse_expresslet(TokenStream* stream) {
             expression->expr = call;
             expression->type = EXPR_FUNC_CALL;       
         } else if (token_compare(t, "{", SNOWFLAKE)) {
-            if (generics != NULL) unexpected_token(t);
             Map* fields = map_new();
             t = next_token(stream);
             if (!token_compare(t, "}", SNOWFLAKE)) {
@@ -221,7 +228,7 @@ Expression* parse_expresslet(TokenStream* stream) {
             TypeValue* tv =gc_malloc(sizeof(TypeValue));
             tv->name = path;
             tv->def = NULL;
-            tv->generics = NULL;
+            tv->generics = generics;
             slit->type = tv;
             slit->fields = fields;
             expression->expr = slit;
@@ -439,6 +446,9 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
     GenericKeys* keys = gc_malloc(sizeof(GenericKeys));
     keys->generics = generics;
     keys->span = from_points(&left, &right);
+    keys->resolved = map_new();
+    keys->generic_uses = map_new();
+    keys->generic_use_keys = list_new(StrList);
     return keys;
 }
 
@@ -447,6 +457,9 @@ GenericValues* parse_generic_values(TokenStream* stream) {
     GenericValues* generics = gc_malloc(sizeof(GenericValues));
     generics->span.left = t->span.left;
     generics->generics = list_new(TypeValueList);
+    generics->generic_type_ctx = NULL;
+    generics->generic_func_ctx = NULL;
+    generics->resolved = map_new();
     t = next_token(stream);
     if (!token_compare(t, ">", SNOWFLAKE)) {
         stream->peek = t;
@@ -527,8 +540,6 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->return_type = return_type;
     func->args = arguments;
     func->is_variadic = variadic;
-    func->generic_uses = map_new();
     func->generics = keys;
-    func->head_resolved = false;
     return func;
 }

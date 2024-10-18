@@ -105,7 +105,7 @@ void gc_flag_stack() {
 }
 
 usize X = 0;
-GcCleanupResult gc_cleanup() {
+GcCleanupResult         gc_cleanup() {
     usize length_before = ALLOCATIONS.length;
     usize size_before = 0;
     usize size_after = 0;

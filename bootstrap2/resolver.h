@@ -5,6 +5,7 @@
 #include "module.h"
 
 void resolve(Program* program);
-str funcusage_to_key(FuncUsage* fu);
+str gvals_to_key(GenericValues* generics);
+str gvals_to_c_key(GenericValues* generics);
 
 #endif

@@ -3,7 +3,7 @@
 ## Quickstart
 ```sh
 cd bootstrap2/build
-./build.sh # build the compiler
+./build # build the compiler
 ./run hello # compile an run hello.kdo
 ```
 Note that this is meant to be compiled with gcc and uses certain gnu compiler extensions. There exists a [./bootstrap2/.clangd](./bootstrap2/.clangd) file,

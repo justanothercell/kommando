@@ -130,6 +130,6 @@
         Type* elements; \
     } Name
 
-LIST(StrList_ptr, char*);
+LIST(List, void*);
 
 #endif
