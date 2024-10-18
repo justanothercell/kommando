@@ -372,9 +372,9 @@ void resolve_expr(Program* program, Module* module, FuncDef* func, GenericKeys* 
         case EXPR_LET: {
             LetExpr* let = expr->expr;
 
+            resolve_expr(program, module, func, type_generics, let->value, vars);
             VarBox* v = var_register(vars, let->var);
             let->var->id = v->id;
-            resolve_expr(program, module, func, type_generics, let->value, vars);
             v->resolved = let->value->resolved;
             if (let->type == NULL) {
                 let->type = let->value->resolved->type;
@@ -427,11 +427,16 @@ void resolve_expr(Program* program, Module* module, FuncDef* func, GenericKeys* 
         case EXPR_FIELD_ACCESS: {
             FieldAccess* fa = expr->expr;
             resolve_expr(program, module, func, type_generics, fa->object, vars);
-            TypeDef* td = fa->object->resolved->type->def;
+            TypeValue* tv = fa->object->resolved->type;
+            TypeDef* td = tv->def;
             Field* field = map_get(td->fields, fa->field->name);
             if (field == NULL) spanned_error("Invalid struct field", fa->field->span, "Struct %s has no such field '%s'", td->name->name, fa->field->name);
+            TypeValue* field_ty = field->type;
+            if (tv->generics != NULL && !field_ty->name->absolute && field_ty->name->elements.length == 1 && map_contains(tv->generics->resolved, field_ty->name->elements.elements[0]->name)) {
+                field_ty = map_get(tv->generics->resolved, field_ty->name->elements.elements[0]->name);
+            }
             expr->resolved = gc_malloc(sizeof(TVBox));
-            expr->resolved->type = field->type;
+            expr->resolved->type = field_ty;
         } break;
         case EXPR_STRUCT_LITERAL: {
             StructLiteral* slit = expr->expr;
@@ -445,7 +450,12 @@ void resolve_expr(Program* program, Module* module, FuncDef* func, GenericKeys* 
                 Field* f = map_remove(temp_fields, key);
                 if (f == NULL) spanned_error("Invalid struct field", field->name->span, "Struct %s has no such field '%s'", type->name->name, key);
                 resolve_expr(program, module, func, type_generics, field->value, vars);
-                assert_types_equal(program, module, field->value->resolved->type, f->type, field->name->span, func->generics, type_generics);
+                TypeValue* value_ty = field->value->resolved->type;
+                TypeValue* field_ty = f->type;
+                if (slit->type->generics != NULL && !field_ty->name->absolute && field_ty->name->elements.length == 1 && map_contains(slit->type->generics->resolved, field_ty->name->elements.elements[0]->name)) {
+                    field_ty = map_get(slit->type->generics->resolved, field_ty->name->elements.elements[0]->name);
+                }
+                assert_types_equal(program, module, value_ty, field_ty, field->name->span, func->generics, type_generics);
             }));
             map_foreach(temp_fields, lambda(void, (str key, Field* field) {
                 spanned_error("Field not initialized", slit->type->name->elements.elements[0]->span, "Field '%s' of struct %s was not initialized", type->name->name, key);
@@ -527,6 +537,7 @@ void resolve_funcdef(Program* program, Module* module, FuncDef* func, bool* head
 void resolve_typedef(Program* program, Module* module, TypeDef* ty, bool* head_resolved) {
     if (ty->extern_ref != NULL) {
         log("Type %s is extern", ty->name->name);
+        *head_resolved = true;
         return;
     }
     log("Resolving type %s", ty->name->name);

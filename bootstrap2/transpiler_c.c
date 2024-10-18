@@ -14,15 +14,6 @@
 #include "resolver.h"
 #include "token.h"
 
-str gen_c_fn_name(FuncDef* def, GenericValues* generics) {
-    if (def->body == NULL) {
-        if (def->generics != NULL) spanned_error("Generic extern function", def->name->span, "Extern functions may not be generic");
-        return def->name->name;
-    }
-    u32 hash = str_hash(gvals_to_c_key(generics));
-    return to_str_writer(stream, fprintf(stream,"%s%p%lx", def->name->name, def, hash));
-}
-
 str gen_c_type_name(TypeValue* tv, GenericValues* generics) {
     TypeDef* ty = tv->def;
     if (ty == NULL) panic("Unresolved type");
@@ -37,10 +28,39 @@ str gen_c_type_name(TypeValue* tv, GenericValues* generics) {
             return gen_c_type_name(concrete, NULL);
         }
     }
-    str key = gvals_to_c_key(tv->generics);
-    log("making c name %s%s", ty->name->name, key);
+    str key = to_str_writer(stream, {
+        fprintf(stream, "%p", ty);
+        if (tv->generics != NULL) {
+            fprintf(stream, "<");
+            list_foreach_i(&tv->generics->generics, lambda(void, (usize i, TypeValue* generic_tv) {
+                if (i > 0) fprintf(stream, ",");
+                fprintf(stream, "%s", gen_c_type_name(generic_tv, generics));
+            }));
+            fprintf(stream, ">");
+        }
+    });
     u32 hash = str_hash(key);
-    return to_str_writer(stream, fprintf(stream,"struct %s%p%lx", ty->name->name, ty, hash));
+    return to_str_writer(stream, fprintf(stream,"struct %s%lx", ty->name->name, hash));
+}
+
+str gen_c_fn_name(FuncDef* def, GenericValues* generics) {
+    if (def->body == NULL) {
+        if (def->generics != NULL) spanned_error("Generic extern function", def->name->span, "Extern functions may not be generic");
+        return def->name->name;
+    }
+    str data = to_str_writer(stream, {
+        fprintf(stream, "%p", def);
+        if (generics != NULL) {
+            fprintf(stream, "<");
+            list_foreach_i(&generics->generics, lambda(void, (usize i, TypeValue* generic_tv) {
+                if (i > 0) fprintf(stream, ",");
+                fprintf(stream, "%s", gen_c_type_name(generic_tv, generics));
+            }));
+            fprintf(stream, ">");
+        }
+    });
+    u32 hash = str_hash(data);
+    return to_str_writer(stream, fprintf(stream,"%s%lx", def->name->name, hash));
 }
 
 GenericValues* expand_generics(GenericValues* generics, GenericValues* context) {
@@ -58,10 +78,8 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
     list_foreach(&generics->generics, lambda(void, (TypeValue* generic) {
         str key = to_str_writer(stream, fprint_typevalue(stream, generic));
         str real_key = map_get(rev, to_str_writer(s, fprintf(s, "%p", generic)));
-        log("%s rekey to %s", key, real_key);
         if (map_contains(context->resolved, key)) {
             TypeValue* concrete = map_get(context->resolved, key);
-            log(" -> %s", to_str_writer(s, fprint_typevalue(s, concrete)));
             list_append(&expanded->generics, concrete);
             map_put(expanded->resolved, real_key, concrete);
         } else {
@@ -103,7 +121,7 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
             GenericValues* fc_generics = fc->generics;
             if (fc->generics != NULL) {
                 fc_generics = expand_generics(fc_generics, generics);
-            } 
+            }
             str c_fn_name = gen_c_fn_name(fd, fc_generics);
             fprintf(code_stream, "%s(", c_fn_name);
             list_foreach_i(&fc->arguments, lambda(void, (usize i, Expression* arg) {
@@ -255,7 +273,6 @@ void transpile_block(FILE* code_stream, str modkey, FuncDef* func, GenericValues
 void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func, GenericValues* generics) {
     str c_fn_name = gen_c_fn_name(func, generics);
     str c_ret_ty = gen_c_type_name(func->return_type, generics);
-    log("%s + %s -> %s", to_str_writer(stream, fprint_typevalue(stream, func->return_type)), gvals_to_c_key(generics), c_ret_ty);
 
     fprintf(header_stream, "// %s::%s%s\n", modkey, func->name->name, gvals_to_c_key(generics));
     fprintf(header_stream, "%s %s(", c_ret_ty, c_fn_name);
@@ -296,11 +313,11 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
 
 bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
     if (instance->generic_func_ctx == NULL && instance->generic_type_ctx == NULL) return true;
+    if (instance->generic_func_ctx != NULL && instance->generic_type_ctx != NULL) todo();
     if (instance->generic_func_ctx != NULL) {
         map_foreach(instance->generic_func_ctx->generic_uses, lambda(void, (str _key, GenericValues* context) {
             GenericValues* expanded = expand_generics(instance, context);
             str expanded_key = gvals_to_key(expanded);
-            log("Expanded %s in %s to %s", gvals_to_key(instance), gvals_to_key(context), expanded_key);
             if (!map_contains(instance_host->generic_uses, expanded_key)) {
                 map_put(instance_host->generic_uses, expanded_key, expanded);
                 // we are iterating over this but in this case we can safely append, even if realloc
@@ -308,14 +325,23 @@ bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
             }
         }));
     }
-    if (instance->generic_type_ctx != NULL) todo();
+    if (instance->generic_type_ctx != NULL) {
+        map_foreach(instance->generic_type_ctx->generic_uses, lambda(void, (str _key, GenericValues* context) {
+            GenericValues* expanded = expand_generics(instance, context);
+            str expanded_key = gvals_to_key(expanded);
+            if (!map_contains(instance_host->generic_uses, expanded_key)) {
+                map_put(instance_host->generic_uses, expanded_key, expanded);
+                // we are iterating over this but in this case we can safely append, even if realloc
+                list_append(&instance_host->generic_use_keys, expanded_key);
+            }
+        }));
+    }
     return false;
 }
 
 void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func) {
     if (func->generics != NULL) {
         // we can safely append to that list, even if it reallocates it should be fine
-        log("looping %s", func->name->name);
         list_foreach(&func->generics->generic_use_keys, lambda(void, (str key) {
             GenericValues* generics = map_get(func->generics->generic_uses, key);
             if (monomorphize(generics, func->generics)) {
@@ -327,56 +353,30 @@ void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, Func
     }
 }
 
-void transpile_typedef_def_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, GenericValues* generics) {
+void transpile_typedef_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, GenericValues* generics, bool body) {
     if (!ty->extern_ref) {
         TypeValue* tv = gc_malloc(sizeof(TypeValue));
         tv->def = ty;
         tv->name = NULL;
         tv->generics = generics;
         str c_name = gen_c_type_name(tv, NULL);
-        fprintf(header_stream, "// %s::%s\n", modkey, ty->name->name);
-        fprintf(header_stream, "%s;\n", c_name);
+        fprintf(header_stream, "// %s::%s%s\n", modkey, ty->name->name, gvals_to_key(tv->generics));
+        fprintf(header_stream, "%s", c_name);
+        if (body) {
+            fprintf(header_stream, " {\n");
+            map_foreach(ty->fields, lambda(void, (str key, Field* f) {
+                str c_field_ty = gen_c_type_name(f->type, generics);
+                str c_field_name = key;
+                fprintf(header_stream, "   %s %s;\n", c_field_ty, c_field_name);
+            }));
+            fprintf(header_stream, "}");
+        }
+        fprintf(header_stream, ";\n");
         fprintf(header_stream, "\n");
     }
 }
 
-void transpile_typedef_def(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty) {
-    if (ty->extern_ref) {
-        return;
-    }
-    if (ty->generics != NULL) {
-        // we can safely append to that list, even if it reallocates it should be fine
-        list_foreach(&ty->generics->generic_use_keys, lambda(void, (str key) {
-            GenericValues* generics = map_get(ty->generics->generic_uses, key);
-            if (monomorphize(generics, ty->generics)) {
-                transpile_typedef_def_generic_variant(header_stream, code_stream, modkey, ty, generics);
-            }
-        }));
-    } else {
-        transpile_typedef_def_generic_variant(header_stream, code_stream, modkey, ty, NULL);
-    }
-}
-
-void transpile_typedef_body_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, GenericValues* generics) {
-    if (!ty->extern_ref) {
-        TypeValue* tv = gc_malloc(sizeof(TypeValue));
-        tv->def = ty;
-        tv->name = NULL;
-        tv->generics = generics;
-        str c_name = gen_c_type_name(tv, NULL);
-        fprintf(header_stream, "// %s::%s\n", modkey, ty->name->name);
-        fprintf(header_stream, "%s {\n", c_name);
-        map_foreach(ty->fields, lambda(void, (str key, Field* f) {
-            str c_field_ty = gen_c_type_name(f->type, NULL);
-            str c_field_name = key;
-            fprintf(header_stream, "   %s %s;\n", c_field_ty, c_field_name);
-        }));
-        fprintf(header_stream, "};\n");
-        fprintf(header_stream, "\n");
-    }
-}
-
-void transpile_typedef_body(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty) {
+void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, bool body) {
     if (ty->extern_ref) {
         return;
     }
@@ -384,21 +384,23 @@ void transpile_typedef_body(FILE* header_stream, FILE* code_stream, str modkey, 
         // we can safely append to that list
         list_foreach(&ty->generics->generic_use_keys, lambda(void, (str key) {
             GenericValues* generics = map_get(ty->generics->generic_uses, key);
-            transpile_typedef_body_generic_variant(header_stream, code_stream, modkey, ty, generics);
+            if (monomorphize(generics, ty->generics)) {
+                transpile_typedef_generic_variant(header_stream, code_stream, modkey, ty, generics, body);
+            }
         }));
     } else {
-        transpile_typedef_body_generic_variant(header_stream, code_stream, modkey, ty, NULL);
+        transpile_typedef_generic_variant(header_stream, code_stream, modkey, ty, NULL, body);
     }
 }
 
 
-void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module,usize stage) {
+void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, usize stage) {
     if (stage == 1) map_foreach(module->items, lambda(void, (str key, ModuleItem* item) {
         switch (item->type) {
         case MIT_FUNCTION:
             break;
         case MIT_STRUCT:
-            transpile_typedef_def(header_stream, code_stream, modkey, item->item);
+            transpile_typedef(header_stream, code_stream, modkey, item->item, false);
             break;
         }
     }));
@@ -407,7 +409,7 @@ void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module
         case MIT_FUNCTION:
             break;
         case MIT_STRUCT:
-            transpile_typedef_body(header_stream, code_stream, modkey, item->item);
+            transpile_typedef(header_stream, code_stream, modkey, item->item, true);
             break;
         }
     }));

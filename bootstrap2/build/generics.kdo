@@ -25,6 +25,10 @@ struct Box<T> {
     item: T
 }
 
+struct BoxHolder<T> {
+    item: Box<T>
+}
+
 
 fn main() {
     // just checking that all these expand correctly...
@@ -46,11 +50,18 @@ fn main() {
     print_typeinfo::<std::unit>();
     
     let box = Box::<std::i8> { item: 0i8 };
+    let item = unbox::<std::i8>(box);
     let box = Box::<std::i32> { item: 0i32 };
     let box = Box::<Box<std::i32>> { item: Box::<std::i32> { item: 1i32 } };
+    let item = box.item.item;
+    let holder = BoxHolder::<std::i8> { item: Box::<std::i8> { item: 0i8 } };
     print_typeinfo::<Box<std::i8>>();
     print_typeinfo::<Box<std::i32>>();
     print_typeinfo::<Box<Box<std::i32>>>();
+}
+
+fn unbox<I>(b: Box<I>) -> I {
+    b.item
 }
 
 fn print_typeinfo<T>() {
