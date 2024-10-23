@@ -11,19 +11,9 @@
 |  | \\_/\_|| \| || || |_|_| |\_|   |__| || |\_||_|| |\_||__     \___[_[_]__]___|
 ```
 
-
-
-
-
-
-
-
-
-
-
 ## Quickstart
 ```sh
-cd bootstrap2/build
+cd bootstrap/build
 ./build # build the compiler
 ./run hello # compile an run hello.kdo
 ```
