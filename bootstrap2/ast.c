@@ -5,6 +5,8 @@
 #include "lib/map.h"
 #include "lib/str.h"
 #include "token.h"
+#include "module.h"
+
 #include <stdio.h>
 
 Path* path_new(bool absolute, IdentList elements) {
@@ -31,8 +33,8 @@ Path* path_join(Path* parent, Path* child) {
 }
 
 void fprint_path(FILE* file, Path* path) {
-    if (path->absolute) fprintf(file, "::");
-    list_foreach_i(&path->elements, lambda(void, (usize i, Identifier* element) {
+    if (path->absolute && path->elements.length > 0) fprintf(file, "::");
+    list_foreach_i(&path->elements, lambda(void, usize i, Identifier* element, {
         if (i > 0) fprintf(file, "::");
         fprintf(file, "%s", element->name);
     }));
@@ -46,10 +48,15 @@ void fprint_expression(FILE* file, Expression* expression) {
 }
 
 void fprint_typevalue(FILE* file, TypeValue* tval) {
-    fprint_path(file, tval->name);
+    if (tval->def != NULL && tval->def->module != NULL) {
+        fprint_path(file, tval->def->module->path);
+        fprintf(file, "::%s", tval->def->name->name);
+    } else{
+        fprint_path(file, tval->name);        
+    }
     if (tval->generics != NULL && tval->generics->generics.length > 0) {
         fputc('<', file);
-        list_foreach_i(&tval->generics->generics, lambda(void, (int i, TypeValue* generic) {
+        list_foreach_i(&tval->generics->generics, lambda(void, int i, TypeValue* generic, {
             fprint_typevalue(file, generic);
         }));
         fputc('>', file);   

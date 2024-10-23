@@ -1,0 +1,10 @@
+fn malloc<T>() -> std::ptr<T> {
+    let size = std::sizeof::<T>();
+    let raw_ptr = c_api::malloc(size);
+    std::typecast::<std::opaque_ptr, std::ptr<T>>(raw_ptr)
+}
+
+fn free<T>(ptr: std::ptr<T>) {
+    let raw_ptr = std::typecast::<std::ptr<T>, std::opaque_ptr>(ptr);
+    c_api::free(raw_ptr);
+}

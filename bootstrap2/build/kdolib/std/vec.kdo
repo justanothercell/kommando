@@ -1,0 +1,5 @@
+struct Vec<T> {
+    length: std::usize,
+    capacity: std::usize,
+    buffer: std::opaque_ptr
+}

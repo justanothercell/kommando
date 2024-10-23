@@ -9,7 +9,7 @@ void fprint_stacktrace(FILE* file);
 
 void __panic(str file, usize line, str fmt, ...);
 #define panic(fmt, ...) __panic(__FILENAME__, __LINE__, fmt, ## __VA_ARGS__)
-#define unreachable(...) panic("Unreachabe expression reached" __VA_ARGS__)
+#define unreachable(...) panic("Unreachabe expression reached: " __VA_ARGS__)
 #define todo(...) panic("TODO: " __VA_ARGS__)
 
 void __quit(str file, usize line, int code);

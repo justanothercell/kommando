@@ -25,6 +25,7 @@ Path* path_join(Path* parent, Path* child);
 void fprint_path(FILE* file, Path* path);
 typedef struct TypeValue TypeValue;
 typedef struct FuncDef FuncDef;
+typedef struct Module Module;
 typedef struct GenericKeys GenericKeys;
 typedef struct Field {
     Identifier* name;
@@ -35,6 +36,8 @@ typedef struct TypeDef {
     GenericKeys* generics;
     str extern_ref;
     Map* fields;
+    u32 transpile_state;
+    Module* module;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
 
@@ -73,10 +76,13 @@ ENUM(ExprType,
     EXPR_BLOCK,
     EXPR_VARIABLE,
     EXPR_LET,
+    EXPR_ASSIGN,
     EXPR_CONDITIONAL,
     EXPR_WHILE_LOOP,
     EXPR_RETURN,   // typeof(expr) = Expression*
     EXPR_BREAK,    // typeof(expr) = Expression*
+    EXPR_TAKEREF,  // typeof(expr) = Expression*
+    EXPR_DEREF,    // typeof(expr) = Expression*
     EXPR_CONTINUE, // no data
     EXPR_FIELD_ACCESS,
     EXPR_STRUCT_LITERAL,
@@ -145,6 +151,11 @@ typedef struct LetExpr {
     Expression* value;
 } LetExpr;
 
+typedef struct Assign {
+    Expression* asignee;
+    Expression* value;
+} Assign;
+
 typedef struct Conditional {
     Expression* cond;
     Block* then;
@@ -169,6 +180,7 @@ typedef struct FuncDef {
     bool no_mangle;
     bool is_variadic;
     GenericKeys* generics;
+    Module* module;
 } FuncDef;
 
 ENUM(ModuleItemType,

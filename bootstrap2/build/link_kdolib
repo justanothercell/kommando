@@ -1,2 +1,0 @@
-#!/bin/sh
-echo ::c_api=kdolib/c_api.kdo ::c_api::str=kdolib/c_api/str.kdo

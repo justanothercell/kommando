@@ -6,6 +6,9 @@ fn fclose(stream: std::opaque_ptr) -> std::i32;
 
 fn exit(code: std::i32) -> std::c_void;
 
+fn malloc(size: std::usize) -> std::opaque_ptr;
+fn free(ptr: std::opaque_ptr) -> std::c_void;
+
 // we do not have constants yet
 fn null() -> std::opaque_ptr {
     std::typecast::<std::usize, std::opaque_ptr>(0usize)

@@ -116,7 +116,7 @@ void compile(CompilerOptions options) {
     program->main_module = main;
     map_put(program->modules, to_str_writer(stream, fprint_path(stream, main->path)), main);
     map_put(program->modules, to_str_writer(stream, fprint_path(stream, std->path)), std);
-    map_foreach(options.modules, lambda(void, (str modname, str file) {
+    map_foreach(options.modules, lambda(void, str modname, str file, {
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
         Module* mod = parse_module_contents(s, gen_path(modname));
         map_put(program->modules, to_str_writer(stream, fprint_path(stream, mod->path)), mod);

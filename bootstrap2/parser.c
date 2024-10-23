@@ -58,6 +58,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     type->extern_ref = NULL;
     type->generics = keys;
     type->fields = fields;
+    type->transpile_state = 0;
     type->name = name;
 }
 
@@ -79,6 +80,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->type = MIT_FUNCTION;
             mi->span = function->name->span;
             mi->head_resolved = false;
+            function->module = module;
             map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
@@ -87,6 +89,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->type = MIT_STRUCT;
             mi->span = type->name->span;
             mi->head_resolved = false;
+            type->module = module;
             map_put(module->items, type->name->name, mi);
         } else {
             unexpected_token(t);
@@ -101,7 +104,11 @@ Expression* parse_expresslet(TokenStream* stream) {
     CodePoint start = t->span.left;
     CodePoint end = t->span.right;
     
-    if (token_compare(t, "let", IDENTIFIER)) {
+    if (token_compare(t, "(", SNOWFLAKE)) {
+        expression = parse_expression(stream);
+        t = next_token(stream);
+        if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
+    } else if (token_compare(t, "let", IDENTIFIER)) {
         Identifier* name = parse_identifier(stream);
         end = name->span.right;
         LetExpr* let = gc_malloc(sizeof(LetExpr));
@@ -145,7 +152,7 @@ Expression* parse_expresslet(TokenStream* stream) {
             end = ((Expression*)expression->expr)->span.right;
         }
         expression->type = EXPR_BREAK;
-    } else if (token_compare(t, "contimue", IDENTIFIER)) {
+    } else if (token_compare(t, "continue", IDENTIFIER)) {
         expression->type = EXPR_CONTINUE;
         expression->expr = NULL;
     } else if (token_compare(t, "if", IDENTIFIER)) {
@@ -283,7 +290,32 @@ int bin_op_precedence(str op) {
 }
 
 Expression* parse_expression(TokenStream* stream) {
-    Expression* expr = parse_expresslet(stream);
+    Expression* expr = NULL;
+    Expression** inner = &expr;
+
+    while (true) {
+        Token* t = next_token(stream);
+        if (token_compare(t, "&", SNOWFLAKE)) {
+            Expression* ref = gc_malloc(sizeof(Expression));
+            ref->span = t->span;
+            ref->type = EXPR_TAKEREF;
+            ref->expr = NULL;
+            *inner = ref;
+            inner = (Expression**)&ref->expr;
+        } else if (token_compare(t, "*", SNOWFLAKE)) {
+            Expression* deref = gc_malloc(sizeof(Expression));
+            deref->span = t->span;
+            deref->type = EXPR_DEREF;
+            deref->expr = NULL;
+            *inner = deref;
+            inner = (Expression**)&deref->expr;
+        } else {
+            stream->peek = t;
+            *inner = parse_expresslet(stream);
+            break;
+        }
+    }
+    
     while (true) {
         Token* t = next_token(stream);
         if (t->type == SNOWFLAKE) {
@@ -299,8 +331,18 @@ Expression* parse_expression(TokenStream* stream) {
                     t->string[2] = 0;
                     t->span.right = n->span.right;
                 } else {
-                    if (str_eq("=", t->string)) unexpected_token(n);
                     stream->peek = n;
+                    if (str_eq("=", t->string)) {
+                        Expression* value = parse_expression(stream);
+                        Assign* assign = gc_malloc(sizeof(Assign));
+                        assign->asignee = expr;
+                        assign->value = value;
+                        Expression* assignment = gc_malloc(sizeof(Expression));
+                        assignment->span = from_points(&expr->span.left, &value->span.right);
+                        assignment->type = EXPR_ASSIGN;
+                        assignment->expr = assign;
+                        return assignment;
+                    }
                 }
                 Expression* rhs = parse_expresslet(stream);
                 if (expr->type == EXPR_BIN_OP) {

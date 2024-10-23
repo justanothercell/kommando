@@ -1,2 +1,2 @@
 #!/bin/sh
-./compiler $(./link_kdolib) $1.kdo $1 -cr
+./compiler $(./kdolib/link) $1.kdo $1 -cr

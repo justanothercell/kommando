@@ -9,12 +9,58 @@
 #define IDENTITY_MACRO(x) x
 #define STRINGIFY(x) #x
 
+#define VALUE_IF_ELSE_TEST(x, y) y
+#define VALUE_IF_ELSE_TEST0(x, y) y
+#define VALUE_IF_ELSE_TEST1(x, y) x
+#define VALUE_IF_ELSE(COND, x, y) VALUE_IF_ELSE_TEST ## COND (x, y)
+
+#define VALUE_IF_TEST(...)
+#define VALUE_IF_TEST0(...)
+#define VALUE_IF_TEST1(...) __VA_ARGS__
+#define VALUE_IF(COND, ...) VALUE_IF_TEST ## COND (__VA_ARGS__)
+
+#define VALUE_UNLESS_TEST(...) __VA_ARGS__
+#define VALUE_UNLESS_TEST0(...) __VA_ARGS__
+#define VALUE_UNLESS_TEST1(...)
+#define VALUE_UNLESS(COND, ...) VALUE_UNLESS_TEST ## COND (__VA_ARGS__)
 
 #ifndef __INTELLISENSE__
-#define lambda(ret_type, _body) ({ ret_type f1234567890 _body; f1234567890; })
+#define _lambda0(x, ...) VALUE_IF(__VA_OPT__(1), , x)
+#define _lambda1(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda0(__VA_ARGS__))
+#define _lambda2(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda1(__VA_ARGS__))
+#define _lambda3(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda2(__VA_ARGS__))
+#define _lambda4(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda3(__VA_ARGS__))
+#define _lambda5(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda4(__VA_ARGS__))
+#define _lambda6(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda5(__VA_ARGS__))
+#define _lambda7(x, ...) VALUE_IF(__VA_OPT__(1), , x _lambda6(__VA_ARGS__))
+#define _lambda8(x, ...) VALUE_IF(__VA_OPT__(1), x _lambda7(__VA_ARGS__))
+#define _body0(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x, x)
+#define _body1(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body0(__VA_ARGS__), x)
+#define _body2(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body1(__VA_ARGS__), x)
+#define _body3(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body2(__VA_ARGS__), x)
+#define _body4(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body3(__VA_ARGS__), x)
+#define _body5(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body4(__VA_ARGS__), x)
+#define _body6(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body5(__VA_ARGS__), x)
+#define _body7(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body6(__VA_ARGS__), x)
+#define _body8(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), _body7(__VA_ARGS__), x)
+#define lambda(ret_type, ...) ({ ret_type f1234567890 ( _lambda8(__VA_ARGS__) ) _body8(__VA_ARGS__); f1234567890; })
+
+#define lambda_return return
 #else
-// dummy since intellij doesnt know inner functions
-#define lambda(ret_type, _body) ({ void* f1234567890(); f1234567890; })
+// dummy def since intellij/clang doesnt know inner functions
+#define _body(body) body;
+#define _lambda1(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _body(__VA_ARGS__), x;)
+#define _lambda2(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda1(__VA_ARGS__), x;)
+#define _lambda2(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda1(__VA_ARGS__), x;)
+#define _lambda3(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda2(__VA_ARGS__), x;)
+#define _lambda4(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda3(__VA_ARGS__), x;)
+#define _lambda5(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda4(__VA_ARGS__), x;)
+#define _lambda6(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda5(__VA_ARGS__), x;)
+#define _lambda7(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda6(__VA_ARGS__), x;)
+#define _lambda8(x, ...) VALUE_IF_ELSE(__VA_OPT__(1), x = {}; _lambda7(__VA_ARGS__), x;)
+#define lambda(ret_type, ...) ({ void* f1234567890(); _lambda8(__VA_ARGS__) f1234567890; })
+
+#define lambda_return
 #endif
 
 #ifdef __WIN32__

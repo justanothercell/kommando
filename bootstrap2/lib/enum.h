@@ -19,7 +19,15 @@
 #define FIELDS14(macro, f, ...) macro(f) __VA_OPT__(, FIELDS13(macro,__VA_ARGS__))
 #define FIELDS15(macro, f, ...) macro(f) __VA_OPT__(, FIELDS14(macro,__VA_ARGS__))
 #define FIELDS16(macro, f, ...) macro(f) __VA_OPT__(, FIELDS15(macro,__VA_ARGS__))
-#define FIELDS(macro, ...) FIELDS16(macro,__VA_ARGS__)
+#define FIELDS17(macro, f, ...) macro(f) __VA_OPT__(, FIELDS16(macro,__VA_ARGS__))
+#define FIELDS18(macro, f, ...) macro(f) __VA_OPT__(, FIELDS17(macro,__VA_ARGS__))
+#define FIELDS19(macro, f, ...) macro(f) __VA_OPT__(, FIELDS18(macro,__VA_ARGS__))
+#define FIELDS20(macro, f, ...) macro(f) __VA_OPT__(, FIELDS19(macro,__VA_ARGS__))
+#define FIELDS21(macro, f, ...) macro(f) __VA_OPT__(, FIELDS20(macro,__VA_ARGS__))
+#define FIELDS22(macro, f, ...) macro(f) __VA_OPT__(, FIELDS21(macro,__VA_ARGS__))
+#define FIELDS23(macro, f, ...) macro(f) __VA_OPT__(, FIELDS22(macro,__VA_ARGS__))
+#define FIELDS24(macro, f, ...) macro(f) __VA_OPT__(, FIELDS23(macro,__VA_ARGS__))
+#define FIELDS(macro, ...) FIELDS24(macro,__VA_ARGS__)
 
 #define ENUM(name, ...) typedef enum name { FIELDS(IDENTITY_MACRO, __VA_ARGS__) } name; static char* name##__NAMES[] = { FIELDS(STRINGIFY, __VA_ARGS__) } /* NOLINT(writable-strings) */
 

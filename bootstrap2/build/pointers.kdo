@@ -1,0 +1,30 @@
+/*struct Link<K> {
+    prev: std::ptr<Link<K>>,
+    next: std::ptr<Link<K>>,
+    item: K
+}
+
+fn link_new<X>(item: X) -> std::ptr<Link<X>> {
+    let link = std::mem::malloc::<Link<X>>();
+    (*link).item = item;
+    link
+}
+
+fn main() {
+    let link = link_new::<std::i32>(4);
+}*/
+fn foo<X>(x: Box<Box<X>>) {
+    
+}
+
+fn bar<Z>() -> Box<Box<Z>> {
+    Box::<Box::<Z>> { }
+}
+
+struct Box<T> {}
+
+fn main() {
+    let f = bar::<std::i32>();
+    //foo::<std::i32>(f);
+    c_api::printf("Done :3\n");
+}
