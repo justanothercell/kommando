@@ -8,3 +8,7 @@ fn free<T>(ptr: std::ptr<T>) {
     let raw_ptr = std::typecast::<std::ptr<T>, std::opaque_ptr>(ptr);
     c_api::free(raw_ptr);
 }
+
+fn null<T>() -> std::ptr<T> {
+    std::typecast::<std::usize, std::ptr<T>>(0usize)
+}

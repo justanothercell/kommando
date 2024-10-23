@@ -227,9 +227,7 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
     // no need to register if we are not generic - we just complie the one default nongeneric variant in that case
     if (gkeys != NULL) {
         str key = gvals_to_key(gvals);
-        log("registring check %s", key);
         if (!map_contains(gkeys->generic_uses, key)) {
-            log("yes!");
             map_put(gkeys->generic_uses, key, gvals);
             list_append(&gkeys->generic_use_keys, key);
         }
@@ -238,9 +236,7 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
 }
 
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics) {
-    log("r %s", to_str_writer(s, fprint_typevalue(s, tval)));
     if (tval->def != NULL) return;
-    log("...doing r");
     // might be a generic? >`OvO´<
     if (!tval->name->absolute && tval->name->elements.length == 1) {
         str key = tval->name->elements.elements[0]->name;
@@ -258,12 +254,10 @@ void resolve_typevalue(Program* program, Module* module, TypeValue* tval, Generi
         if ((func_gen_t != NULL || type_gen_t != NULL) && tval->generics != NULL) spanned_error("Generic generic", tval->generics->span, "Generic parameter should not have generic arguments @ %s", to_str_writer(s, fprint_span(s, &tval->def->name->span)));
         if (func_gen_t != NULL) {
             tval->def = func_gen_t;
-    log("done generic F r %s", to_str_writer(s, fprint_typevalue(s, tval)));
             return;
         }
         if (type_gen_t != NULL) {
             tval->def = type_gen_t;
-    log("done generic T r %s", to_str_writer(s, fprint_typevalue(s, tval)));
             return;
         }
     }
@@ -274,7 +268,6 @@ void resolve_typevalue(Program* program, Module* module, TypeValue* tval, Generi
             resolve_typevalue(program, module, tv, func_generics, type_generics);
         }));
     }
-    log("done r %s", to_str_writer(s, fprint_typevalue(s, tval)));
 }
 
 void assert_types_equal(Program* program, Module* module, TypeValue* tv1, TypeValue* tv2, Span span, GenericKeys* func_generics, GenericKeys* type_generics) {
@@ -460,12 +453,26 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         case EXPR_WHILE_LOOP: {
             WhileLoop* wl = expr->expr;
             resolve_expr(program, func, type_generics, wl->cond, vars);
+            TypeValue* bool_ty = gen_typevalue("::std::bool", &wl->cond->span);
+            resolve_typevalue(program, func->module, bool_ty, func->generics, type_generics);
+            assert_types_equal(program, func->module, wl->cond->resolved->type, bool_ty, wl->cond->span, func->generics, type_generics);
             resolve_block(program, func, type_generics, wl->body, vars);
-            todo("resolve EXPR_WHILE_LOOP");
+            expr->resolved = gc_malloc(sizeof(TVBox));
+            expr->resolved->type = wl->body->res;
         } break;
         case EXPR_RETURN: {
-            resolve_expr(program, func, type_generics, expr->expr, vars);
-            todo("resolve EXPR_RETURN");
+            Expression* ret = expr->expr;
+            if (expr == NULL) {
+                TypeValue* bool_ty = gen_typevalue("::std::unit", &expr->span);
+                resolve_typevalue(program, func->module, bool_ty, func->generics, type_generics);
+                expr->resolved = gc_malloc(sizeof(TVBox));
+                expr->resolved->type = bool_ty;
+            } else {
+                resolve_expr(program, func, type_generics, ret, vars);
+                expr->resolved = gc_malloc(sizeof(TVBox));
+                expr->resolved->type = ret->resolved->type;
+            }
+            assert_types_equal(program, func->module, expr->resolved->type, func->return_type, func->name->span, func->generics, type_generics);
         } break;
         case EXPR_BREAK: {
             resolve_expr(program, func, type_generics, expr->expr, vars);
@@ -502,9 +509,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_STRUCT_LITERAL: {
             StructLiteral* slit = expr->expr;
-            log("STRUCT LITERAL...");
             resolve_typevalue(program, func->module, slit->type, func->generics, type_generics);
-            log("STRUCT LITERAL: %s", to_str_writer(s, fprint_typevalue(s, slit->type)));
             TypeDef* type = slit->type->def;
             Map* temp_fields = map_new();
             map_foreach(type->fields, lambda(void, str key, Field* field, {
@@ -613,7 +618,13 @@ void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved) {
 
     if (func->body != NULL) {
         resolve_block(program, func, type_generics, func->body, &vars);
+        // last expression is not a "return"?
+        if (func->body->expressions.length > 0) {
+            Expression* last = func->body->expressions.elements[func->body->expressions.length - 1];
+            if (last->type == EXPR_RETURN) goto return_manually;
+        }
         assert_types_equal(program, func->module, func->body->res, func->return_type, func->name->span, func->generics, type_generics);
+        return_manually: {}
     }
 }
 

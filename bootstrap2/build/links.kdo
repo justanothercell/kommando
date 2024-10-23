@@ -1,0 +1,70 @@
+struct Link<T> {
+    prev: std::ptr<Link<T>>,
+    next: std::ptr<Link<T>>,
+    item: T
+}
+
+fn link_new<T>(item: T) -> std::ptr<Link<T>> {
+    let link = std::mem::malloc::<Link<T>>();
+    (*link).item = item;
+    link
+}
+
+
+fn link_insert_after<T>(link: std::ptr<Link<T>>, item: T) -> std::ptr<Link<T>> {
+    let next = link_new::<T>(item);
+    if (*link).next != std::mem::null::<std::ptr<Link<T>>>() {
+        (*next).next = (*link).next;
+        (*(*link).next).prev = next;
+    };
+    (*link).next = next;
+    (*next).prev = link;
+    next
+}
+
+fn link_insert_before<T>(link: std::ptr<Link<T>>, item: T) -> std::ptr<Link<T>> {
+    let prev = link_new::<T>(item);
+    if (*link).prev != std::mem::null::<std::ptr<Link<T>>>() {
+        (*prev).prev = (*link).prev;
+        (*(*link).prev).next = prev;
+    };
+    (*link).prev = prev;
+    (*prev).next = link;
+    prev
+}
+
+fn link_goto_start<T>(link: std::ptr<Link<T>>) -> std::ptr<Link<T>> {
+    while (*link).prev != std::mem::null::<std::ptr<Link<T>>>() {
+        link = (*link).prev;
+    };
+    link
+}
+
+fn link_goto_end<T>(link: std::ptr<Link<T>>) -> std::ptr<Link<T>> {
+    while (*link).next != std::mem::null::<std::ptr<Link<T>>>() {
+        link = (*link).next;
+    };
+    link
+}
+
+fn main() {
+    let link = link_new::<std::i32>(4);
+    link = link_insert_after::<std::i32>(link, 6);
+    link = link_insert_after::<std::i32>(link, 8);
+    link = link_insert_after::<std::i32>(link, 10);
+    link = link_insert_after::<std::i32>(link, 12);
+    link = link_insert_after::<std::i32>(link, 21);
+    link = link_insert_after::<std::i32>(link, 28);
+    link = link_insert_after::<std::i32>(link, 37);
+    link = link_insert_after::<std::i32>(link, 44);
+    link = link_insert_after::<std::i32>(link, 51);
+
+    link = link_goto_start::<std::i32>(link);
+    c_api::printf("0: %d\n", (*link).item);
+    let elem = 1;
+    while (*link).next != std::mem::null::<std::ptr<Link<std::i32>>>() {
+        link = (*link).next;
+        c_api::printf("%d: %d\n", elem, (*link).item);
+        elem = elem + 1;
+    };
+}

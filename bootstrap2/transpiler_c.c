@@ -95,7 +95,7 @@ str gen_c_fn_name(FuncDef* def, GenericValues* generics) {
 }
 
 GenericValues* expand_generics(GenericValues* generics, GenericValues* context) {
-    if (generics == NULL || (generics->generic_func_ctx == NULL && generics->generic_type_ctx == NULL) || context == NULL) return generics;
+    if (generics == NULL || context == NULL) return generics;
     GenericValues* expanded = gc_malloc(sizeof(GenericValues));
     expanded->generic_func_ctx = context->generic_func_ctx;
     expanded->generic_type_ctx = context->generic_type_ctx;
@@ -109,20 +109,19 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
     list_foreach(&generics->generics, lambda(void, TypeValue* generic, {
         str key = to_str_writer(stream, fprint_typevalue(stream, generic));
         str real_key = map_get(rev, to_str_writer(s, fprintf(s, "%p", generic)));
-        log("expand %s %s", key, real_key);
         if (map_contains(context->resolved, key)) {
             TypeValue* concrete = map_get(context->resolved, key);
-            log("... replaced with %s", to_str_writer(stream, fprint_typevalue(stream, concrete)));
             list_append(&expanded->generics, concrete);
             map_put(expanded->resolved, real_key, concrete);
         } else {
             TypeValue* concrete = generic;
-            log("... keeping %s", to_str_writer(stream, fprint_typevalue(stream, concrete)));
-            GenericValues* expandeds = expand_generics(concrete->generics, context);
-
-            log("... expanded %s", to_str_writer(stream, fprint_typevalue(stream, concrete)));
-            list_append(&expanded->generics, concrete);
-            map_put(expanded->resolved, real_key, concrete);
+            GenericValues* c_e = expand_generics(concrete->generics, context);
+            TypeValue* concrete_expanded = gc_malloc(sizeof(TypeValue));
+            concrete_expanded->generics = c_e;
+            concrete_expanded->def = concrete->def;
+            concrete_expanded->name = concrete->name;
+            list_append(&expanded->generics, concrete_expanded);
+            map_put(expanded->resolved, real_key, concrete_expanded);
         }
     }));
     return expanded;
@@ -226,7 +225,14 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
             fprintf(code_stream, "})");
         } break;
         case EXPR_WHILE_LOOP: {
-            todo("EXPR_WHILE_LOOP");
+            WhileLoop* wl = expr->expr;
+            fprintf(code_stream, "({\n");
+            fprint_indent(code_stream, indent + 1);
+            fprintf(code_stream, "while (");
+            transpile_expression(code_stream, modkey, func,  generics, wl->cond, indent + 1);
+            fprintf(code_stream, ") ");
+            transpile_block(code_stream, modkey, func,  generics, wl->body, indent + 1);
+            fprintf(code_stream, ";\n})\n");
         } break;
         case EXPR_RETURN: {
             todo("EXPR_RETURN");
@@ -335,31 +341,28 @@ void transpile_block(FILE* code_stream, str modkey, FuncDef* func, GenericValues
     fprintf(code_stream, "})");
 }
 
-bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
-    GenericValues* instance_i = instance;
-    if (instance_i->generic_func_ctx == NULL && instance_i->generic_type_ctx == NULL) {
-        for (usize i = 0;i < instance_i->generics.length;i++) {
-            GenericValues* v = instance_i->generics.elements[i]->generics;
-            log("  (%s)%llu", gvals_to_key(v), i);
-            if (v == NULL) break;
-            if (v->generic_func_ctx != NULL || v->generic_type_ctx != NULL) {
-                log("found %s", gvals_to_key(v));
-                instance_i = v;
-                break;
-            }
+static GenericValues* find_contexted(GenericValues* instance) {
+    if (instance->generic_func_ctx != NULL || instance->generic_type_ctx != NULL) return instance;
+    for (usize i = 0;i < instance->generics.length;i++) {
+        GenericValues* v = instance->generics.elements[i]->generics;
+        if (v == NULL) continue;
+        v = find_contexted(v);
+        if (v->generic_func_ctx != NULL || v->generic_type_ctx != NULL) {
+            return v;
         }
-        if (instance_i->generic_func_ctx == NULL && instance_i->generic_type_ctx == NULL) return true;
-    } else log("is default");
+    }
+    return instance;
+}
+
+bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
+    GenericValues* instance_i = find_contexted(instance);
+    if (instance_i->generic_func_ctx == NULL && instance_i->generic_type_ctx == NULL) return true;
     if (instance_i->generic_func_ctx != NULL && instance_i->generic_type_ctx != NULL) todo();
     if (instance_i->generic_func_ctx != NULL) {
-        log("%llu", map_size(instance_i->generic_func_ctx->generic_uses));
         map_foreach(instance_i->generic_func_ctx->generic_uses, lambda(void, str key, GenericValues* context, {
             GenericValues* expanded = expand_generics(instance, context);
-                log("  expanded %s to %s", gvals_to_key(instance), gvals_to_key(expanded));
             str expanded_key = gvals_to_key(expanded);
-                log("checking %s -> %s", key, expanded_key);
             if (!map_contains(instance_host->generic_uses, expanded_key)) {
-                log("...added");
                 map_put(instance_host->generic_uses, expanded_key, expanded);
                 // we are iterating over this but in this case we can safely append, even if realloc
                 list_append(&instance_host->generic_use_keys, expanded_key);
@@ -425,11 +428,16 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
 void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func) {
     log("Transpiling function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
     if (func->generics != NULL) {
+        Map* dupls = map_new();
         // we can safely append to that list, even if it reallocates it should be fine
         list_foreach(&func->generics->generic_use_keys, lambda(void, str key, {
             GenericValues* generics = map_get(func->generics->generic_uses, key);
             if (monomorphize(generics, func->generics)) {
-                transpile_function_generic_variant(header_stream, code_stream, modkey, func, generics);
+                str fn_c_name = gen_c_fn_name(func, generics);
+                if (!map_contains(dupls, fn_c_name)) {
+                    transpile_function_generic_variant(header_stream, code_stream, modkey, func, generics);
+                    map_put(dupls, fn_c_name, malloc(1));
+                }
             }
         }));
     } else {
@@ -473,9 +481,7 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
         // we can safely append to that list
         list_foreach(&ty->generics->generic_use_keys, lambda(void, str key, {
             GenericValues* generics = map_get(ty->generics->generic_uses, key);
-            log("mono %s", key);
             if (monomorphize(generics, ty->generics)) { 
-            log("doing the thing!");
                 map_foreach(ty->fields, lambda(void, str key, Field* f, {
                     TypeValue* tv = f->type;
                     if (map_contains(generics->resolved, tv->def->name->name)) tv = map_get(generics->resolved, tv->def->name->name);

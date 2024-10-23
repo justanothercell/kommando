@@ -316,74 +316,72 @@ Expression* parse_expression(TokenStream* stream) {
         }
     }
     
-    while (true) {
-        Token* t = next_token(stream);
-        if (t->type == SNOWFLAKE) {
-            if (str_eq("+", t->string) || str_eq("-", t->string) || str_eq("*", t->string) || str_eq("/", t->string)
-             || str_eq("|", t->string) || str_eq("&", t->string) || str_eq("^", t->string) || str_eq("!", t->string)
-             || str_eq("%", t->string) || str_eq(">", t->string) || str_eq("<", t->string) || str_eq("=", t->string)) {
-                Token* n = next_token(stream);
-                if (n->type == SNOWFLAKE) {
-                    str s = t->string;
-                    t->string = gc_malloc(3);
-                    t->string[0] = s[0];
-                    t->string[1] = n->string[0];
-                    t->string[2] = 0;
-                    t->span.right = n->span.right;
-                } else {
-                    stream->peek = n;
-                    if (str_eq("=", t->string)) {
-                        Expression* value = parse_expression(stream);
-                        Assign* assign = gc_malloc(sizeof(Assign));
-                        assign->asignee = expr;
-                        assign->value = value;
-                        Expression* assignment = gc_malloc(sizeof(Expression));
-                        assignment->span = from_points(&expr->span.left, &value->span.right);
-                        assignment->type = EXPR_ASSIGN;
-                        assignment->expr = assign;
-                        return assignment;
-                    }
-                }
-                Expression* rhs = parse_expresslet(stream);
-                if (expr->type == EXPR_BIN_OP) {
-                    BinOp* lhs = expr->expr;
-                    if (bin_op_precedence(lhs->op) < bin_op_precedence(t->string)) {
-                        Expression* a = lhs->lhs;
-                        Expression* b = lhs->rhs;
-                        Expression* c = rhs;
-                        BinOp* op = gc_malloc(sizeof(BinOp));
-                        op->lhs = b;
-                        op->rhs = c;
-                        op->op = t->string;
-                        op->op_span = t->span;
-                        t->string = lhs->op;
-                        t->span = lhs->op_span;
-                        Expression* op_expr = gc_malloc(sizeof(Expression));
-                        op_expr->expr = op;
-                        op_expr->type = EXPR_BIN_OP;
-                        op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
-                        expr = a;
-                        rhs = op_expr;
-                    }
-                }
-                BinOp* op = gc_malloc(sizeof(BinOp));
-                op->lhs = expr;
-                op->rhs = rhs;
-                op->op = t->string;
-                op->op_span = t->span;
-                Expression* parent = gc_malloc(sizeof(Expression));
-                parent->expr = op;
-                parent->type = EXPR_BIN_OP;
-                parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
-                expr = parent;
+    Token* t = next_token(stream);
+    if (t->type == SNOWFLAKE) {
+        if (str_eq("+", t->string) || str_eq("-", t->string) || str_eq("*", t->string) || str_eq("/", t->string)
+            || str_eq("|", t->string) || str_eq("&", t->string) || str_eq("^", t->string) || str_eq("!", t->string)
+            || str_eq("%", t->string) || str_eq(">", t->string) || str_eq("<", t->string) || str_eq("=", t->string)) {
+            Token* n = next_token(stream);
+            if (n->type == SNOWFLAKE && (str_eq("=", n->string) || str_eq("<", n->string) || str_eq(">", n->string))) {
+                str s = t->string;
+                t->string = gc_malloc(3);
+                t->string[0] = s[0];
+                t->string[1] = n->string[0];
+                t->string[2] = 0;
+                t->span.right = n->span.right;
             } else {
-                stream->peek = t;
-                return expr;
+                stream->peek = n;
+                if (str_eq("=", t->string)) {
+                    Expression* value = parse_expression(stream);
+                    Assign* assign = gc_malloc(sizeof(Assign));
+                    assign->asignee = expr;
+                    assign->value = value;
+                    Expression* assignment = gc_malloc(sizeof(Expression));
+                    assignment->span = from_points(&expr->span.left, &value->span.right);
+                    assignment->type = EXPR_ASSIGN;
+                    assignment->expr = assign;
+                    return assignment;
+                }
             }
+            Expression* rhs = parse_expression(stream);
+            if (rhs->type == EXPR_BIN_OP) {
+                BinOp* rhs_inner = rhs->expr;
+                if (bin_op_precedence(t->string) <= bin_op_precedence(rhs_inner->op)) {
+                    Expression* a = expr;
+                    Expression* b = rhs_inner->lhs;
+                    Expression* c = rhs_inner->rhs;
+                    BinOp* op = gc_malloc(sizeof(BinOp));
+                    op->lhs = a;
+                    op->rhs = b;
+                    op->op = t->string;
+                    op->op_span = t->span;
+                    t->string = rhs_inner->op;
+                    t->span = rhs_inner->op_span;
+                    Expression* op_expr = gc_malloc(sizeof(Expression));
+                    op_expr->expr = op;
+                    op_expr->type = EXPR_BIN_OP;
+                    op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                    expr = op_expr;
+                    rhs = c;
+                }
+            }
+            BinOp* op = gc_malloc(sizeof(BinOp));
+            op->lhs = expr;
+            op->rhs = rhs;
+            op->op = t->string;
+            op->op_span = t->span;
+            Expression* parent = gc_malloc(sizeof(Expression));
+            parent->expr = op;
+            parent->type = EXPR_BIN_OP;
+            parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+            expr = parent;
         } else {
             stream->peek = t;
             return expr;
         }
+    } else {
+        stream->peek = t;
+        return expr;
     }
 }
 
@@ -444,6 +442,7 @@ Block* parse_block(TokenStream* stream) {
 
     while (true) {
         Expression* expression = parse_expression(stream);
+        log("%s", ExprType__NAMES[expression->type]);
         list_append(&expressions, expression);
         t = next_token(stream);
         if (!token_compare(t, ";", SNOWFLAKE)) {
