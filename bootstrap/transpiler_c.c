@@ -45,7 +45,7 @@ void fprint_resolved_typevalue(FILE* stream, TypeValue* tv, GenericValues* gener
 
 str gen_c_type_name(TypeValue* tv, GenericValues* generics) {
     TypeDef* ty = tv->def;
-    if (ty == NULL) panic("Unresolved type");
+    if (ty == NULL) panic("Unresolved type %s @ %s", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->name->elements.elements[0]->span)));
     if (ty->extern_ref != NULL) {
         return ty->extern_ref;
     }

@@ -445,6 +445,7 @@ Block* parse_block(TokenStream* stream) {
         log("%s", ExprType__NAMES[expression->type]);
         list_append(&expressions, expression);
         t = next_token(stream);
+        log("'%s'", t->string);
         if (!token_compare(t, ";", SNOWFLAKE)) {
             if (token_compare(t, "}", SNOWFLAKE)) {
                 yield_last = true;
