@@ -4,6 +4,12 @@
 #include "lib.h"
 #include "ast.h"
 
+typedef struct Import {
+
+} Import;
+
+LIST(ImportList, Import*);
+
 typedef struct Module {
     Path* path;
     Map* items;

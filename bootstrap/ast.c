@@ -48,6 +48,10 @@ void fprint_expression(FILE* file, Expression* expression) {
 }
 
 void fprint_typevalue(FILE* file, TypeValue* tval) {
+    if (tval == NULL) {
+        fprintf(file, "(null)");
+        return;
+    }
     if (tval->def != NULL && tval->def->module != NULL) {
         fprint_path(file, tval->def->module->path);
         fprintf(file, "::%s", tval->def->name->name);

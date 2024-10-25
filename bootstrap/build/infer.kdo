@@ -1,0 +1,19 @@
+fn print_ty<T>(t: T) -> T {
+    c_api::printf("%s\n", std::typename::<T>());
+    t
+}
+
+struct Foo<T> {
+    item: T
+}
+
+fn main() {
+    let x: _ = 0;
+    print_ty::<std::i32>(x);
+    print_ty::<std::u32>(0);
+    print_ty::<_>(x);
+    print_ty(8u16);
+    let y: std::u8 = print_ty::<_>(4);
+    let f: Foo = _ { item: 4u8 };
+    let f = Foo { item: 4u8 };
+}

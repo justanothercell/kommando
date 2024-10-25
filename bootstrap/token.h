@@ -36,6 +36,7 @@ typedef struct TokenStream {
     Token* peek;
     usize length;
     CodePoint point;
+    bool last;
 } TokenStream;
 
 TokenStream* tokenstream_new(str file, str source);

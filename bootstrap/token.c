@@ -17,11 +17,15 @@ bool is_whitespace(char c) {
 }
 
 char next_char(TokenStream* stream) {
-    if (stream->point.index >= stream->length) return '\0';
     if (stream->peek_char !='\0') {
         char next = stream->peek_char;
         stream->peek_char = '\0';
         return next;
+    }
+    if (stream->point.index >= stream->length) {
+        if (stream->last) return '\0';
+        stream->last = true;
+        return ' ';
     }
     char next = stream->point.source[stream->point.index];
     stream->point.index += 1;
@@ -134,6 +138,7 @@ TokenStream* tokenstream_new(str file, str source) {
     stream->point.line = 0;
     stream->point.column = 0;
     stream->point.index = 0;
+    stream->last = false;
 
     return stream;
 }
