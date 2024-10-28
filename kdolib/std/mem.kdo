@@ -4,6 +4,12 @@ fn malloc<T>() -> std::ptr<T> {
     std::typecast(raw_ptr)
 }
 
+fn new_uninit<T>() -> T {
+    let size = std::sizeof::<T>();
+    let raw_ptr = c_api::alloca(size);
+    *std::typecast(raw_ptr)
+}
+
 fn free<T>(ptr: std::ptr<T>) {
     let raw_ptr = to_raw(ptr);
     c_api::free(raw_ptr);

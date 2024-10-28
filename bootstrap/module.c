@@ -108,6 +108,9 @@ Module* gen_std() {
     register_extern_type(module, "u64", "uint64_t");
     register_extern_type(module, "usize", "uintptr_t");
 
+    register_extern_type(module, "f32", "float");
+    register_extern_type(module, "f64", "double");
+
     TypeDef* ty_unit = gen_simple_type("unit");
     ModuleItem* ty_unit_mi = gc_malloc(sizeof(ModuleItem));
     ty_unit_mi->item = ty_unit;
@@ -139,29 +142,19 @@ Module* gen_std() {
 
     {
         Map* var_bindings = map_new();
+        Variable* var = gc_malloc(sizeof(Variable));
+        var->name = gen_identifier("t");
+        map_put(var_bindings, "t", var);
+        Map* type_bindings = map_new();
+        map_put(type_bindings, "V", gen_typevalue("V", NULL));
+        register_intrinsic(module, "fn numcast<T, V>(t: T) -> V { } ", "((@!V)$!t)", var_bindings, type_bindings);
+    }
+
+    {
+        Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
         register_intrinsic(module, "fn sizeof<T>() -> ::std::usize {} ", "sizeof(@!T)", var_bindings, type_bindings);
-    }
-
-    {
-        Map* var_bindings = map_new();
-        Variable* var = gc_malloc(sizeof(Variable));
-        var->name = gen_identifier("t");
-        map_put(var_bindings, "t", var);
-        Map* type_bindings = map_new();
-        map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn ptr_ref<T>(t: T) -> ::std::ptr<T> {} ", "(&$!t)", var_bindings, type_bindings);
-    }
-
-    {
-        Map* var_bindings = map_new();
-        Variable* var = gc_malloc(sizeof(Variable));
-        var->name = gen_identifier("t");
-        map_put(var_bindings, "t", var);
-        Map* type_bindings = map_new();
-        map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn ptr_deref<T>(t: ::std::ptr<T>) -> T {} ", "(*$!t)", var_bindings, type_bindings);
     }
 
     {
@@ -195,6 +188,24 @@ Module* gen_std() {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         register_intrinsic(module, "fn intrinsic_argv() -> ::std::opaque_ptr {} ", "__global__argv", var_bindings, type_bindings);
+    }
+
+    {
+        Map* var_bindings = map_new();
+        Map* type_bindings = map_new();
+        register_intrinsic(module, "fn stdin() -> ::std::opaque_ptr {} ", "stdin", var_bindings, type_bindings);
+    }
+
+    {
+        Map* var_bindings = map_new();
+        Map* type_bindings = map_new();
+        register_intrinsic(module, "fn stdout() -> ::std::opaque_ptr {} ", "stdout", var_bindings, type_bindings);
+    }
+
+    {
+        Map* var_bindings = map_new();
+        Map* type_bindings = map_new();
+        register_intrinsic(module, "fn stderr() -> ::std::opaque_ptr {} ", "stderr", var_bindings, type_bindings);
     }
 
     return module;

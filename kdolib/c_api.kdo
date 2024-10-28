@@ -3,10 +3,12 @@ fn fprintf(stream: std::opaque_ptr, fmt: std::c_const_str_ptr, *) -> std::i32;
 
 fn fopen(path: std::c_const_str_ptr, mode: std::c_const_str_ptr) -> std::opaque_ptr;
 fn fclose(stream: std::opaque_ptr) -> std::i32;
+fn fflush(stream: std::opaque_ptr) -> std::i32;
 
 fn exit(code: std::i32) -> std::c_void;
 
 fn malloc(size: std::usize) -> std::opaque_ptr;
+fn alloca(size: std::usize) -> std::opaque_ptr;
 fn realloc(ptr: std::opaque_ptr, size: std::usize) -> std::opaque_ptr;
 fn free(ptr: std::opaque_ptr) -> std::c_void;
 
@@ -14,3 +16,11 @@ fn free(ptr: std::opaque_ptr) -> std::c_void;
 fn null() -> std::opaque_ptr {
     std::typecast(0usize)
 }
+
+// we do not have constants yet
+fn nullstr() -> std::c_const_str_ptr {
+    std::typecast(0usize)
+}
+
+// gnu-c
+fn getline(out_line: std::ptr<std::c_const_str_ptr>, out_size: std::ptr<std::usize>, stream: std::opaque_ptr) -> std::i32;

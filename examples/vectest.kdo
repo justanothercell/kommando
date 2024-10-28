@@ -1,0 +1,25 @@
+fn main() {
+    c_api::printf("=== Vector test ===\n");
+    let vec: _<std::u32> = std::vec::vec_new();
+    let a = 1u32;
+    let b = 1u32;
+    while a < 128 {
+        std::vec::vec_push(&vec, a);
+        let t = a + b;
+        a = b;
+        b = t;
+    };
+    c_api::printf("length: %lu\n", vec.length);
+    c_api::printf("capacity: %lu\n", vec.capacity);
+    let i: std::usize = 0;
+    while i < vec.length {
+        c_api::printf("%3lu. %3u\n", i, std::vec::vec_get(&vec, i));
+        i = i + 1;
+    };
+    c_api::printf("Popping:\n");
+    while vec.length > 0 {
+        let item = std::vec::vec_pop(&vec);
+        c_api::printf("%3u ", item);
+    };
+    c_api::printf("\n");
+}

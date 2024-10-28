@@ -323,7 +323,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
             || str_eq("|", t->string) || str_eq("&", t->string) || str_eq("^", t->string) || str_eq("!", t->string)
             || str_eq("%", t->string) || str_eq(">", t->string) || str_eq("<", t->string) || str_eq("=", t->string)) {
             Token* n = next_token(stream);
-            if (n->type == SNOWFLAKE && (str_eq("=", n->string) || str_eq("<", n->string) || str_eq(">", n->string))) {
+            if (n->type == SNOWFLAKE && (str_eq("=", n->string) || str_eq("|", n->string) || str_eq("&", n->string) || str_eq("<", n->string) || str_eq(">", n->string))) {
                 str s = t->string;
                 t->string = gc_malloc(3);
                 t->string[0] = s[0];
@@ -347,7 +347,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
             Expression* rhs = parse_expression(stream, allow_lit);
             if (rhs->type == EXPR_BIN_OP) {
                 BinOp* rhs_inner = rhs->expr;
-                if (bin_op_precedence(t->string) <= bin_op_precedence(rhs_inner->op)) {
+                if (bin_op_precedence(t->string) >= bin_op_precedence(rhs_inner->op)) {
                     Expression* a = expr;
                     Expression* b = rhs_inner->lhs;
                     Expression* c = rhs_inner->rhs;
