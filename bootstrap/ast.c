@@ -8,6 +8,7 @@
 #include "module.h"
 
 #include <stdio.h>
+#include <time.h>
 
 Path* path_new(bool absolute, IdentList elements) {
     Path* path = gc_malloc(sizeof(Path));
@@ -38,6 +39,14 @@ void fprint_path(FILE* file, Path* path) {
         if (i > 0) fprintf(file, "::");
         fprintf(file, "%s", element->name);
     }));
+}
+
+void fprint_td_path(FILE* file, TypeDef* td) {
+    if (td->module != NULL) {
+        fprint_path(file, td->module->path);
+        fprintf(file, "::");
+    }
+    fprintf(file, "%s", td->name->name);
 }
 
 void fprint_expression(FILE* file, Expression* expression) {

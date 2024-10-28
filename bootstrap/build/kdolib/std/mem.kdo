@@ -1,14 +1,37 @@
 fn malloc<T>() -> std::ptr<T> {
     let size = std::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
-    std::typecast::<std::opaque_ptr, std::ptr<T>>(raw_ptr)
+    std::typecast(raw_ptr)
 }
 
 fn free<T>(ptr: std::ptr<T>) {
-    let raw_ptr = std::typecast::<std::ptr<T>, std::opaque_ptr>(ptr);
+    let raw_ptr = to_raw(ptr);
     c_api::free(raw_ptr);
 }
 
+fn arr_malloc<T>(n: std::usize) -> std::ptr<T> {
+    let size = std::sizeof::<T>();
+    let raw_ptr = c_api::malloc(size);
+    std::typecast(raw_ptr)
+}
+
+fn arr_resize<T>(arr: std::ptr<T>, n: std::usize) -> std::ptr<T> {
+    let size = std::sizeof::<T>();
+    let raw_ptr = to_raw(arr);
+    raw_ptr = c_api::realloc(raw_ptr, size * n);
+    std::typecast(raw_ptr)
+}
+
+fn arr_offset<T>(arr: std::ptr<T>, i: std::usize) -> std::ptr<T> {
+    let size = std::sizeof::<T>();
+    let usize_ptr = std::typecast::<_, std::usize>(arr);
+    std::typecast(usize_ptr + std::typecast(size * i))
+}
+
 fn null<T>() -> std::ptr<T> {
-    std::typecast::<std::usize, std::ptr<T>>(0usize)
+    std::typecast(0usize)
+}
+
+fn to_raw<T>(ptr: std::ptr<T>) -> std::opaque_ptr {
+    std::typecast(ptr)
 }
