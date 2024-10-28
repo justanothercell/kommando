@@ -13,9 +13,17 @@
 
 ## Quickstart
 ```sh
-cd bootstrap/build
 ./build # build the compiler
-./run hello # compile an run hello.kdo
+./run examples/hello # compile an run examples/hello.kdo
+
+# to do both steps in one, especially useful during development
+./cr examples/hello
+
+# you can also run the compiler manually (once it is compiled itself)
+./kommando $(./kdolib/link) examples/hello.kdo examples/hello -cr
+
+# run witnout any arguments to see a list of options
+./kommando
 ```
 Note that this is meant to be compiled with gcc and uses certain gnu compiler extensions. There exists a [./bootstrap/.clangd](./bootstrap/.clangd) file,
 but that is only to fix VSCode errors/hints. Specifically, the defined macro `__INTELLISENSE__` temporarily removes inline functions from

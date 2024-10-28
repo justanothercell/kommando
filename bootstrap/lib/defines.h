@@ -76,7 +76,7 @@
 #define print_prefix() fprint_prefix(stdout)
 #define flog(file, fmt, ...) do { fprint_prefix(file); fprintf(file, fmt, ## __VA_ARGS__); fprintf(file, "\n"); } while(0)
 #define log(fmt, ...) flog(stdout, fmt, ## __VA_ARGS__)
-#define finfo(file, module, fmt, ...) do { fprint_prefix(file); fprintf(file, "\t[" module "]\t"); fprintf(file, fmt, ## __VA_ARGS__); fprintf(file, "\n"); } while(0)
+#define finfo(file, module, fmt, ...) do { fprint_prefix(file); fprintf(file, "[" module "] "); fprintf(file, fmt, ## __VA_ARGS__); fprintf(file, "\n"); } while(0)
 #define info(module, fmt, ...) finfo(stdout, module, fmt, ## __VA_ARGS__)
 #define fdebug(file, fmt, expr) ({ typeof(expr) result = expr; finfo(file, ANSI(ANSI_BOLD, ANSI_GREEN_FG) "DEBUG" ANSI_RESET_SEQUENCE, "%s", to_str_writer(stream, fprintf(stream, "%s = ", #expr); fprintf(stream, fmt, result))); result; })
 #define debug(fmt, expr) fdebug(stdout, fmt, expr)

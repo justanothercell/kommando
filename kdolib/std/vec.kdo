@@ -34,3 +34,12 @@ fn vec_get<T>(v: std::ptr<Vec<T>>, i: std::usize) -> T {
 fn vec_get_ref<T>(v: std::ptr<Vec<T>>, i: std::usize) -> std::ptr<T> {
     std::mem::arr_offset((*v).buffer, i)
 }
+
+fn vec_pop<T>(v: std::ptr<Vec<T>>) -> T {
+    if (*v).length > 0 {
+        (*v).length = (*v).length - 1;
+        *std::mem::arr_offset((*v).buffer, (*v).length)
+    } else {
+        std::mem::new_uninit()
+    }
+}

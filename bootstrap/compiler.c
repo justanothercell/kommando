@@ -17,6 +17,7 @@
 
 CompilerOptions build_args(StrList* args) {
     if (args->length == 1) {
+        print_help: {}
         printf("%s <infile.kdo> <out> <options>\n", args->elements[0]);
         printf("Options:\n");
         printf("    --run     -r - run the compiled binary\n");
@@ -24,7 +25,7 @@ CompilerOptions build_args(StrList* args) {
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
-        printf("    ::lib::path=<path/to/lib_file.kdo>\n");
+        printf("    ::lib::path=<path/to/lib_file.kdo> (multiple possible)\n");
         quit(0);
     }
 
@@ -58,7 +59,8 @@ CompilerOptions build_args(StrList* args) {
                 if (options.c_compiler != NULL) panic("c compiler already supplied as `%s` but was supplied again: `--cc=%s`", options.c_compiler, arg);
                 options.c_compiler = arg;
             } else {
-                panic("Invalid flag `--%s`", arg);
+                log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid flag `--%s`", arg);
+                goto print_help;
             } 
         } else if (str_startswith(arg, "-")) {
             arg += 1;
@@ -71,7 +73,8 @@ CompilerOptions build_args(StrList* args) {
                 } else if (arg[j] == 'w') {
                     options.raw = true;
                 } else {
-                    panic("Invalid flag `%c` in `-%s`", arg[j], arg);
+                    log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid flag `%c` in `-%s`", arg[j], arg);
+                    goto print_help;
                 }
             } 
         } else if (str_startswith(arg, "::")) {
@@ -88,7 +91,8 @@ CompilerOptions build_args(StrList* args) {
             } else if (options.outname == NULL) {
                 options.outname = arg;                
             } else {
-                panic("Invalid command line argument `%s`", arg);
+                log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid command line argument `%s`", arg);
+                goto print_help;
             }
         }
     }
@@ -132,6 +136,6 @@ void compile(CompilerOptions options) {
     fclose(header_file);
     fclose(code_file);
 
-    i32 r = system(to_str_writer(stream, fprintf(stream, "%s -Wall %s -o %s", options.c_compiler, code_file_name, options.outname)));
+    i32 r = system(to_str_writer(stream, fprintf(stream, "%s -Wall -lm %s -o %s", options.c_compiler, code_file_name, options.outname)));
     if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
 }

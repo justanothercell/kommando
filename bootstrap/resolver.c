@@ -235,7 +235,6 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
                                                 to_str_writer(s, fprint_span_contents(s, &generic_value->ctx->span)), to_str_writer(s, fprint_span(s, &generic_value->ctx->span)),
                                                 to_str_writer(s, fprint_span_contents(s, &func_generics->span)), to_str_writer(s, fprint_span(s, &func_generics->span))
                                             );
-            log("setting %p of %s", func_generics, fullname);
             generic_value->ctx = func_generics;
         }
         if (type_generics != NULL && generic_value->ctx != type_generics && map_contains(type_generics->resolved, generic_value->def->name->name)) {
@@ -640,11 +639,18 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);            
         } break;
         case EXPR_BREAK: {
-            resolve_expr(program, func, type_generics, expr->expr, vars, t_return);
-            todo("resolve EXPR_BREAK");
+            if (expr->expr != NULL) {
+                resolve_expr(program, func, type_generics, expr->expr, vars, t_return);
+                todo("XPR_BREAK with expr");
+            }
+            TypeValue* unit_ty = gen_typevalue("::std::unit", &expr->span);
+            resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
+            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);    
         } break;
         case EXPR_CONTINUE: {
-            todo("resolve EXPR_CONTINUE -> unit type");
+            TypeValue* unit_ty = gen_typevalue("::std::unit", &expr->span);
+            resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
+            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);            
         } break;
         case EXPR_FIELD_ACCESS: {
             FieldAccess* fa = expr->expr;

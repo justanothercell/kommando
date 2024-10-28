@@ -11,10 +11,5 @@
 *.data
 *.data.old
 *.script
-MEMTRACE.txt
 out.txt
-!build
-!run
-!link_kdolib
-!kdolib/link
 vgcore.*

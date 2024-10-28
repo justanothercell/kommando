@@ -1,0 +1,2 @@
+#!/bin/sh
+./kommando $(./kdolib/link) $1.kdo $1 -cr
