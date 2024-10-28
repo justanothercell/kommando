@@ -16,4 +16,5 @@ out.txt
 !build
 !run
 !link_kdolib
+!kdolib/link
 vgcore.*
