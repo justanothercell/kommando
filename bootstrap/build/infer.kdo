@@ -16,4 +16,6 @@ fn main() {
     let y: std::u8 = print_ty::<_>(4);
     let f: Foo = _ { item: 4u8 };
     let f = Foo { item: 4u8 };
+    let f: _<u8> = Foo { item: 4 };
+    print_ty(f);
 }

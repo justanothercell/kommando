@@ -156,7 +156,7 @@ StrList rsplitn(str s, char delimeter, usize n) {
     StrList list = list_new(StrList);
     usize length = strlen(s);
     usize end = length - 1;
-    for (usize i = length - 1;i >= 0 && n > 0;i--) {
+    for (usize i = length - 1;i > 0 && n > 0;i--) {
         if (s[i] == delimeter) {
             list_append(&list, copy_slice(s+i+1, end - i + 1));
             end = i;

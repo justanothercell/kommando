@@ -33,49 +33,44 @@ void fprint_res_tv(FILE* stream, TypeValue* tv) {
     }
 }
 
-str gvals_to_c_key(GenericValues* generics) {
-    if (generics != NULL && generics->generic_func_ctx != NULL) panic("Generic not fully resolved (func)");
-    if (generics != NULL && generics->generic_type_ctx != NULL) panic("Generic not fully resolved (type)");
-    return gvals_to_key(generics);
-}
-str gvals_to_key(GenericValues* generics) {
+static str __gvals_to_key(GenericValues* generics, bool assert_resolved) {
     return to_str_writer(stream, {
         fprintf(stream, "#");
         if (generics != NULL && generics->generics.length > 0) {
             fprintf(stream, "<");
             list_foreach_i(&generics->generics, lambda(void, usize  i, TypeValue* tv, {
                 if (i > 0) fprintf(stream, ",");
-                if (tv->def == NULL) panic("Unresolved typevalue %s @ %s", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->name->elements.elements[0]->span)));
+                if (tv->def == NULL) spanned_error("Unresolved typevalue", tv->name->elements.elements[0]->span, "%s is not resolved", to_str_writer(s, fprint_typevalue(s, tv)));
                 if (tv->def->module != NULL) {
                     fprint_path(stream, tv->def->module->path);
                     fprintf(stream, "::");
-                }
+                } else if (assert_resolved) spanned_error("Unresolved generic", tv->name->elements.elements[0]->span, "Generic %s @ %s was not properly resolved", tv->def->name->name, to_str_writer(s, fprint_span(s, &tv->def->name->span))); 
                 fprintf(stream, "%s", tv->def->name->name);
-                fprintf(stream, "%s", gvals_to_key(tv->generics));
+                
+                fprintf(stream, "%s", __gvals_to_key(tv->generics, assert_resolved));
+                if (tv->ctx != NULL) {
+                    if (assert_resolved) spanned_error("Unresolved type", tv->name->elements.elements[0]->span, "Type %s @ %s is still in context. This is probably a compiler error.", tv->def->name->name, to_str_writer(s, fprint_span(s, &tv->def->name->span)));
+                    fprintf(stream, "@<%s>", to_str_writer(stream, {
+                        list_foreach_i(&tv->ctx->generics, lambda(void, usize i, Identifier* g, {
+                            if (i > 0) fprintf(stream, ",");
+                            str key = g->name;
+                            TypeDef* td = map_get(tv->ctx->resolved, key);
+                            fprintf(stream, "%s%p", td->name->name, td);
+                        }));
+                    }));
+                }
             }));
             fprintf(stream, ">");
-            if (generics->generic_type_ctx != NULL) {
-                fprintf(stream, "@T<%s>", to_str_writer(stream, {
-                    list_foreach_i(&generics->generic_type_ctx->generics, lambda(void, usize i, Identifier* g, {
-                        if (i > 0) fprintf(stream, ",");
-                        str key = g->name;
-                        TypeDef* td = map_get(generics->generic_type_ctx->resolved, key);
-                        fprintf(stream, "%s%p", td->name->name, td);
-                    }));
-                }));
-            }
-            if (generics->generic_func_ctx != NULL) {
-                fprintf(stream, "@F<%s>", to_str_writer(stream, {
-                    list_foreach_i(&generics->generic_func_ctx->generics, lambda(void, usize i, Identifier* g, {
-                        if (i > 0) fprintf(stream, ",");
-                        str key = g->name;
-                        TypeDef* td = map_get(generics->generic_func_ctx->resolved, key);
-                        fprintf(stream, "%s%p", td->name->name, td);
-                    }));
-                }));
-            }
         }
     });
+}
+
+str gvals_to_key(GenericValues* generics) {
+    return __gvals_to_key(generics, false);
+}
+
+str gvals_to_c_key(GenericValues* generics) {
+    return __gvals_to_key(generics, true);
 }
 
 static void* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, str* error) {
@@ -216,8 +211,6 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
     if (gkeys == NULL && gvals != NULL) spanned_error("Unexpected generics", span, "Expected no generics for %s, got %llu", fullname, gvals->generics.length);
     if (gkeys != NULL && gvals == NULL) {
         gvals = gc_malloc(sizeof(GenericValues));
-        gvals->generic_func_ctx = NULL;
-        gvals->generic_type_ctx = NULL;
         gvals->span = span;
         gvals->generics = list_new(TypeValueList);
         gvals->resolved = map_new();
@@ -235,11 +228,23 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
         TypeValue* generic_value = gvals->generics.elements[i];
         resolve_typevalue(program, module, generic_value, func_generics, type_generics);
         map_put(gvals->resolved, generic_key, generic_value);
-        if (gvals->generic_func_ctx == NULL && func_generics != NULL && map_contains(func_generics->resolved, generic_value->def->name->name)) {
-            gvals->generic_func_ctx = func_generics;
+        if (generic_value->def == NULL) continue;
+        if (func_generics != NULL && generic_value->ctx != func_generics && map_contains(func_generics->resolved, generic_value->def->name->name)) {
+            if (generic_value->ctx != NULL) spanned_error("Multiple context found", generic_value->name->elements.elements[0]->span, "%s has potential contexts in %s @ %s and %s @ %s",
+                                                generic_value->def->name->name,
+                                                to_str_writer(s, fprint_span_contents(s, &generic_value->ctx->span)), to_str_writer(s, fprint_span(s, &generic_value->ctx->span)),
+                                                to_str_writer(s, fprint_span_contents(s, &func_generics->span)), to_str_writer(s, fprint_span(s, &func_generics->span))
+                                            );
+            log("setting %p of %s", func_generics, fullname);
+            generic_value->ctx = func_generics;
         }
-        if (gvals->generic_type_ctx == NULL && type_generics != NULL && map_contains(type_generics->resolved, generic_value->def->name->name)) {
-            gvals->generic_type_ctx = type_generics;
+        if (type_generics != NULL && generic_value->ctx != type_generics && map_contains(type_generics->resolved, generic_value->def->name->name)) {
+            if (generic_value->ctx != NULL) spanned_error("Multiple context found", generic_value->name->elements.elements[0]->span, "%s has potential contexts in %s @ %s and %s @ %s",
+                                                generic_value->def->name->name,
+                                                to_str_writer(s, fprint_span_contents(s, &generic_value->ctx->span)), to_str_writer(s, fprint_span(s, &generic_value->ctx->span)),
+                                                to_str_writer(s, fprint_span_contents(s, &type_generics->span)), to_str_writer(s, fprint_span(s, &type_generics->span))
+                                            );
+            generic_value->ctx = type_generics;
         }
     }
     generic_end: {}
@@ -344,9 +349,8 @@ TypeValue* replace_generic(TypeValue* tv, GenericValues* ctx) {
         TypeValue* clone = gc_malloc(sizeof(TypeValue));
         clone->def = tv->def;
         clone->name = tv->name;
+        clone->ctx = tv->ctx;
         clone->generics = gc_malloc(sizeof(GenericValues));
-        clone->generics->generic_func_ctx = tv->generics->generic_func_ctx;
-        clone->generics->generic_type_ctx = tv->generics->generic_type_ctx;
         clone->generics->span = tv->generics->span;
         clone->generics->generics = list_new(TypeValueList);
         clone->generics->resolved = map_new();
@@ -355,7 +359,6 @@ TypeValue* replace_generic(TypeValue* tv, GenericValues* ctx) {
             map_put(rev, to_str_writer(s, fprintf(s, "%p", val)), key);
         }));
         list_foreach(&tv->generics->generics, lambda(void, TypeValue* val, {
-            str key = to_str_writer(stream, fprint_typevalue(stream, val));
             str real_key = map_get(rev, to_str_writer(s, fprintf(s, "%p", val)));
             val = replace_generic(val, ctx);
             list_append(&clone->generics->generics, val);
@@ -383,8 +386,26 @@ void patch_tvs(TypeValue** tv1ref, TypeValue** tv2ref) {
     }
     if (tv1->generics != NULL && tv2->generics != NULL) {
         if (tv1->generics->generics.length == tv2->generics->generics.length) {
+            Map* rev1 = map_new();
+            map_foreach(tv1->generics->resolved, lambda(void, str key, TypeValue* val, {
+                map_put(rev1, to_str_writer(s, fprintf(s, "%p", val)), key);
+            }));
+            Map* rev2 = map_new();
+            map_foreach(tv2->generics->resolved, lambda(void, str key, TypeValue* val, {
+                map_put(rev2, to_str_writer(s, fprintf(s, "%p", val)), key);
+            }));
             for (usize i = 0;i < tv1->generics->generics.length;i++) {
+                TypeValue* oldtv1_g = tv1->generics->generics.elements[i];
+                TypeValue* oldtv2_g = tv2->generics->generics.elements[i];
                 patch_tvs(&tv1->generics->generics.elements[i], &tv2->generics->generics.elements[i]);
+                if (tv1->generics->generics.elements[i] != oldtv1_g) {
+                    str key = map_get(rev1, to_str_writer(s, fprintf(s, "%p", oldtv1_g)));
+                    map_put(tv1->generics->resolved, key, tv1->generics->generics.elements[i]);
+                }
+                if (tv2->generics->generics.elements[i] != oldtv2_g) {
+                    str key = map_get(rev2, to_str_writer(s, fprintf(s, "%p", oldtv2_g)));
+                    map_put(tv2->generics->resolved, key, tv2->generics->generics.elements[i]);
+                }
             }
             return;
         }
@@ -403,8 +424,9 @@ void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, Gen
     if (!template->name->absolute && template->name->elements.length == 1 && str_eq(template->name->elements.elements[0]->name, "_")) {
         if (!match->name->absolute && match->name->elements.length == 1) {
             str generic = match->name->elements.elements[0]->name;
+
             if (!map_contains(generics->resolved, generic)) {
-                spanned_error("No such generic", match->name->elements.elements[0]->span, "%s is not a valid genericfor %s @ %s", to_str_writer(s, fprint_typevalue(s, match)), 
+                spanned_error("No such generic", match->name->elements.elements[0]->span, "%s is not a valid generic for %s @ %s", to_str_writer(s, fprint_typevalue(s, match)), 
                     to_str_writer(s, fprint_span_contents(s, &generics->span)), to_str_writer(s, fprint_span(s, &generics->span))
                 );
             }
@@ -657,6 +679,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, slit->type);
             
             slit->type = t_return->type;
+            if (t_return->type->def == NULL) spanned_error("Type could not be inferred", expr->span, "%s is not a complete type", to_str_writer(s, fprint_typevalue(s, t_return->type)));
             TypeDef* type = slit->type->def;
 
             Map* temp_fields = map_new();
@@ -716,7 +739,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             }
             resolve_expr(program, func, type_generics, inner, vars, inner_tv);
             finish_tvbox(inner_tv);
-            if (str_eq(to_str_writer(s, fprint_path(s, inner_tv->type->name)), "::std::ptr")) spanned_error("Expected ptr to dereference", expr->span, "Cannot dereference type %s, expected ::std::ptr<_>", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
+            if (!str_eq(to_str_writer(s, fprint_td_path(s, inner_tv->type->def)), "::std::ptr")) spanned_error("Expected ptr to dereference", expr->span, "Cannot dereference type %s, expected ::std::ptr<_>", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             if (inner->resolved->type->generics == NULL || inner->resolved->type->generics->generics.length != 1) spanned_error("Expected ptr to have a pointee", expr->span, "Pointer %s should have one generic argument as its pointee", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, inner->resolved->type->generics->generics.elements[0]);
         } break;
@@ -770,7 +793,7 @@ void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved) {
             type->generics = NULL;
             type->name = key;
             type->extern_ref = NULL;
-            type->fields = NULL;
+            type->fields = map_new();
             type->module = NULL;
             map_put(func->generics->resolved, key->name, type);
         }));
@@ -788,6 +811,11 @@ void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved) {
 
     if (func->body != NULL) {
         TVBox* blockbox = new_tvbox();
+        // last expression is not a "return"?
+        if (func->body->expressions.length > 0) {
+            Expression* last = func->body->expressions.elements[func->body->expressions.length - 1];
+            if (last->type != EXPR_RETURN) blockbox->type = func->return_type;
+        }
         resolve_block(program, func, type_generics, func->body, &vars, blockbox);
         finish_tvbox(blockbox);
         // last expression is not a "return"?

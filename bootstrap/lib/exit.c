@@ -16,6 +16,7 @@
 static void (*EXIT_FUNC)(str file, usize line, int code) = NULL;
 #define INTERRUPT_MODULE ANSI(ANSI_BOLD, ANSI_RED_FG) "INTERRUPT" ANSI_RESET_SEQUENCE
 void signal_handler(int signal) {
+    printf("CAUGHT SIGNAL %u", signal);
     gc_disable();
     switch (signal) {
         case SIGINT:

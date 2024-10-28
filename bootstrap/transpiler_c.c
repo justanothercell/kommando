@@ -1,6 +1,8 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "transpiler_c.h"
 #include "ast.h"
 #include "lib/defines.h"
@@ -17,8 +19,8 @@
 void fprint_resolved_typevalue(FILE* stream, TypeValue* tv, GenericValues* generics, bool long_names) {
     TypeDef* ty = tv->def;
     if (ty == NULL) panic("Unresolved type");
+    if (tv->ctx != NULL) spanned_error("Indirect generic type", ty->name->span, "Type is not concrete");
     if (generics != NULL) {
-        if (generics->generic_type_ctx != NULL || generics->generic_func_ctx != NULL) spanned_error("Indirect generic type", ty->name->span, "Type is not concrete");
         TypeValue* concrete = map_get(generics->resolved, ty->name->name);
         if (concrete != NULL) {
             return fprint_resolved_typevalue(stream, concrete, NULL, long_names);
@@ -45,19 +47,26 @@ void fprint_resolved_typevalue(FILE* stream, TypeValue* tv, GenericValues* gener
 
 str gen_c_type_name(TypeValue* tv, GenericValues* generics) {
     TypeDef* ty = tv->def;
-    if (ty == NULL) panic("Unresolved type %s @ %s", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->name->elements.elements[0]->span)));
+    if (ty == NULL) spanned_error("Unresolved type", tv->name->elements.elements[0]->span,  "Couldn't resolve %s", to_str_writer(s, fprint_typevalue(s, tv)));
     if (ty->extern_ref != NULL) {
         return ty->extern_ref;
     }
     if (generics != NULL) {
-        if (generics->generic_type_ctx != NULL || generics->generic_func_ctx != NULL) spanned_error("Indirect generic type", ty->name->span, "Type is not concrete");
         TypeValue* concrete = map_get(generics->resolved, ty->name->name);
-        if (concrete != NULL) {
+        // T == T
+        // if (str_eq(to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_typevalue(s, concrete)))) {
+        //    spanned_error("Weird generic", tv->name->elements.elements[0]->span, "Tried to replace %s @ %s from %s with %s @ %s from %s",
+        //        to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->name->elements.elements[0]->span)), to_str_writer(s, fprint_span(s, &ty->name->span)),
+        //        to_str_writer(s, fprint_typevalue(s, concrete)), to_str_writer(s, fprint_span(s, &concrete->name->elements.elements[0]->span)), to_str_writer(s, fprint_span(s, &concrete->def->name->span))
+        //    );
+        // }
+        if (concrete != NULL && concrete->def != tv->def) {
             return gen_c_type_name(concrete, generics);
         }
     }
+    if (tv->ctx != NULL) spanned_error("Indirect generic type", ty->name->span, "Type %s is not concrete", ty->name->name);
     if (ty->module == NULL) {
-        spanned_error("Unsubsituted generic", ty->name->span, "Genric %s. This is probably a compiler error. %s with %s", ty->name->name, gvals_to_key(tv->generics), gvals_to_key(generics));
+        spanned_error("Unsubsituted generic", ty->name->span, "Genric %s. This is probably a compiler error. %s with %s @ %s", ty->name->name, gvals_to_key(tv->generics), gvals_to_key(generics), to_str_writer(s, fprint_span(s, &generics->span)));
     }
     str key = to_str_writer(stream, {
         fprintf(stream, "%p", ty);
@@ -96,14 +105,14 @@ str gen_c_fn_name(FuncDef* def, GenericValues* generics) {
 
 GenericValues* expand_generics(GenericValues* generics, GenericValues* context) {
     if (generics == NULL || context == NULL) return generics;
+    log("expanding %s with %s", gvals_to_key(generics), gvals_to_key(context));
     GenericValues* expanded = gc_malloc(sizeof(GenericValues));
-    expanded->generic_func_ctx = context->generic_func_ctx;
-    expanded->generic_type_ctx = context->generic_type_ctx;
     expanded->resolved = map_new();
     expanded->span = generics->span;
     expanded->generics = list_new(TypeValueList);
     Map* rev = map_new();
     map_foreach(generics->resolved, lambda(void, str key, TypeValue* val, {
+        if (str_eq(to_str_writer(s, fprint_typevalue(s, val)), "_")) spanned_error("Unresolved generic", val->name->elements.elements[0]->span, "`_`");
         map_put(rev, to_str_writer(s, fprintf(s, "%p", val)), key);
     }));
     list_foreach(&generics->generics, lambda(void, TypeValue* generic, {
@@ -117,6 +126,7 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
             TypeValue* concrete = generic;
             GenericValues* c_e = expand_generics(concrete->generics, context);
             TypeValue* concrete_expanded = gc_malloc(sizeof(TypeValue));
+            concrete_expanded->ctx = NULL;
             concrete_expanded->generics = c_e;
             concrete_expanded->def = concrete->def;
             concrete_expanded->name = concrete->name;
@@ -124,6 +134,7 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
             map_put(expanded->resolved, real_key, concrete_expanded);
         }
     }));
+    log("expanded %s", gvals_to_key(expanded));
     return expanded;
 }
 
@@ -143,6 +154,7 @@ void fprint_indent(FILE* file, usize indent) {
 
 void transpile_block(FILE* code_stream, str modkey, FuncDef* func, GenericValues* generics, Block* block, usize indent);
 void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericValues* generics, Expression* expr, usize indent) {
+    //log("'%s' %s", ExprType__NAMES[expr->type], to_str_writer(s, fprint_span(s, &expr->span)));
     switch (expr->type) {
         case EXPR_BIN_OP: {
             BinOp* op = expr->expr;
@@ -226,16 +238,30 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
         } break;
         case EXPR_WHILE_LOOP: {
             WhileLoop* wl = expr->expr;
+            str ret_ty = gen_c_type_name(expr->resolved->type, generics);
             fprintf(code_stream, "({\n");
             fprint_indent(code_stream, indent + 1);
             fprintf(code_stream, "while (");
-            transpile_expression(code_stream, modkey, func,  generics, wl->cond, indent + 1);
+            transpile_expression(code_stream, modkey, func, generics, wl->cond, indent + 1);
             fprintf(code_stream, ") ");
             transpile_block(code_stream, modkey, func,  generics, wl->body, indent + 1);
-            fprintf(code_stream, ";\n})\n");
+            fprintf(code_stream, ";\n");
+            fprint_indent(code_stream, indent + 1);
+            fprintf(code_stream, "(%s) {};\n", ret_ty);
+            fprint_indent(code_stream, indent);
+            fprintf(code_stream, "})");
         } break;
         case EXPR_RETURN: {
-            todo("EXPR_RETURN");
+            fprintf(code_stream, "({ ");
+            str ret_ty = gen_c_type_name(expr->resolved->type, generics);
+            if (expr->expr == NULL) {
+                fprintf(code_stream, "return (%s) {};", ret_ty);
+            } else {
+                fprintf(code_stream, "return ");
+                transpile_expression(code_stream, modkey, func, generics, expr->expr, indent + 1);
+                fprintf(code_stream, ";");
+            }
+            fprintf(code_stream, "(%s) {}; })", ret_ty);
         } break;
         case EXPR_BREAK: {
             todo("EXPR_BREAK");
@@ -321,6 +347,12 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
             transpile_expression(code_stream, modkey, func, generics, inner, indent + 1);
             fprintf(code_stream, "))");
         } break;
+        case EXPR_TAKEREF: {
+            Expression* inner = expr->expr;
+            fprintf(code_stream, "&(");
+            transpile_expression(code_stream, modkey, func, generics, inner, indent + 1);
+            fprintf(code_stream, ")");
+        } break;
         default:
             unreachable("%s", ExprType__NAMES[expr->type]);
     }
@@ -341,45 +373,49 @@ void transpile_block(FILE* code_stream, str modkey, FuncDef* func, GenericValues
     fprintf(code_stream, "})");
 }
 
-static GenericValues* find_contexted(GenericValues* instance) {
-    if (instance->generic_func_ctx != NULL || instance->generic_type_ctx != NULL) return instance;
+static TypeValue* find_contexted(GenericValues* instance) {
     for (usize i = 0;i < instance->generics.length;i++) {
-        GenericValues* v = instance->generics.elements[i]->generics;
-        if (v == NULL) continue;
-        v = find_contexted(v);
-        if (v->generic_func_ctx != NULL || v->generic_type_ctx != NULL) {
-            return v;
+        TypeValue* tv = instance->generics.elements[i];
+        if (tv->ctx != NULL) {
+            return tv;
         }
+        GenericValues* v = tv->generics;
+        if (v == NULL) continue;
+        tv = find_contexted(v);
+        if (tv != NULL) return tv;
     }
-    return instance;
+    return NULL;
+}
+
+static bool is_fully_defined(GenericValues* instance) {
+    if (instance == NULL) return true;
+    for (usize i = 0;i < instance->generics.length;i++) {
+        TypeValue* t = instance->generics.elements[i];
+        if (t->def->module == NULL) {
+            log("discarding %s %p", t->def->name->name, t->generics);
+            return false;
+        }   
+        if (!is_fully_defined(t->generics)) return false;
+    }
+    return true;
 }
 
 bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
-    GenericValues* instance_i = find_contexted(instance);
-    if (instance_i->generic_func_ctx == NULL && instance_i->generic_type_ctx == NULL) return true;
-    if (instance_i->generic_func_ctx != NULL && instance_i->generic_type_ctx != NULL) todo();
-    if (instance_i->generic_func_ctx != NULL) {
-        map_foreach(instance_i->generic_func_ctx->generic_uses, lambda(void, str key, GenericValues* context, {
-            GenericValues* expanded = expand_generics(instance, context);
-            str expanded_key = gvals_to_key(expanded);
-            if (!map_contains(instance_host->generic_uses, expanded_key)) {
-                map_put(instance_host->generic_uses, expanded_key, expanded);
-                // we are iterating over this but in this case we can safely append, even if realloc
-                list_append(&instance_host->generic_use_keys, expanded_key);
-            }
-        }));
+    if (instance == NULL) return true;
+    TypeValue* contexted = find_contexted(instance);
+    if (!contexted) {
+        if (!is_fully_defined(instance)) spanned_error("Not fully defined", instance->span, "This is probably a compiler error.");
+        return true;
     }
-    if (instance_i->generic_type_ctx != NULL) {
-        map_foreach(instance_i->generic_type_ctx->generic_uses, lambda(void, str _key, GenericValues* context, {
-            GenericValues* expanded = expand_generics(instance, context);
-            str expanded_key = gvals_to_key(expanded);
-            if (!map_contains(instance_host->generic_uses, expanded_key)) {
-                map_put(instance_host->generic_uses, expanded_key, expanded);
-                // we are iterating over this but in this case we can safely append, even if realloc
-                list_append(&instance_host->generic_use_keys, expanded_key);
-            }
-        }));
-    }
+    map_foreach(contexted->ctx->generic_uses, lambda(void, str key, GenericValues* context, {
+        GenericValues* expanded = expand_generics(instance, context);
+        str expanded_key = gvals_to_key(expanded);
+        if (!map_contains(instance_host->generic_uses, expanded_key)) {
+            map_put(instance_host->generic_uses, expanded_key, expanded);
+            // we are iterating over this but in this case we can safely append, even if realloc
+            list_append(&instance_host->generic_use_keys, expanded_key);
+        }
+    }));
     return false;
 }
 
@@ -432,8 +468,11 @@ void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, Func
         // we can safely append to that list, even if it reallocates it should be fine
         list_foreach(&func->generics->generic_use_keys, lambda(void, str key, {
             GenericValues* generics = map_get(func->generics->generic_uses, key);
+            log("checking %s", gvals_to_key(generics));
             if (monomorphize(generics, func->generics)) {
+                log("doing the thing!");
                 str fn_c_name = gen_c_fn_name(func, generics);
+                log("...named %s", fn_c_name);
                 if (!map_contains(dupls, fn_c_name)) {
                     transpile_function_generic_variant(header_stream, code_stream, modkey, func, generics);
                     map_put(dupls, fn_c_name, malloc(1));
@@ -448,6 +487,7 @@ void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, Func
 void transpile_typedef_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, GenericValues* generics, bool body) {
     if (!ty->extern_ref) {
         TypeValue* tv = gc_malloc(sizeof(TypeValue));
+        tv->ctx = NULL;
         tv->def = ty;
         tv->name = NULL;
         tv->generics = generics;
@@ -512,7 +552,8 @@ void transpile_to_c(FILE* header_stream, FILE* code_stream, str header_name, Pro
     fprintf(header_stream, "\n");
 
     fprintf(code_stream, "/* File generated by kommando compiler. Do not modify. */\n");
-    fprintf(code_stream, "#include \"%s\"\n", header_name);
+    StrList header_path = rsplitn(header_name, '/', 1);
+    fprintf(code_stream, "#include \"%s\"\n", header_path.elements[header_path.length - 1]);
     fprintf(code_stream, "\n");
     fprintf(code_stream, "static int __global__argc = 0;\n");
     fprintf(code_stream, "static char** __global__argv = (void*)0;\n");

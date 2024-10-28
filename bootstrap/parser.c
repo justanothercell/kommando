@@ -98,14 +98,14 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
     return module;
 }
 
-Expression* parse_expresslet(TokenStream* stream) {
+Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
     Expression* expression = gc_malloc(sizeof(Expression));
     Token* t = next_token(stream);
     CodePoint start = t->span.left;
     CodePoint end = t->span.right;
     
     if (token_compare(t, "(", SNOWFLAKE)) {
-        expression = parse_expression(stream);
+        expression = parse_expression(stream, true);
         t = next_token(stream);
         if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
     } else if (token_compare(t, "let", IDENTIFIER)) {
@@ -125,7 +125,7 @@ Expression* parse_expresslet(TokenStream* stream) {
         }
         t = next_token(stream);
         if (token_compare(t, "=", SNOWFLAKE)) {
-            let->value = parse_expression(stream);
+            let->value = parse_expression(stream, allow_lit);
             end = let->value->span.right;
         } else {
             spanned_error("Let binding needs value", t->span, "let binding needs to be assigned with a value: let %s = ...;", name->name);
@@ -138,7 +138,7 @@ Expression* parse_expresslet(TokenStream* stream) {
         if (token_compare(t, ";", SNOWFLAKE)) {
             expression->expr = NULL;
         } else {
-            expression->expr = parse_expression(stream);
+            expression->expr = parse_expression(stream, allow_lit);
             end = ((Expression*)expression->expr)->span.right;
         }
         expression->type = EXPR_RETURN;
@@ -148,7 +148,7 @@ Expression* parse_expresslet(TokenStream* stream) {
         if (token_compare(t, ";", SNOWFLAKE)) {
             expression->expr = NULL;
         } else {
-            expression->expr = parse_expression(stream);
+            expression->expr = parse_expression(stream, allow_lit);
             end = ((Expression*)expression->expr)->span.right;
         }
         expression->type = EXPR_BREAK;
@@ -157,7 +157,7 @@ Expression* parse_expresslet(TokenStream* stream) {
         expression->expr = NULL;
     } else if (token_compare(t, "if", IDENTIFIER)) {
         Conditional* conditional = gc_malloc(sizeof(Conditional));
-        conditional->cond = parse_expression(stream);
+        conditional->cond = parse_expression(stream, false);
         conditional->then = parse_block(stream);
         end = conditional->then->span.right;
         t = next_token(stream);
@@ -172,7 +172,7 @@ Expression* parse_expresslet(TokenStream* stream) {
         expression->type = EXPR_CONDITIONAL;
     } else if (token_compare(t, "while", IDENTIFIER)) {
         WhileLoop* while_loop = gc_malloc(sizeof(WhileLoop));
-        while_loop->cond = parse_expression(stream);
+        while_loop->cond = parse_expression(stream, false);
         while_loop->body = parse_block(stream);
         end = while_loop->body->span.right;
         expression->expr = while_loop;
@@ -195,7 +195,7 @@ Expression* parse_expresslet(TokenStream* stream) {
             if (!token_compare(t, ")", SNOWFLAKE)) {
                 stream->peek = t;
                 while (true) {
-                    Expression* argument = parse_expression(stream);
+                    Expression* argument = parse_expression(stream, true);
                     list_append(&arguments, argument);
                     t = next_token(stream);
                     if (token_compare(t, ")", SNOWFLAKE)) {
@@ -210,7 +210,7 @@ Expression* parse_expresslet(TokenStream* stream) {
             call->generics = generics;
             expression->expr = call;
             expression->type = EXPR_FUNC_CALL;       
-        } else if (token_compare(t, "{", SNOWFLAKE)) {
+        } else if (token_compare(t, "{", SNOWFLAKE) && allow_lit) {
             Map* fields = map_new();
             t = next_token(stream);
             if (!token_compare(t, "}", SNOWFLAKE)) {
@@ -219,7 +219,7 @@ Expression* parse_expresslet(TokenStream* stream) {
                     Identifier* field = parse_identifier(stream);
                     t = next_token(stream);
                     if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
-                    Expression* value = parse_expression(stream);
+                    Expression* value = parse_expression(stream, true);
                     StructFieldLit* sfl = gc_malloc(sizeof(StructFieldLit));
                     sfl->name = field;
                     sfl->value = value;
@@ -236,13 +236,14 @@ Expression* parse_expresslet(TokenStream* stream) {
             tv->name = path;
             tv->def = NULL;
             tv->generics = generics;
+            tv->ctx = NULL;
             slit->type = tv;
             slit->fields = fields;
             expression->expr = slit;
             expression->type = EXPR_STRUCT_LITERAL;
         } else {
             if (generics != NULL) unexpected_token(gen_start);
-            if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s", to_str_writer(stream, fprint_path(stream, path)));
+            if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s @ %s", to_str_writer(stream, fprint_path(stream, path)), to_str_writer(stream, fprint_span(stream, &path->elements.elements[0]->span)));
             stream->peek = t;
             Variable* var = gc_malloc(sizeof(Variable));
             var->id = 0;
@@ -289,7 +290,7 @@ int bin_op_precedence(str op) {
     unreachable("Invalid binop %s", op);
 }
 
-Expression* parse_expression(TokenStream* stream) {
+Expression* parse_expression(TokenStream* stream, bool allow_lit) {
     Expression* expr = NULL;
     Expression** inner = &expr;
 
@@ -311,7 +312,7 @@ Expression* parse_expression(TokenStream* stream) {
             inner = (Expression**)&deref->expr;
         } else {
             stream->peek = t;
-            *inner = parse_expresslet(stream);
+            *inner = parse_expresslet(stream, allow_lit);
             break;
         }
     }
@@ -332,7 +333,7 @@ Expression* parse_expression(TokenStream* stream) {
             } else {
                 stream->peek = n;
                 if (str_eq("=", t->string)) {
-                    Expression* value = parse_expression(stream);
+                    Expression* value = parse_expression(stream, allow_lit);
                     Assign* assign = gc_malloc(sizeof(Assign));
                     assign->asignee = expr;
                     assign->value = value;
@@ -343,7 +344,7 @@ Expression* parse_expression(TokenStream* stream) {
                     return assignment;
                 }
             }
-            Expression* rhs = parse_expression(stream);
+            Expression* rhs = parse_expression(stream, allow_lit);
             if (rhs->type == EXPR_BIN_OP) {
                 BinOp* rhs_inner = rhs->expr;
                 if (bin_op_precedence(t->string) <= bin_op_precedence(rhs_inner->op)) {
@@ -409,6 +410,7 @@ TypeValue* parse_type_value(TokenStream* stream) {
     tval->name = name;
     tval->generics = NULL;
     tval->def = NULL;
+    tval->ctx = NULL;
     Token* t = try_next_token(stream);
     if (t != NULL) {
         stream->peek = t;
@@ -441,17 +443,17 @@ Block* parse_block(TokenStream* stream) {
     stream->peek = t;
 
     while (true) {
-        Expression* expression = parse_expression(stream);
-        log("%s", ExprType__NAMES[expression->type]);
+        Expression* expression = parse_expression(stream, true);
         list_append(&expressions, expression);
         t = next_token(stream);
-        log("'%s'", t->string);
         if (!token_compare(t, ";", SNOWFLAKE)) {
             if (token_compare(t, "}", SNOWFLAKE)) {
                 yield_last = true;
                 end = t->span.right;
                 break;
-            } else unexpected_token(t);
+            } else {
+                unexpected_token(t, "Maybe missing semicolon?");
+            }
         }
         t = next_token(stream);
         if (token_compare(t, "}", SNOWFLAKE)) {
@@ -499,8 +501,6 @@ GenericValues* parse_generic_values(TokenStream* stream) {
     GenericValues* generics = gc_malloc(sizeof(GenericValues));
     generics->span.left = t->span.left;
     generics->generics = list_new(TypeValueList);
-    generics->generic_type_ctx = NULL;
-    generics->generic_func_ctx = NULL;
     generics->resolved = map_new();
     t = next_token(stream);
     if (!token_compare(t, ">", SNOWFLAKE)) {

@@ -28,10 +28,10 @@
         panic(title ": " message " @ %s", ##__VA_ARGS__, to_str_writer(out, fprint_span(out, &span))); \
     } \
 } while (0)
-#define unexpected_token(t) spanned_error("Unexpected token", t->span, "`%s` %s", to_str_writer(out, fprint_token(out, t)), TokenType__NAMES[t->type])
+#define unexpected_token(t, ...) spanned_error("Unexpected token", t->span, "`%s` %s. %s", to_str_writer(out, fprint_token(out, t)), TokenType__NAMES[t->type], ## __VA_ARGS__)
 
 Module* parse_module_contents(TokenStream* stream, Path* path);
-Expression* parse_expression(TokenStream* stream);
+Expression* parse_expression(TokenStream* stream, bool allow_lit);
 Path* parse_path(TokenStream* stream);
 TypeValue* parse_type_value(TokenStream* stream);
 Identifier* parse_identifier(TokenStream* stream);
