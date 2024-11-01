@@ -4,10 +4,6 @@
 #include "lib.h"
 #include "ast.h"
 
-typedef struct Import {
-
-} Import;
-
 LIST(ImportList, Import*);
 
 typedef struct Module {
@@ -23,7 +19,7 @@ typedef struct Program {
     Module* main_module;
 } Program;
 
-Module* gen_std();
+Module* gen_intrinsics();
 
 Identifier* gen_identifier(str name);
 TypeValue* gen_typevalue(str typevalue, Span* span);

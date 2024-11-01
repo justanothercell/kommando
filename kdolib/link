@@ -1,2 +1,3 @@
 #!/bin/sh
-echo ::c_api=kdolib/c_api.kdo ::c_api::str=kdolib/c_api/str.kdo ::c_api::math=kdolib/c_api/math.kdo ::std::mem=kdolib/std/mem.kdo ::std::vec=kdolib/std/vec.kdo ::std::io=kdolib/std/io.kdo
+echo ::c_api=kdolib/c_api/c_api.kdo ::c_api::str=kdolib/c_api/str.kdo ::c_api::math=kdolib/c_api/math.kdo \
+     ::std=kdolib/std/std.kdo ::std::mem=kdolib/std/mem.kdo ::std::vec=kdolib/std/vec.kdo ::std::io=kdolib/std/io.kdo

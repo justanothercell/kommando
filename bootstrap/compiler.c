@@ -115,11 +115,11 @@ void compile(CompilerOptions options) {
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
 
-    Module* std = gen_std();
+    Module* intrinsics = gen_intrinsics();
 
     program->main_module = main;
     map_put(program->modules, to_str_writer(stream, fprint_path(stream, main->path)), main);
-    map_put(program->modules, to_str_writer(stream, fprint_path(stream, std->path)), std);
+    map_put(program->modules, to_str_writer(stream, fprint_path(stream, intrinsics->path)), intrinsics);
     map_foreach(options.modules, lambda(void, str modname, str file, {
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
         Module* mod = parse_module_contents(s, gen_path(modname));
@@ -132,7 +132,7 @@ void compile(CompilerOptions options) {
     str header_file_name = to_str_writer(stream, fprintf(stream, "%s.h", options.outname));
     FILE* code_file = fopen(code_file_name, "w");
     FILE* header_file = fopen(header_file_name, "w");
-    transpile_to_c(header_file, code_file, header_file_name, program);
+    transpile_to_c(options, header_file, code_file, header_file_name, program);
     fclose(header_file);
     fclose(code_file);
 

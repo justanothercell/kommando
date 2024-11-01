@@ -194,4 +194,9 @@ typedef struct ModuleItem {
     Span span;
     bool head_resolved;
 } ModuleItem;
+
+typedef struct Import {
+    Path* path;
+} Import;
+
 #endif
