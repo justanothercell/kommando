@@ -83,9 +83,9 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     map_put(module->items, fd->name->name, mi);
 }
 
-Module* gen_std() {
+Module* gen_intrinsics() {
     Module* module = gc_malloc(sizeof(Module));
-    module->path = gen_path("::std");
+    module->path = gen_path("::intrinsics");
     module->imports = list_new(PathList);
     module->items = map_new();
     module->resolved = false;
@@ -181,13 +181,13 @@ Module* gen_std() {
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
-        register_intrinsic(module, "fn intrinsic_argc() -> ::std::usize {} ", "__global__argc", var_bindings, type_bindings);
+        register_intrinsic(module, "fn intrinsic_argc() -> ::std::usize {} ", "__global_argc", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
-        register_intrinsic(module, "fn intrinsic_argv() -> ::std::opaque_ptr {} ", "__global__argv", var_bindings, type_bindings);
+        register_intrinsic(module, "fn intrinsic_argv() -> ::std::opaque_ptr {} ", "__global_argv", var_bindings, type_bindings);
     }
 
     {
