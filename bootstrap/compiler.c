@@ -3,12 +3,7 @@
 #include <string.h>
 #include "compiler.h"
 #include "ast.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/gc.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
+#include "lib.h"
 #include "module.h"
 #include "parser.h"
 #include "resolver.h"
@@ -108,22 +103,24 @@ CompilerOptions build_args(StrList* args) {
 
 void compile(CompilerOptions options) {
     Program* program = gc_malloc(sizeof(Program));
-    program->modules = map_new();
+    program->packages = map_new();
 
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
-    Module* main = parse_module_contents(stream, path_new(true, list_new(IdentList)));
+    Module* main = parse_module_contents(stream, gen_path("::main"));
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
 
     Module* intrinsics = gen_intrinsics();
 
     program->main_module = main;
-    map_put(program->modules, to_str_writer(stream, fprint_path(stream, main->path)), main);
-    map_put(program->modules, to_str_writer(stream, fprint_path(stream, intrinsics->path)), intrinsics);
+
+    insert_module(program, main);
+    insert_module(program, intrinsics);
+
     map_foreach(options.modules, lambda(void, str modname, str file, {
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
         Module* mod = parse_module_contents(s, gen_path(modname));
-        map_put(program->modules, to_str_writer(stream, fprint_path(stream, mod->path)), mod);
+        insert_module(program, mod);
     }));
 
     resolve(program);
@@ -136,6 +133,11 @@ void compile(CompilerOptions options) {
     fclose(header_file);
     fclose(code_file);
 
-    i32 r = system(to_str_writer(stream, fprintf(stream, "%s -Wall -lm %s -o %s", options.c_compiler, code_file_name, options.outname)));
-    if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
+    if (options.compile) {
+        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compilign generated c code... ");
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wswitch-enum -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
+        i32 r = system(command);
+        if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
+        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Done!");
+    }
 }

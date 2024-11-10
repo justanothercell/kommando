@@ -38,6 +38,7 @@ typedef struct TypeDef {
     Map* fields;
     u32 transpile_state;
     Module* module;
+    bool head_resolved;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
 void fprint_td_path(FILE* file, TypeDef* def);
@@ -177,23 +178,12 @@ typedef struct FuncDef {
     Block* body;
     TypeValue* return_type;
     ArgumentList args;
-    bool no_mangle;
-    bool is_variadic;
     GenericKeys* generics;
     Module* module;
-} FuncDef;
-
-ENUM(ModuleItemType,
-    MIT_FUNCTION,
-    MIT_STRUCT
-);
-
-typedef struct ModuleItem {
-    void* item;
-    ModuleItemType type;
-    Span span;
+    bool no_mangle;
+    bool is_variadic;
     bool head_resolved;
-} ModuleItem;
+} FuncDef;
 
 typedef struct Import {
     Path* path;

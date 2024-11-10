@@ -1,1 +1,1 @@
-use intrinsics::*;
+use intrinsics::types::*;
