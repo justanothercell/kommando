@@ -1,6 +1,0 @@
-#!/bin/sh
-rm -f kommando
-cd bootstrap
-gcc -g -rdynamic -o compiler $(find . -name "*.c")
-cd ..
-mv -f bootstrap/compiler kommando

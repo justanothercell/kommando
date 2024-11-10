@@ -1,2 +1,2 @@
 CompileFlags:
-  Add: [-D, __INTELLISENSE__, -Wall, -Wextra, -Wno-deprecated-non-prototype]
+  Add: [-D, __INTELLISENSE__, -Wall, -Wextra, -Werror, -Wpointer-arith, -Wno-error=unused, -Wno-error=unused-parameter, -Wno-error=deprecated-non-prototype]

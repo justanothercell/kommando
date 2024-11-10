@@ -13,13 +13,10 @@
 
 ## Quickstart
 ```sh
-./build # build the compiler
-./run examples/hello # compile an run examples/hello.kdo
+make cr file=examples/hello
 
-# to do both steps in one, especially useful during development
-./cr examples/hello
-
-# you can also run the compiler manually (once it is compiled itself)
+# you can also run the compiler manually (once it is compiled itself).
+# ./kdolib/link is a bash file which inserts the kommando library paths
 ./kommando $(./kdolib/link) examples/hello.kdo examples/hello -cr
 
 # run witnout any arguments to see a list of options
