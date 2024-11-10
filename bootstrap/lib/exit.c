@@ -16,7 +16,7 @@
 static void (*EXIT_FUNC)(str file, usize line, int code) = NULL;
 #define INTERRUPT_MODULE ANSI(ANSI_BOLD, ANSI_RED_FG) "INTERRUPT" ANSI_RESET_SEQUENCE
 void signal_handler(int signal) {
-    printf("CAUGHT SIGNAL %u", signal);
+    printf("CAUGHT SIGNAL %u\n", signal);
     gc_disable();
     switch (signal) {
         case SIGINT:
@@ -77,12 +77,12 @@ void fprint_stacktrace(FILE* file) {
         while(trace[i][p] != '(' && trace[i][p] != ' ' && trace[i][p] != 0) p += 1;
 
         char syscom[256];
-        sprintf(syscom,"addr2line %p -f -e %.*s", (void*)(callstack[i] - info.dli_fbase), (int)p, trace[i]);
+        sprintf(syscom,"addr2line %p -f -e %.*s", (void*)((char*)callstack[i] - (char*)info.dli_fbase), (int)p, trace[i]);
         FILE* res = popen(syscom, "r");
         char result[256];
         usize read = fread(result, 1, 255, res);
         result[read-1] = '\0'; // removing \n
-        fclose(res);
+        pclose(res);
         
         StrList func_loc = split(result, '\n');
         str func = func_loc.elements[0];

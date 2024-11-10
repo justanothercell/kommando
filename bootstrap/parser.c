@@ -1,12 +1,6 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/gc.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 #include "module.h"
 #include "token.h"
 #include <stdbool.h>
@@ -60,6 +54,8 @@ TypeDef* parse_struct(TokenStream* stream) {
     type->fields = fields;
     type->transpile_state = 0;
     type->name = name;
+    type->head_resolved = false;
+    return type;
 }
 
 Module* parse_module_contents(TokenStream* stream, Path* path) {
@@ -78,8 +74,6 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
             mi->item = function;
             mi->type = MIT_FUNCTION;
-            mi->span = function->name->span;
-            mi->head_resolved = false;
             function->module = module;
             map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "struct", IDENTIFIER)) {
@@ -87,8 +81,6 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
             mi->item = type;
             mi->type = MIT_STRUCT;
-            mi->span = type->name->span;
-            mi->head_resolved = false;
             type->module = module;
             map_put(module->items, type->name->name, mi);
         } else {
@@ -376,6 +368,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
             parent->type = EXPR_BIN_OP;
             parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
             expr = parent;
+            return expr;
         } else {
             stream->peek = t;
             return expr;
@@ -384,6 +377,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
         stream->peek = t;
         return expr;
     }
+    unexpected_token(t, "unreachable: this is a compiler bug");
 }
 
 Path* parse_path(TokenStream* stream) {
@@ -583,5 +577,6 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->args = arguments;
     func->is_variadic = variadic;
     func->generics = keys;
+    func->head_resolved = false;
     return func;
 }

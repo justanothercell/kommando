@@ -1,17 +1,9 @@
 #include "resolver.h"
 #include "ast.h"
 #include "lib.h"
-#include "lib/debug.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/gc.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 #include "module.h"
 #include "parser.h"
 #include "token.h"
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -73,90 +65,38 @@ str gvals_to_c_key(GenericValues* generics) {
     return __gvals_to_key(generics, true);
 }
 
-static void* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, str* error) {
+static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind) {
     str full_name = to_str_writer(stream, fprint_path(stream, path));
     Identifier* name = path->elements.elements[path->elements.length-1];
     
-    path->elements.length -= 1;
-    str pathstr = to_str_writer(stream, fprint_path(stream, path));
-    path->elements.length += 1;
-    
-    if (path->absolute) {
-        Module* item_module = map_get(program->modules, pathstr);
-        if (item_module == NULL) {
-            Span* s = gc_malloc(sizeof(Span));
-            s->left = path->elements.elements[0]->span.left;
-            s->right = name->span.right;
-            *error = to_str_writer(stream, fprintf(stream, "no such module %s for item %s of kind %s", pathstr, name->name, ModuleItemType__NAMES[kind]));
-            return s;
+    usize i = 0;
+    Identifier* m = path->elements.elements[0];
+    ModuleItem* mod = map_get(module->items, m->name);
+    if (mod != NULL) { // try local
+        if (mod->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[mod->type]);
+        module = mod->item;
+        i += 1;
+    } else { // try global
+        Module* package = map_get(program->packages, m->name);
+        if (package != NULL) {
+            if (path->absolute) spanned_error("No such package", m->span, "Package %s does not exist. Try including it with the command line args: ::%s=path/to/package.kdo", m->name, m->name);
+            i += 1;
+            module = package;
         }
-        ModuleItem* item = map_get(item_module->items, name->name);
-        if (item == NULL) {
-            *error = to_str_writer(stream, fprintf(stream, "no such item %s of kind %s", full_name, ModuleItemType__NAMES[kind]));
-            return &name->span;
-        }
-        if (item->type != kind) {
-            *error = to_str_writer(stream, fprintf(stream, "%s should resolve to %s but got %s @ %s (1)", full_name, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->span))));
-            return &name->span;
-        }
-        return item;
-    } else {
-        if (path->elements.length > 1) {
-            Path* joined = path_join(module->path, path);
-            Span joined_span = from_points(&joined->elements.elements[0]->span.left, &joined->elements.elements[0]->span.right);
-            str err1 = NULL;
-            str err2 = NULL;
-            Path* abs = path_new(true, path->elements);
-            Span abs_span = from_points(&abs->elements.elements[0]->span.left, &abs->elements.elements[0]->span.right);
-            str path_1 = to_str_writer(stream, fprint_path(stream, joined));
-            str path_2 = to_str_writer(stream, fprint_path(stream, abs));
-            if (str_eq(path_1, path_2)) return resolve_item_raw(program, module, joined, kind, error);
-            ModuleItem* candidate_1 = resolve_item_raw(program, module, joined, kind, &err1);
-            ModuleItem* candidate_2 = resolve_item_raw(program, module, abs, kind, &err2);
-            if (err1 != NULL && err2 != NULL) {
-                Span* s = gc_malloc(sizeof(Span));
-                s->left = path->elements.elements[0]->span.left;
-                s->right = name->span.right;
-                *error = to_str_writer(stream, fprintf(stream, "no such item %s of kind %s", full_name, ModuleItemType__NAMES[kind]));
-                return s;
-            }
-            if (err1 == NULL && err2 == NULL) {
-                Span* s = gc_malloc(sizeof(Span));
-                s->left = path->elements.elements[0]->span.left;
-                s->right = name->span.right;
-                *error = to_str_writer(stream, fprintf(stream, "Multiple candiates for %s %s: %s %s @ %s and %s %s @ %s", ModuleItemType__NAMES[kind], full_name, 
-                            ModuleItemType__NAMES[candidate_1->type], to_str_writer(s, fprint_path(s, joined)), 
-                                to_str_writer(s, fprint_span(s, &joined_span)),
-                            ModuleItemType__NAMES[candidate_2->type], to_str_writer(s, fprint_path(s, abs)), 
-                                to_str_writer(s, fprint_span(s, &abs_span))));
-                return s;
-            }
-            if (err1 == NULL) {
-                if (candidate_1->type != kind) {
-                    *error = to_str_writer(stream, fprintf(stream, "%s should resolve to %s but got %s @ %s (2a)", path_1, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[candidate_1->type], to_str_writer(s, fprint_span(s, &candidate_1->span))));
-                    return &name->span;
-                }
-                return candidate_1;
-            }
-            if (err2 == NULL) {
-                if (candidate_2->type != kind) {
-                    *error = to_str_writer(stream, fprintf(stream, "%s should resolve to %s but got %s @ %s (2b)", path_2, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[candidate_2->type], to_str_writer(s, fprint_span(s, &candidate_2->span))));
-                    return &name->span;
-                }
-                return candidate_2;
-            }
-        }
-        ModuleItem* item = map_get(module->items, name->name);
-        if (item == NULL) {
-            *error = to_str_writer(stream, fprintf(stream, "no such item %s of kind %s", full_name, ModuleItemType__NAMES[kind]));
-            return &name->span;
-        }
-        if (item->type != kind) {
-            *error = to_str_writer(stream, fprintf(stream, "%s should resolve to %s but got %s @ %s (3)", full_name, ModuleItemType__NAMES[kind], ModuleItemType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->span))));
-            return &name->span;
-        }
-        return item;
     }
+    if (i == 0) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
+    while (i < path->elements.length - 1) {
+        Identifier* m = path->elements.elements[i];
+        i += 1;
+        ModuleItem* it = map_get(module->items, m->name);
+        if (it == NULL) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
+        if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
+        module = it->item;
+    }
+    ModuleItem* it = map_get(module->items, name->name);
+    if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[it->type], name->name);
+    if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
+    return it->item;
 }
 
 void register_item(GenericValues* item_values, GenericKeys* gkeys) {
@@ -170,28 +110,22 @@ void register_item(GenericValues* item_values, GenericKeys* gkeys) {
     }
 }
 
-void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved);
-void resolve_typedef(Program* program, TypeDef* ty, bool* head_resolved);
+void resolve_funcdef(Program* program, FuncDef* func);
+void resolve_typedef(Program* program, TypeDef* ty);
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
-    str error = NULL;
-    void* item = resolve_item_raw(program, module, path, kind, &error);
-    if (error != NULL) {
-        Span span = *(Span*)item;
-        spanned_error("Unable to resolve item", span, "%s", error);
-    }
-    ModuleItem* mi = item;
-    if (!mi->head_resolved) {
-        switch (mi->type) {
-            case MIT_FUNCTION:
-                resolve_funcdef(program, mi->item, &mi->head_resolved);
-                break;
-            case MIT_STRUCT:
-                resolve_typedef(program, mi->item, &mi->head_resolved);
-                break;
-            default:
-                unreachable();
-        }
+    ModuleItem* mi = resolve_item_raw(program, module, path, kind);
+    switch (mi->type) {
+        case MIT_FUNCTION: {
+            FuncDef* func = mi->item;
+            if (!func->head_resolved) resolve_funcdef(program, func);
+        } break;
+        case MIT_STRUCT: {
+            TypeDef* type = mi->item;
+            if (!type->head_resolved) resolve_typedef(program, type);
+        } break;
+        default:
+            unreachable();
     }
     GenericKeys* gkeys = NULL;
     switch (mi->type) {
@@ -266,7 +200,8 @@ void resolve_typevalue(Program* program, Module* module, TypeValue* tval, Generi
         if (type_generics != NULL) {
             type_gen_t = map_get(type_generics->resolved, key);
         }
-        if (func_gen_t != NULL && type_gen_t != NULL) spanned_error("Multiple generic candidates", tval->name->elements.elements[0]->span, "Generic %s is could belong to  %s or %s", 
+        if (func_gen_t != NULL && type_gen_t != NULL) spanned_error("Multiple generic candidates", tval->name->elements.elements[0]->span, "Generic %s could belong to %s or %s", 
+                    tval->name->elements.elements[0]->name,
                     to_str_writer(stream, fprint_span(stream, &func_gen_t->name->span)),
                     to_str_writer(stream, fprint_span(stream, &type_gen_t->name->span)));
         if ((func_gen_t != NULL || type_gen_t != NULL) && tval->generics != NULL) spanned_error("Generic generic", tval->generics->span, "Generic parameter should not have generic arguments @ %s", to_str_writer(s, fprint_span(s, &tval->def->name->span)));
@@ -369,6 +304,7 @@ TypeValue* replace_generic(TypeValue* tv, GenericValues* ctx) {
     if (map_contains(ctx->resolved, tv->name->elements.elements[0]->name)) {
         return map_get(ctx->resolved, tv->name->elements.elements[0]->name);
     }
+    return tv;
 }
 
 void patch_tvs(TypeValue** tv1ref, TypeValue** tv2ref) {
@@ -784,7 +720,7 @@ void resolve_block(Program* program, FuncDef* func, GenericKeys* type_generics, 
 }
 
 void resolve_module(Program* program, Module* module);
-void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved) {
+void resolve_funcdef(Program* program, FuncDef* func) {
     if (!func->module->resolved && !func->module->in_resolution) {
         resolve_module(program, func->module);
     }
@@ -813,7 +749,7 @@ void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved) {
     }));
     resolve_typevalue(program, func->module, func->return_type, func->generics, type_generics);
 
-    *head_resolved = true;
+    func->head_resolved = true;
 
     if (func->body != NULL) {
         TVBox* blockbox = new_tvbox();
@@ -834,13 +770,13 @@ void resolve_funcdef(Program* program, FuncDef* func, bool* head_resolved) {
     }
 }
 
-void resolve_typedef(Program* program, TypeDef* ty, bool* head_resolved) {
+void resolve_typedef(Program* program, TypeDef* ty) {
     if (!ty->module->resolved && !ty->module->in_resolution) {
         resolve_module(program, ty->module);
     }
     if (ty->extern_ref != NULL) {
         log("Type %s is extern", ty->name->name);
-        *head_resolved = true;
+        ty->head_resolved = true;
         return;
     }
     log("Resolving type %s", ty->name->name);
@@ -856,7 +792,7 @@ void resolve_typedef(Program* program, TypeDef* ty, bool* head_resolved) {
             map_put(ty->generics->resolved, key->name, type);
         }));
     }
-    *head_resolved = true;
+    ty->head_resolved = true;
     map_foreach(ty->fields, lambda(void, str name, Field* field, {
         resolve_typevalue(program, ty->module, field->type, NULL, ty->generics);
     }));
@@ -870,20 +806,22 @@ void resolve_module(Program* program, Module* module) {
 
     log("Resolving module %s", path_str);
 
-    list_foreach(&module->imports, lambda(void, Path* path, {
-        Module* mod = map_get(program->modules, to_str_writer(stream, fprint_path(stream, path)));
-        resolve_module(program, mod);
-    }));
-
     map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
-        if (item->head_resolved) return; // this means at this point the whole item is already resolved, the "head" part is for recursion detection
         switch (item->type) {
-            case MIT_FUNCTION:
-                resolve_funcdef(program, item->item, &item->head_resolved);
-                break;
-            case MIT_STRUCT:
-                resolve_typedef(program, item->item, &item->head_resolved);
-                break;
+            case MIT_FUNCTION: {
+                FuncDef* func = item->item;
+                if (func->head_resolved) return;
+                resolve_funcdef(program, func);
+            } break;
+            case MIT_STRUCT: {
+                TypeDef* type = item->item;
+                if (type->head_resolved) return;
+                resolve_typedef(program, type);
+            } break;
+            case MIT_MODULE: {
+                Module* mod = item->item;
+                resolve_module(program, mod);
+            } break;
         }
     }));
 
@@ -892,7 +830,7 @@ void resolve_module(Program* program, Module* module) {
 }
 
 void resolve(Program* program) {
-    map_foreach(program->modules, lambda(void, str key, Module* mod, {
+    map_foreach(program->packages, lambda(void, str key, Module* mod, {
         resolve_module(program, mod);
     }));
 }

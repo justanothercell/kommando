@@ -44,45 +44,46 @@ void check_check(void* ptr) {
     uint8_t* check_l = ((uint8_t*)ptr)+4;
     uint8_t* check_r = ((uint8_t*)ptr)+8+(*(uint32_t*)size_m);
     if (!check_checksum32(check_l)) {
-        panic("block checksum (left) not valid for %p: Wrote over preceeding bytes.\n", ptr + 8);
+        panic("block checksum (left) not valid for %p: Wrote over preceeding bytes.\n", (char*)ptr + 8);
     }
     if (!check_checksum32(check_r)) {
-        panic("Block checksum (right) not valid for %p: Wrote over succeeding bytes.\n", ptr + 8);
+        panic("Block checksum (right) not valid for %p: Wrote over succeeding bytes.\n", (char*)ptr + 8);
     }
 }
 
 void* debug_malloc(size_t size, char* file, int line) {
     opentrace();
     void* ptr = malloc(size + 12);
-    fprintf(MEMTRACE, "MALLOC %p %lu @ %s:%d\n", ptr + 8, size, file, line);
+    fprintf(MEMTRACE, "MALLOC %p %lu @ %s:%d\n", (char*)ptr + 8, size, file, line);
     fflush(MEMTRACE);
     set_check(ptr, size);
-    return ptr + 8;
+    return (char*)ptr + 8;
 }
 
 void* debug_realloc(void* ptr, size_t size, char* file, int line) {
     if (ptr != NULL) {
-        ptr -= 8;
+        ptr = (char*)ptr - 8;
         check_check(ptr);
     }
     opentrace();
+    usize p = (usize)ptr;
     void* new_ptr = realloc(ptr, size + 12);
-    if (ptr == NULL) fprintf(MEMTRACE, "REALLOC %p %p %lu @ %s:%d\n", ptr, new_ptr + 8, size, file, line);
-    else fprintf(MEMTRACE, "REALLOC %p %p %lu @ %s:%d\n", ptr + 8, new_ptr + 8, size, file, line);
+    if (ptr == NULL) fprintf(MEMTRACE, "REALLOC %p %p %lu @ %s:%d\n", (char*)p, (char*)new_ptr + 8, size, file, line);
+    else fprintf(MEMTRACE, "REALLOC %p %p %lu @ %s:%d\n", (char*)p + 8, (char*)new_ptr + 8, size, file, line);
     fflush(MEMTRACE);
     set_check(new_ptr, size);
-    return new_ptr + 8;
+    return (char*)new_ptr + 8;
 }
 
 void debug_free(void* ptr, char* file, int line) {
     if (ptr != NULL) {
-        ptr -= 8;
+        ptr = (char*)ptr - 8;
         check_check(ptr);
     }
     opentrace();
-    free(ptr);
     if (ptr == NULL) fprintf(MEMTRACE, "FREE %p @ %s:%d\n", ptr, file, line);
-    else fprintf(MEMTRACE, "FREE %p @ %s:%d\n", ptr + 8, file, line);
+    else fprintf(MEMTRACE, "FREE %p @ %s:%d\n", (char*)ptr + 8, file, line);
+    free(ptr);
     fflush(MEMTRACE);
 }
 
