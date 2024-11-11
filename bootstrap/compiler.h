@@ -2,6 +2,7 @@
 #define COMPILER_H
 
 #include "lib.h"
+#include "lib/str.h"
 #include "module.h"
 #include "token.h"
 
@@ -13,6 +14,7 @@ typedef struct CompilerOptions {
     bool run;
     bool raw;
     bool compile;
+    StrList module_names;
     Map* modules;
 } CompilerOptions;
 

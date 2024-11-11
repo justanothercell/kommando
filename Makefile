@@ -1,5 +1,5 @@
 build: clean
-	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") -Wall -Wextra -Werror -Wno-unused -Wpointer-arith
+	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-variable -Wno-error=unused-parameter
 
 clean:
 	rm -f kommando

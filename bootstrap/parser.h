@@ -5,6 +5,7 @@
 #include "lib.h"
 #include "module.h"
 #include "token.h"
+
 #define spanned_error(title, span, message, ...) do { \
     if (span.left.line == span.right.line) { \
         usize il1234567890 = span.left.index - span.left.column;\
@@ -20,14 +21,6 @@
         if (span.left.column == span.right.column) indicator1234567890[1] = '\0'; \
         else indicator1234567890[span.right.column - span.left.column] = '\0'; \
         if (span.right.column != span.left.column + 1) indicator1234567890[span.right.column - span.left.column - 1] = '\0'; \
-        log("%s", title ": " message "\n  %s\n % 3llu | %.*s\n     *-%s%s"); \
-        log("%llu %llu", span.left.line + 1, ir1234567890 - il1234567890); \
-        log("%s", to_str_writer(out, fprint_span(out, &span))); \
-        log("%llu", il1234567890); \
-        log("%s", padding1234567890); \
-        log("%s", indicator1234567890); \
-        log(message, ##__VA_ARGS__); \
-        log("UwU"); \
         panic(title ": " message "\n  %s\n % 3llu | %.*s\n     *-%s%s", \
             ##__VA_ARGS__, to_str_writer(out, fprint_span(out, &span)), \
             span.left.line + 1, ir1234567890 - il1234567890, span.left.source+il1234567890, padding1234567890, indicator1234567890 \

@@ -8,6 +8,7 @@
 #include "lib/str.h"
 
 void cleanup_quit(str file, usize line, int code) {
+    UNUSED(file); UNUSED(line); UNUSED(code);
     gc_end();
 }
 

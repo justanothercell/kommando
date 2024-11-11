@@ -286,7 +286,8 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
             str c_ty = gen_c_type_name(slit->type, generics);
             fprintf(code_stream, "(%s) { ", c_ty);
             usize i = 0;
-            map_foreach(slit->fields, lambda(void, str _key, StructFieldLit* sfl, {
+            map_foreach(slit->fields, lambda(void, str key, StructFieldLit* sfl, {
+                UNUSED(key);
                 if (i++ > 0) fprintf(code_stream, ", ");
                 fprintf(code_stream, ".%s=", sfl->name->name);
                 transpile_expression(code_stream, modkey, func, generics, sfl->value, indent + 1);
@@ -409,6 +410,7 @@ bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
         return true;
     }
     map_foreach(contexted->ctx->generic_uses, lambda(void, str key, GenericValues* context, {
+        UNUSED(key);
         GenericValues* expanded = expand_generics(instance, context);
         str expanded_key = gvals_to_key(expanded);
         if (!map_contains(instance_host->generic_uses, expanded_key)) {
@@ -483,6 +485,7 @@ void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, Func
 }
 
 void transpile_typedef_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, GenericValues* generics, bool body) {
+    UNUSED(code_stream);
     if (!ty->extern_ref) {
         TypeValue* tv = gc_malloc(sizeof(TypeValue));
         tv->ctx = NULL;
@@ -521,6 +524,7 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
             GenericValues* generics = map_get(ty->generics->generic_uses, key);
             if (monomorphize(generics, ty->generics)) { 
                 map_foreach(ty->fields, lambda(void, str key, Field* f, {
+                    UNUSED(key);
                     TypeValue* tv = f->type;
                     if (map_contains(generics->resolved, tv->def->name->name)) tv = map_get(generics->resolved, tv->def->name->name);
                     if (tv->def->transpile_state != 2 && tv->def != ty) {
@@ -532,6 +536,7 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
         }));
     } else {
         map_foreach(ty->fields, lambda(void, str key, Field* f, {
+            UNUSED(key);
             TypeValue* v = f->type;
             if (v->def->transpile_state != 2 && v->def != ty) {
                 transpile_typedef(header_stream, code_stream, to_str_writer(s, fprint_path(s, v->def->module->path)), v->def, true);
@@ -542,8 +547,20 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
     ty->transpile_state = 2;
 }
 
-void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, ModuleItemType pass_mask) {
-    
+void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, ModuleItemType type) {
+    map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
+        switch (item->type) {
+            case MIT_MODULE:
+                transpile_module(header_stream, code_stream, key, item->item, type);
+                break;
+            case MIT_FUNCTION:
+                if (type == MIT_FUNCTION) transpile_function(header_stream, code_stream, modkey, item->item);
+                break;
+            case MIT_STRUCT:
+                if (type == MIT_STRUCT) transpile_typedef(header_stream, code_stream, modkey, item->item, true);
+                break;
+        }
+    }));
 }
 
 void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_stream, str header_name, Program* program) {
@@ -583,8 +600,8 @@ void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_str
         FuncDef* main_func = main_func_item->item;
         fprintf(code_stream, "// c main entrypoint\n");
         fprintf(code_stream, "int main(int argc, char** argv) {\n");
-        fprintf(code_stream, "    __global__argc = argc;\n");
-        fprintf(code_stream, "    __global__argv = argv;\n");
+        fprintf(code_stream, "    __global_argc = argc;\n");
+        fprintf(code_stream, "    __global_argv = argv;\n");
         fprintf(code_stream, "    %s();\n", gen_c_fn_name(main_func, NULL));
         fprintf(code_stream, "    return 0;\n");
         fprintf(code_stream, "}\n");

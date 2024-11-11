@@ -4,6 +4,9 @@
 #include "compiler.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
 #include "module.h"
 #include "parser.h"
 #include "resolver.h"
@@ -32,6 +35,7 @@ CompilerOptions build_args(StrList* args) {
     options.raw = false;
     options.compile = false;
     options.run = false;
+    options.module_names = list_new(StrList);
     options.modules = map_new();
 
     for (usize i = 1;i < args->length;i++) {
@@ -78,6 +82,7 @@ CompilerOptions build_args(StrList* args) {
                     str mod = to_str_writer(stream, fprintf(stream, "%.*s", (int)i, arg));
                     str file = arg + i + 1;
                     map_put(options.modules, mod, file);
+                    list_append(&options.module_names, mod);
                 }
             }
         } else {
@@ -106,22 +111,30 @@ void compile(CompilerOptions options) {
     program->packages = map_new();
 
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
+    log("Parsing module ::main");
     Module* main = parse_module_contents(stream, gen_path("::main"));
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
 
     Module* intrinsics = gen_intrinsics();
+    Module* intrinsics_types = gen_intrinsics_types();
 
     program->main_module = main;
 
     insert_module(program, main);
     insert_module(program, intrinsics);
+    insert_module(program, intrinsics_types);
 
-    map_foreach(options.modules, lambda(void, str modname, str file, {
+    list_foreach(&options.module_names, lambda(void, str modname, {
+        str file = map_get(options.modules, modname);
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
+    log("Parsing module %s", modname);
         Module* mod = parse_module_contents(s, gen_path(modname));
         insert_module(program, mod);
     }));
+
+    Module* std = map_get(program->packages, "std");
+    std->items = intrinsics_types->items;
 
     resolve(program);
 
