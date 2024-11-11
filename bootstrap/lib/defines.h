@@ -6,6 +6,8 @@
 
 #include "terminal.h"
 
+#define UNUSED(x) (void)x
+
 #define IDENTITY_MACRO(x) x
 #define STRINGIFY(x) #x
 

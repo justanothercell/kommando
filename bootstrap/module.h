@@ -8,9 +8,9 @@
 LIST(ImportList, Import*);
 
 ENUM(ModuleItemType,
-    MIT_FUNCTION = 1,
-    MIT_STRUCT = 2,
-    MIT_MODULE = 4
+    MIT_FUNCTION,
+    MIT_STRUCT,
+    MIT_MODULE
 );
 
 typedef struct ModuleItem {

@@ -14,12 +14,12 @@ fn free(ptr: std::opaque_ptr) -> std::c_void;
 
 // we do not have constants yet
 fn null() -> std::opaque_ptr {
-    std::typecast(0usize)
+    intrinsics::typecast(0usize)
 }
 
 // we do not have constants yet
 fn nullstr() -> std::c_const_str_ptr {
-    std::typecast(0usize)
+    intrinsics::typecast(0usize)
 }
 
 // gnu-c

@@ -1,6 +1,10 @@
 #include "resolver.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/defines.h"
+#include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
 #include "module.h"
 #include "parser.h"
 #include "token.h"
@@ -66,12 +70,14 @@ str gvals_to_c_key(GenericValues* generics) {
 }
 
 static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind) {
-    str full_name = to_str_writer(stream, fprint_path(stream, path));
     Identifier* name = path->elements.elements[path->elements.length-1];
+
+    if (path->elements.length == 1 && !path->absolute) goto get_item;
     
     usize i = 0;
     Identifier* m = path->elements.elements[0];
-    ModuleItem* mod = map_get(module->items, m->name);
+    ModuleItem* mod = NULL;
+    if (!path->absolute) mod = map_get(module->items, m->name);
     if (mod != NULL) { // try local
         if (mod->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[mod->type]);
         module = mod->item;
@@ -79,10 +85,9 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
     } else { // try global
         Module* package = map_get(program->packages, m->name);
         if (package != NULL) {
-            if (path->absolute) spanned_error("No such package", m->span, "Package %s does not exist. Try including it with the command line args: ::%s=path/to/package.kdo", m->name, m->name);
             i += 1;
             module = package;
-        }
+        } else if (path->absolute) spanned_error("No such package", m->span, "Package %s does not exist. Try including it with the command line args: ::%s=path/to/package.kdo", m->name, m->name);
     }
     if (i == 0) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
     while (i < path->elements.length - 1) {
@@ -93,10 +98,11 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
         if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
         module = it->item;
     }
+    get_item: {}
     ModuleItem* it = map_get(module->items, name->name);
-    if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[it->type], name->name);
+    if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[kind], name->name);
     if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
-    return it->item;
+    return it;
 }
 
 void register_item(GenericValues* item_values, GenericKeys* gkeys) {
@@ -114,7 +120,39 @@ void resolve_funcdef(Program* program, FuncDef* func);
 void resolve_typedef(Program* program, TypeDef* ty);
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
-    ModuleItem* mi = resolve_item_raw(program, module, path, kind);
+    typedef struct {
+        str key;
+        ModuleItem* item;
+    } MICacheItem;
+    LIST(MICList, MICacheItem);
+    static MICList LOOKUP_CACHE = list_new(MICList);
+    const usize CACHE_SIZE = 16;
+    str key = to_str_writer(s, {
+        fprint_path(s, path);
+        if (!path->absolute) {
+            fprintf(s, "|");
+            fprint_path(s, module->path);
+        }
+    });
+
+    ModuleItem* mi = NULL;
+    for (usize i = 0;i < CACHE_SIZE && i < LOOKUP_CACHE.length;i++) {
+        if (str_eq(LOOKUP_CACHE.elements[i].key, key)) {
+            mi = LOOKUP_CACHE.elements[i].item;
+            if (i > 0) { // improve location in cache
+                MICacheItem t = LOOKUP_CACHE.elements[i];
+                LOOKUP_CACHE.elements[i] = LOOKUP_CACHE.elements[i - 1];
+                LOOKUP_CACHE.elements[i - 1] = t;
+            }
+        }
+    }
+
+    if (mi == NULL) {
+        mi = resolve_item_raw(program, module, path, kind);
+        MICacheItem mic = (MICacheItem) { .key=key, .item = mi };
+        if (LOOKUP_CACHE.length < CACHE_SIZE) list_append(&LOOKUP_CACHE, mic);
+        else LOOKUP_CACHE.elements[CACHE_SIZE - 1] = mic;
+    }
     switch (mi->type) {
         case MIT_FUNCTION: {
             FuncDef* func = mi->item;
@@ -639,6 +677,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
                 finish_tvbox(fieldbox);
             }));
             map_foreach(temp_fields, lambda(void, str key, Field* field, {
+                UNUSED(field);
                 spanned_error("Field not initialized", slit->type->name->elements.elements[0]->span, "Field '%s' of struct %s was not initialized", type->name->name, key);
             }));
         
@@ -647,10 +686,12 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         case EXPR_C_INTRINSIC: {
             CIntrinsic* ci = expr->expr;
             map_foreach(ci->var_bindings, lambda(void, str key, Variable* var, {
+                UNUSED(key);
                 VarBox* vb = var_find(vars, var);
                 var->id = vb->id;
             }));
             map_foreach(ci->type_bindings, lambda(void, str key, TypeValue* tv, {
+                UNUSED(key);
                 resolve_typevalue(program, func->module, tv, func->generics, type_generics);
             }));
             resolve_typevalue(program, func->module, ci->ret_ty, func->generics, type_generics);
@@ -794,6 +835,7 @@ void resolve_typedef(Program* program, TypeDef* ty) {
     }
     ty->head_resolved = true;
     map_foreach(ty->fields, lambda(void, str name, Field* field, {
+        UNUSED(name);
         resolve_typevalue(program, ty->module, field->type, NULL, ty->generics);
     }));
 }
@@ -807,6 +849,7 @@ void resolve_module(Program* program, Module* module) {
     log("Resolving module %s", path_str);
 
     map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
+        UNUSED(key);
         switch (item->type) {
             case MIT_FUNCTION: {
                 FuncDef* func = item->item;
@@ -831,6 +874,7 @@ void resolve_module(Program* program, Module* module) {
 
 void resolve(Program* program) {
     map_foreach(program->packages, lambda(void, str key, Module* mod, {
+        UNUSED(key);
         resolve_module(program, mod);
     }));
 }

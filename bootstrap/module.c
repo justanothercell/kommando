@@ -30,7 +30,7 @@ void insert_module(Program* program, Module* module) {
         Identifier* m = path->elements.elements[i];
         i += 1;
         ModuleItem* it = map_get(current->items, m->name);
-        if (it == NULL) spanned_error("No such module", m->span, "Module %s does not exist.",m->name);
+        if (it == NULL) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
         if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
         current = it->item;
     }
@@ -105,6 +105,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
     mi->item = fd;
     mi->type = MIT_FUNCTION;
+    fd->module = module;
     map_put(module->items, fd->name->name, mi);
 }
 
