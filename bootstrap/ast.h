@@ -189,4 +189,10 @@ typedef struct Import {
     Path* path;
 } Import;
 
+typedef struct ModDef {
+    bool pub;
+    Identifier* name;
+} ModDef;
+LIST(ModDefList, ModDef*);
+
 #endif

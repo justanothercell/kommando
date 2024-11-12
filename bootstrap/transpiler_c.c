@@ -566,6 +566,8 @@ void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_str
     if (!options.raw) {
         fprintf(header_stream, "#include <stdint.h>\n");
         fprintf(header_stream, "#include <stdbool.h>\n");
+        fprintf(header_stream, "#include <stdalign.h>\n");
+        fprintf(header_stream, "\n");
         fprintf(header_stream, "extern void* stdin;\n");
         fprintf(header_stream, "extern void* stdout;\n");
         fprintf(header_stream, "extern void* stderr;\n");

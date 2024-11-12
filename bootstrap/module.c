@@ -11,10 +11,11 @@
 #include <stdio.h>
 #include <time.h>
 
-void insert_module(Program* program, Module* module) {
+void insert_module(Program* program, Module* module, bool pub) {
     Path* path = module->path;
     if (path->elements.length == 1) {
         Identifier* name = path->elements.elements[0];
+        if (!pub) spanned_error("Package must be public", name->span, "Cannot register package %s as private, this is probably a compiler error.", to_str_writer(s, fprint_path(s, path)));
         if (map_put(program->packages, name->name, module) != NULL) spanned_error("Package already exists", name->span, "Cannot register package %s, it already exists.", to_str_writer(s, fprint_path(s, path)));
         return;
     }
@@ -36,6 +37,7 @@ void insert_module(Program* program, Module* module) {
     ModuleItem* item = malloc(sizeof(ModuleItem));
     item->type = MIT_MODULE;
     item->item = module;
+    item->module = current;
     Identifier* name = path->elements.elements[i];
     if (map_put(current->items, name->name, item) != NULL) spanned_error("Item already exists", name->span, "Cannot register module %s, item of such name already exists in parent module.", to_str_writer(s, fprint_path(s, path)));
 }
@@ -83,6 +85,8 @@ void register_extern_type(Module* module, str name, str extern_ref) {
     ModuleItem* ty_mi = malloc(sizeof(ModuleItem));
     ty_mi->item = ty;
     ty_mi->type = MIT_STRUCT;
+    ty_mi->pub = true;
+    ty_mi->module = module;
     ty->module = module;
     map_put(module->items, name, ty_mi);
 }
@@ -115,6 +119,8 @@ Module* gen_intrinsics_types() {
     module->items = map_new();
     module->resolved = false;
     module->in_resolution = false;
+    module->filepath = NULL;
+    module->subs = list_new(ModDefList);
 
     register_extern_type(module, "bool", "bool");
     register_extern_type(module, "opaque_ptr", "void*");
@@ -163,6 +169,8 @@ Module* gen_intrinsics() {
     module->items = map_new();
     module->resolved = false;
     module->in_resolution = false;
+    module->filepath = NULL;
+    module->subs = list_new(ModDefList);
 
     {
         Map* var_bindings = map_new();
@@ -189,6 +197,13 @@ Module* gen_intrinsics() {
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
         register_intrinsic(module, "fn sizeof<T>() -> ::std::usize {} ", "sizeof(@!T)", var_bindings, type_bindings);
+    }
+
+    {
+        Map* var_bindings = map_new();
+        Map* type_bindings = map_new();
+        map_put(type_bindings, "T", gen_typevalue("T", NULL));
+        register_intrinsic(module, "fn alignof<T>() -> ::std::usize {} ", "alignof(@!T)", var_bindings, type_bindings);
     }
 
     {

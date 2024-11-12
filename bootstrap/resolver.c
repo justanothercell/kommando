@@ -1,6 +1,6 @@
+#include "lib.h"
 #include "resolver.h"
 #include "ast.h"
-#include "lib.h"
 #include "lib/str.h"
 #include "module.h"
 #include "parser.h"
@@ -91,12 +91,7 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
         Identifier* m = path->elements.elements[i];
         i += 1;
         ModuleItem* it = map_get(module->items, m->name);
-        log("%p %s", it, to_str_writer(s, fprint_path(s, path)));
         if (it == NULL) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
-        log("%s", to_str_writer(s, fprint_span(s, &m->span)));
-        log("%u %u", it->type, MIT_MODULE);
-        log("%p", it->item);
-        log("%p", it);
         if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
         module = it->item;
     }
@@ -111,9 +106,7 @@ void register_item(GenericValues* item_values, GenericKeys* gkeys) {
     // no need to register if we are not generic - we just complie the one default nongeneric variant in that case
     if (item_values != NULL) {
         str key = gvals_to_key(item_values);
-        log("trying to register %s", key);
         if (!map_contains(gkeys->generic_uses, key)) {
-            log("Registered!");
             map_put(gkeys->generic_uses, key, item_values);
             list_append(&gkeys->generic_use_keys, key);
         }
@@ -123,6 +116,11 @@ void register_item(GenericValues* item_values, GenericKeys* gkeys) {
 void resolve_funcdef(Program* program, FuncDef* func);
 void resolve_typedef(Program* program, TypeDef* ty);
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
+static int hits = 0;
+static int misses = 0;
+void report_cache() {
+    log("Item cache hits: %d misses: %d", hits, misses);
+}
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
     typedef struct {
         str key;
@@ -131,6 +129,27 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
     LIST(MICList, MICacheItem);
     static MICList LOOKUP_CACHE = list_new(MICList);
     const usize CACHE_SIZE = 16;
+    /*
+        // examples/generics.kdo
+        // note that this is still a rather small example so it only is partially representative.
+        size: hits/misses
+            1:   40/295
+            2:   71/264
+            3:   90/245
+            4:   95/240
+            6:  109/226
+            8:  112/223
+           12:  145/190
+           16:  161/174
+           24:  193/142
+           32:  197/138
+           48:  214/121
+           64:  217/118
+           96:  246/ 89
+          128:  246/ 89
+          192:  246/ 89
+          256:  246/ 89
+    */
     str key = to_str_writer(s, {
         fprint_path(s, path);
         if (!path->absolute) {
@@ -148,6 +167,8 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
                 LOOKUP_CACHE.elements[i] = LOOKUP_CACHE.elements[i - 1];
                 LOOKUP_CACHE.elements[i - 1] = t;
             }
+            hits += 1;
+            break;
         }
     }
 
@@ -156,7 +177,24 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
         MICacheItem mic = (MICacheItem) { .key=key, .item = mi };
         if (LOOKUP_CACHE.length < CACHE_SIZE) list_append(&LOOKUP_CACHE, mic);
         else LOOKUP_CACHE.elements[CACHE_SIZE - 1] = mic;
+        misses += 1;
     }
+#ifdef DEBUG_CACHE
+    {
+        FILE* cachelog = NULL;
+        if (hits + misses == 1) {
+            cachelog = fopen("CACHELOG.txt", "w");
+        } else {
+            cachelog = fopen("CACHELOG.txt", "a");
+        }
+        list_foreach_i(&LOOKUP_CACHE, lambda(void, usize i, MICacheItem item, {
+            if (i > 0) fprintf(cachelog, ", ");
+            fprintf(cachelog, "%s", item.key);
+        }));
+        fprintf(cachelog, "\n");
+        fclose(cachelog);
+    }
+#endif
     switch (mi->type) {
         case MIT_FUNCTION: {
             FuncDef* func = mi->item;
@@ -476,7 +514,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             FuncCall* fc = expr->expr;
 
             FuncDef* fd = resolve_item(program, func->module, fc->name, MIT_FUNCTION, func->generics, type_generics, &fc->generics);
-            log("calling %s in %s", fd->name->name, func->name->name);
             // preresolve return
             TypeValue* pre_ret = replace_generic(fd->return_type, fc->generics);
             if (t_return->type != NULL) patch_generics(pre_ret, fd->return_type, t_return->type, fc->generics);
@@ -490,7 +527,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             }
             // resolving args
             list_foreach_i(&fc->arguments, lambda(void, usize i, Expression* arg, {
-                log("%s in %s, arg %llu of %llu", fd->name->name, func->name->name, i, fd->args.length);
                 if (i < fd->args.length) {
                     TVBox* argbox = new_tvbox();
                     TypeValue* arg_tv = replace_generic(fd->args.elements[i]->type, fc->generics);
@@ -508,7 +544,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             TypeValue* ret = replace_generic(fd->return_type, fc->generics);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, ret);
 
-            log("@ %s", gvals_to_key(fc->generics));
             register_item(fc->generics, fd->generics);        
         } break;
         case EXPR_LITERAL: {
@@ -771,7 +806,8 @@ void resolve_funcdef(Program* program, FuncDef* func) {
     if (!func->module->resolved && !func->module->in_resolution) {
         resolve_module(program, func->module);
     }
-    log("Resolving function %s", func->name->name);
+    log("Resolving function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
+
     if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
     if (func->return_type == NULL) {
         func->return_type = gen_typevalue("::std::unit", &func->name->span);
@@ -826,7 +862,7 @@ void resolve_typedef(Program* program, TypeDef* ty) {
         ty->head_resolved = true;
         return;
     }
-    log("Resolving type %s", ty->name->name);
+    log("Resolving type %s::%s", to_str_writer(s, fprint_path(s, ty->module->path)), ty->name->name);
     if (str_eq(ty->name->name, "_")) spanned_error("Invalid type name", ty->name->span, "`_` is a reserved name.");
     if (ty->generics != NULL) {
         list_foreach(&ty->generics->generics, lambda(void, Identifier* key, {
@@ -869,7 +905,7 @@ void resolve_module(Program* program, Module* module) {
             } break;
             case MIT_MODULE: {
                 Module* mod = item->item;
-                resolve_module(program, mod);
+                if (!mod->resolved && !mod->in_resolution) resolve_module(program, mod);
             } break;
         }
     }));

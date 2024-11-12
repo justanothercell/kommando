@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
 #include "module.h"
 #include "token.h"
 #include <stdbool.h>
@@ -65,15 +66,27 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
     module->path = path;
     module->resolved = false;
     module->in_resolution = false;
+    module->filepath = NULL;
+    module->subs = list_new(ModDefList);
 
     while (has_next(stream)) {
         Token* t = next_token(stream);
         stream->peek = t;
+
+        bool pub = false;
+        if (token_compare(t, "pub", IDENTIFIER)) {
+            pub = true;
+            t = next_token(stream); // skip peek 
+            t = next_token(stream); // setting new peek
+            stream->peek = t;
+        }
         if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
             ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = function;
             mi->type = MIT_FUNCTION;
+            mi->module = module;
+            mi->pub = pub;
             function->module = module;
             map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "struct", IDENTIFIER)) {
@@ -81,8 +94,19 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = type;
             mi->type = MIT_STRUCT;
+            mi->module = module;
+            mi->pub = pub;
             type->module = module;
             map_put(module->items, type->name->name, mi);
+        } else if (token_compare(t, "mod", IDENTIFIER)) {
+            t = next_token(stream); // skip mod
+            Identifier* name = parse_identifier(stream);
+            t = next_token(stream);
+            if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
+            ModDef* mod = malloc(sizeof(ModDef));
+            mod->name = name;
+            mod->pub = pub;
+            list_append(&module->subs, mod);
         } else {
             unexpected_token(t);
         }

@@ -16,6 +16,8 @@ ENUM(ModuleItemType,
 typedef struct ModuleItem {
     void* item;
     ModuleItemType type;
+    bool pub;
+    Module* module;
 } ModuleItem;
 
 LIST(MIList, ModuleItem*);
@@ -26,6 +28,8 @@ typedef struct Module {
     PathList imports;
     bool resolved;
     bool in_resolution;
+    ModDefList subs;
+    str filepath;
 } Module;
 
 typedef struct Program {
@@ -33,7 +37,7 @@ typedef struct Program {
     Module* main_module;
 } Program;
 
-void insert_module(Program* program, Module* module);
+void insert_module(Program* program, Module* module, bool pub);
 
 Module* gen_intrinsics();
 Module* gen_intrinsics_types();
