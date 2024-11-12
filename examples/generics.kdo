@@ -65,5 +65,5 @@ fn unbox<I>(b: Box<I>) -> I {
 }
 
 fn print_typeinfo<T>() {
-    c_api::printf("sizeof(%s) = %lu\n", std::short_typename::<T>(), std::sizeof::<T>());
+    c_api::printf("sizeof(%s) = %lu\n", intrinsics::short_typename::<T>(), intrinsics::sizeof::<T>());
 }

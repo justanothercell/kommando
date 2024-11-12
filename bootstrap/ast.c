@@ -1,17 +1,12 @@
 #include "ast.h"
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 #include "token.h"
 #include "module.h"
 
 #include <stdio.h>
-#include <time.h>
 
 Path* path_new(bool absolute, IdentList elements) {
-    Path* path = gc_malloc(sizeof(Path));
+    Path* path = malloc(sizeof(Path));
     path->absolute = absolute;
     path->elements = elements;
     return path;

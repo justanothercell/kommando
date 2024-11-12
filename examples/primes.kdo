@@ -18,7 +18,7 @@ fn is_prime(n: ::std::u32, divisor: ::std::u32) -> ::std::u32 {
             n
         } else {
             if n % divisor == 0u32 {
-                0u320u32
+                0u32
             } else {
                 is_prime(n, divisor + 1u32)
             }

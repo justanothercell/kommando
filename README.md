@@ -13,6 +13,10 @@
 
 ## Quickstart
 ```sh
+make build
+make run file=examples/hello
+
+# or both in one step:
 make cr file=examples/hello
 
 # you can also run the compiler manually (once it is compiled itself).

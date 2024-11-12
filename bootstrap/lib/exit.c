@@ -17,7 +17,6 @@ static void (*EXIT_FUNC)(str file, usize line, int code) = NULL;
 #define INTERRUPT_MODULE ANSI(ANSI_BOLD, ANSI_RED_FG) "INTERRUPT" ANSI_RESET_SEQUENCE
 void signal_handler(int signal) {
     printf("CAUGHT SIGNAL %u\n", signal);
-    gc_disable();
     switch (signal) {
         case SIGINT:
             finfo(stderr, INTERRUPT_MODULE, "Caught signal SIGINT (%u)", signal);
@@ -45,7 +44,6 @@ void init_exit_handler(void (*exit_func)(str file, usize line, int code)) {
 }
 
 __attribute__((__noreturn__)) void __panic(str file, usize line, str fmt, ...) {
-    gc_disable();
     fprint_prefix_raw(stderr, file, (int)line);
     fprintf(stderr, ANSI(ANSI_BOLD,ANSI_RED_FG)"Panic"ANSI_RESET_SEQUENCE": ");
     va_list args;

@@ -1,0 +1,7 @@
+fn typecast<K, U>(t: K) -> U {
+    intrinsics::typecast::<K, U>(t)
+}
+
+fn numcast<K, U>(t: K) -> U {
+    intrinsics::numcast::<K, U>(t)
+}

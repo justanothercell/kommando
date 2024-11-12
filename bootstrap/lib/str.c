@@ -8,14 +8,14 @@
 
 str copy_str(str s) {
     usize len = strlen(s);
-    str t = gc_malloc(len + 1);
+    str t = malloc(len + 1);
     memcpy(t, s, len);
     t[len] = '\0';
     return t;
 }
 
 str copy_slice(str s, usize length) {
-    str t = gc_malloc(length + 1);
+    str t = malloc(length + 1);
     memcpy(t, s, length);
     t[length] = '\0';
     return t;
@@ -24,7 +24,7 @@ str copy_slice(str s, usize length) {
 str concat_str(str a, str b) {
     usize len_a = strlen(a);
     usize len_b = strlen(b);
-    str t = gc_malloc(len_a + len_b + 1);
+    str t = malloc(len_a + len_b + 1);
     memcpy(t, a, len_a);
     memcpy(t + len_a, b, len_b);
     t[len_a + len_b] = '\0';
@@ -107,7 +107,7 @@ str read_to_string(FILE* file) {
     long fsize = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    char *string = gc_malloc(fsize + 1);
+    char *string = malloc(fsize + 1);
     fread(string, fsize, 1, file);
 
     string[fsize] = 0;

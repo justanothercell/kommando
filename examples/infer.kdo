@@ -1,5 +1,5 @@
 fn print_ty<T>(t: T) -> T {
-    c_api::printf("%s\n", std::typename::<T>());
+    c_api::printf("%s\n", intrinsics::typename::<T>());
     t
 }
 
