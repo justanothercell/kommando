@@ -4,6 +4,7 @@
 #include "compiler.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/defines.h"
 #include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
@@ -16,14 +17,18 @@
 CompilerOptions build_args(StrList* args) {
     if (args->length == 1) {
         print_help: {}
-        printf("%s <infile.kdo> <out> <options>\n", args->elements[0]);
+        printf("=== Help ===\n");
+        printf("%s <infile.kdo> <out> [options...]\n", args->elements[0]);
         printf("Options:\n");
+        printf("    --help       - show this list\n");
         printf("    --run     -r - run the compiled binary\n");
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
         printf("    ::lib::path=<path/to/lib_file.kdo> (multiple possible)\n");
+        printf("Alternatively use:\n");
+        printf("make run file=<infile>\n");
         quit(0);
     }
 
@@ -43,7 +48,9 @@ CompilerOptions build_args(StrList* args) {
         if (strlen(arg) == 0) continue;
         if (str_startswith(arg, "--")) {
             arg += 2;
-            if (str_eq(arg, "run")) {
+            if (str_eq(arg, "help")) {
+                goto print_help;
+            } else if (str_eq(arg, "run")) {
                 options.run = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
@@ -99,15 +106,21 @@ CompilerOptions build_args(StrList* args) {
 
     if (options.run && !options.compile) panic("Cannot run without compiling (--compile|-c flag missing)");
 
-    if (options.source == NULL) panic("No source file set");
-    if (options.outname == NULL) panic("No out name set");
+    if (options.source == NULL) { 
+        log("No source file set");
+        goto print_help;
+    }
+    if (options.outname == NULL) { 
+        log("No out name set");
+        goto print_help;
+    }
     if (options.out_dir == NULL) options.out_dir = "./build";
     if (options.c_compiler == NULL) options.c_compiler = "gcc";
     return options;
 }
 
 void compile(CompilerOptions options) {
-    Program* program = gc_malloc(sizeof(Program));
+    Program* program = malloc(sizeof(Program));
     program->packages = map_new();
 
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
@@ -134,7 +147,9 @@ void compile(CompilerOptions options) {
     }));
 
     Module* std = map_get(program->packages, "std");
-    std->items = intrinsics_types->items;
+    map_foreach(intrinsics_types->items, lambda(void, str key, ModuleItem* item, {
+        map_put(std->items, key, item);
+    }));
 
     resolve(program);
 

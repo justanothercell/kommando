@@ -3,7 +3,6 @@
 #include "lib.h"
 #include "lib/defines.h"
 #include "lib/exit.h"
-#include "lib/gc.h"
 #include "lib/list.h"
 #include "lib/map.h"
 #include "parser.h"
@@ -34,11 +33,11 @@ void insert_module(Program* program, Module* module) {
         if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
         current = it->item;
     }
-    ModuleItem* item = gc_malloc(sizeof(ModuleItem));
+    ModuleItem* item = malloc(sizeof(ModuleItem));
     item->type = MIT_MODULE;
     item->item = module;
     Identifier* name = path->elements.elements[i];
-    if (map_put(current->items, name->name, module) != NULL) spanned_error("Item already exists", name->span, "Cannot register module %s, item of such name already exists in parent module.", to_str_writer(s, fprint_path(s, path)));
+    if (map_put(current->items, name->name, item) != NULL) spanned_error("Item already exists", name->span, "Cannot register module %s, item of such name already exists in parent module.", to_str_writer(s, fprint_path(s, path)));
 }
 
 Identifier* gen_identifier(str name) {
@@ -67,7 +66,7 @@ TypeValue* gen_typevalue(str typevalue, Span* span) {
 
 TypeDef* gen_simple_type(str name) {
     Identifier* ident = gen_identifier(name);
-    TypeDef* td = gc_malloc(sizeof(TypeDef));
+    TypeDef* td = malloc(sizeof(TypeDef));
     td->name = ident;
     td->generics = NULL;
     td->extern_ref = NULL;
@@ -81,7 +80,7 @@ TypeDef* gen_simple_type(str name) {
 void register_extern_type(Module* module, str name, str extern_ref) {
     TypeDef* ty = gen_simple_type(name);
     ty->extern_ref = extern_ref;
-    ModuleItem* ty_mi = gc_malloc(sizeof(ModuleItem));
+    ModuleItem* ty_mi = malloc(sizeof(ModuleItem));
     ty_mi->item = ty;
     ty_mi->type = MIT_STRUCT;
     ty->module = module;
@@ -92,8 +91,8 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     TokenStream* s = tokenstream_new("<generated>", prototype);
     FuncDef* fd = parse_function_definition(s);
     fd->body->yield_last = true;
-    Expression* expr = gc_malloc(sizeof(Expression));
-    CIntrinsic* ci = gc_malloc(sizeof(CIntrinsic));
+    Expression* expr = malloc(sizeof(Expression));
+    CIntrinsic* ci = malloc(sizeof(CIntrinsic));
     ci->var_bindings = var_bindings;
     ci->type_bindings = type_bindings;
     ci->c_expr = intrinsic;
@@ -102,7 +101,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     expr->expr = ci;
     expr->span = fd->name->span;
     list_append(&fd->body->expressions, expr);
-    ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
+    ModuleItem* mi = malloc(sizeof(ModuleItem));
     mi->item = fd;
     mi->type = MIT_FUNCTION;
     fd->module = module;
@@ -110,7 +109,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
 }
 
 Module* gen_intrinsics_types() {
-    Module* module = gc_malloc(sizeof(Module));
+    Module* module = malloc(sizeof(Module));
     module->path = gen_path("::intrinsics::types");
     module->imports = list_new(PathList);
     module->items = map_new();
@@ -138,7 +137,7 @@ Module* gen_intrinsics_types() {
     register_extern_type(module, "f64", "double");
 
     TypeDef* ty_unit = gen_simple_type("unit");
-    ModuleItem* ty_unit_mi = gc_malloc(sizeof(ModuleItem));
+    ModuleItem* ty_unit_mi = malloc(sizeof(ModuleItem));
     ty_unit_mi->item = ty_unit;
     ty_unit_mi->type = MIT_STRUCT;
     ty_unit->module = module;
@@ -148,7 +147,7 @@ Module* gen_intrinsics_types() {
     TokenStream* ty_ptr_gs = tokenstream_new("<generated>", "<T> ");
     ty_ptr->generics = parse_generic_keys(ty_ptr_gs);
     ty_ptr->extern_ref = "void*";
-    ModuleItem* ty_ptr_mi = gc_malloc(sizeof(ModuleItem));
+    ModuleItem* ty_ptr_mi = malloc(sizeof(ModuleItem));
     ty_ptr_mi->item = ty_ptr;
     ty_ptr_mi->type = MIT_STRUCT;
     ty_ptr->module = module;
@@ -158,7 +157,7 @@ Module* gen_intrinsics_types() {
 }
 
 Module* gen_intrinsics() {
-    Module* module = gc_malloc(sizeof(Module));
+    Module* module = malloc(sizeof(Module));
     module->path = gen_path("::intrinsics");
     module->imports = list_new(PathList);
     module->items = map_new();
@@ -167,7 +166,7 @@ Module* gen_intrinsics() {
 
     {
         Map* var_bindings = map_new();
-        Variable* var = gc_malloc(sizeof(Variable));
+        Variable* var = malloc(sizeof(Variable));
         var->name = gen_identifier("t");
         map_put(var_bindings, "t", var);
         Map* type_bindings = map_new();
@@ -177,7 +176,7 @@ Module* gen_intrinsics() {
 
     {
         Map* var_bindings = map_new();
-        Variable* var = gc_malloc(sizeof(Variable));
+        Variable* var = malloc(sizeof(Variable));
         var->name = gen_identifier("t");
         map_put(var_bindings, "t", var);
         Map* type_bindings = map_new();

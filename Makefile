@@ -4,8 +4,29 @@ build: clean
 clean:
 	rm -f kommando
 
-cr: build
-	./kommando $(shell ./kdolib/link) $(file).kdo $(file) -cr
+cr: build run
 
 run:
-	./kommando $(shell ./kdolib/link) $(file).kdo $(file) -cr
+	name=$(basename $(file) .kdo); \
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr
+
+compile:
+	name=$(basename $(file) .kdo); \
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c
+
+help:
+	./kommando --help
+
+test: build
+	@success=0; \
+	fail=0; \
+	for file in $(shell find ./examples -name "*.kdo"); do \
+		if make compile file=$$file > /dev/null; then \
+			echo "Successfully compiled $$file"; \
+			success=$$((success + 1)); \
+		else \
+			echo "Error compiling $$file"; \
+			fail=$$((fail + 1)); \
+		fi; \
+	done; \
+	echo "$$success examples compiled successfully, $$fail failed";

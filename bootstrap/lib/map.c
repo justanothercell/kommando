@@ -6,7 +6,7 @@
 
 
 Map* map_new() {
-    Map* map = gc_malloc(sizeof(Map));
+    Map* map = malloc(sizeof(Map));
     map->buckets = list_new(BucketList);
     for (usize i = 0;i < 256;i++) list_append(&map->buckets, list_new(Bucket));
     map->random = rand();

@@ -108,7 +108,7 @@ Token* try_next_token(TokenStream* stream) {
     if (tok.length == 0 && type != STRING) return NULL;
     list_append(&tok, '\0');
 
-    Token* t = gc_malloc(sizeof(Token));
+    Token* t = malloc(sizeof(Token));
     t->string = tok.elements;
     t->span = from_points(&start, &stream->point);
     t->type = type;
@@ -128,7 +128,7 @@ bool has_next(TokenStream* stream) {
 }
 
 TokenStream* tokenstream_new(str file, str source) {
-    TokenStream* stream = gc_malloc(sizeof(TokenStream));
+    TokenStream* stream = malloc(sizeof(TokenStream));
 
     stream->peek = NULL;
     stream->peek_char = '\0';

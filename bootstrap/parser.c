@@ -40,7 +40,7 @@ TypeDef* parse_struct(TokenStream* stream) {
         if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
         TypeValue* tv = parse_type_value(stream);
         if (map_contains(fields, field_name->name)) spanned_error("Duplicate field name", field_name->span, "field with name %s already exists in struct %s", field_name->name, name->name);
-        Field* field = gc_malloc(sizeof(Field));
+        Field* field = malloc(sizeof(Field));
         field->name = name;
         field->type = tv;
         map_put(fields, field_name->name, field);
@@ -48,7 +48,7 @@ TypeDef* parse_struct(TokenStream* stream) {
         if (token_compare(t, "}", SNOWFLAKE)) break;
         if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
     }
-    TypeDef* type = gc_malloc(sizeof(TypeDef));
+    TypeDef* type = malloc(sizeof(TypeDef));
     type->extern_ref = NULL;
     type->generics = keys;
     type->fields = fields;
@@ -59,7 +59,7 @@ TypeDef* parse_struct(TokenStream* stream) {
 }
 
 Module* parse_module_contents(TokenStream* stream, Path* path) {
-    Module* module = gc_malloc(sizeof(Module));
+    Module* module = malloc(sizeof(Module));
     module->imports = list_new(PathList);
     module->items = map_new();
     module->path = path;
@@ -71,14 +71,14 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         stream->peek = t;
         if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
-            ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
+            ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = function;
             mi->type = MIT_FUNCTION;
             function->module = module;
             map_put(module->items, function->name->name, mi);
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
-            ModuleItem* mi = gc_malloc(sizeof(ModuleItem));
+            ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = type;
             mi->type = MIT_STRUCT;
             type->module = module;
@@ -91,7 +91,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
 }
 
 Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
-    Expression* expression = gc_malloc(sizeof(Expression));
+    Expression* expression = malloc(sizeof(Expression));
     Token* t = next_token(stream);
     CodePoint start = t->span.left;
     CodePoint end = t->span.right;
@@ -103,8 +103,8 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
     } else if (token_compare(t, "let", IDENTIFIER)) {
         Identifier* name = parse_identifier(stream);
         end = name->span.right;
-        LetExpr* let = gc_malloc(sizeof(LetExpr));
-        Variable* var = gc_malloc(sizeof(Variable));
+        LetExpr* let = malloc(sizeof(LetExpr));
+        Variable* var = malloc(sizeof(Variable));
         var->id = 0;
         var->name = name;
         let->var = var;
@@ -148,7 +148,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         expression->type = EXPR_CONTINUE;
         expression->expr = NULL;
     } else if (token_compare(t, "if", IDENTIFIER)) {
-        Conditional* conditional = gc_malloc(sizeof(Conditional));
+        Conditional* conditional = malloc(sizeof(Conditional));
         conditional->cond = parse_expression(stream, false);
         conditional->then = parse_block(stream);
         end = conditional->then->span.right;
@@ -163,7 +163,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         expression->expr = conditional;
         expression->type = EXPR_CONDITIONAL;
     } else if (token_compare(t, "while", IDENTIFIER)) {
-        WhileLoop* while_loop = gc_malloc(sizeof(WhileLoop));
+        WhileLoop* while_loop = malloc(sizeof(WhileLoop));
         while_loop->cond = parse_expression(stream, false);
         while_loop->body = parse_block(stream);
         end = while_loop->body->span.right;
@@ -196,7 +196,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                     } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
                 }
             }
-            FuncCall* call = gc_malloc(sizeof(FuncCall));
+            FuncCall* call = malloc(sizeof(FuncCall));
             call->name = path;
             call->arguments = arguments;
             call->generics = generics;
@@ -212,7 +212,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                     t = next_token(stream);
                     if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
                     Expression* value = parse_expression(stream, true);
-                    StructFieldLit* sfl = gc_malloc(sizeof(StructFieldLit));
+                    StructFieldLit* sfl = malloc(sizeof(StructFieldLit));
                     sfl->name = field;
                     sfl->value = value;
                     map_put(fields, field->name, sfl);
@@ -223,8 +223,8 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                     } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
                 }
             }
-            StructLiteral* slit = gc_malloc(sizeof(StructLiteral));
-            TypeValue* tv =gc_malloc(sizeof(TypeValue));
+            StructLiteral* slit = malloc(sizeof(StructLiteral));
+            TypeValue* tv =malloc(sizeof(TypeValue));
             tv->name = path;
             tv->def = NULL;
             tv->generics = generics;
@@ -237,7 +237,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             if (generics != NULL) unexpected_token(gen_start);
             if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s @ %s", to_str_writer(stream, fprint_path(stream, path)), to_str_writer(stream, fprint_span(stream, &path->elements.elements[0]->span)));
             stream->peek = t;
-            Variable* var = gc_malloc(sizeof(Variable));
+            Variable* var = malloc(sizeof(Variable));
             var->id = 0;
             var->name = path->elements.elements[0];
             expression->expr = var;
@@ -253,10 +253,10 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         Token* t = next_token(stream);
         if (token_compare(t, ".", SNOWFLAKE)) {
             Identifier* field = parse_identifier(stream);
-            FieldAccess* fa = gc_malloc(sizeof(FieldAccess));
+            FieldAccess* fa = malloc(sizeof(FieldAccess));
             fa->object = expression;
             fa->field = field;
-            expression = gc_malloc(sizeof(Expression));
+            expression = malloc(sizeof(Expression));
             expression->span = from_points(&fa->object->span.left, &fa->field->span.right);
             expression->expr = fa;
             expression->type = EXPR_FIELD_ACCESS;
@@ -289,14 +289,14 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
     while (true) {
         Token* t = next_token(stream);
         if (token_compare(t, "&", SNOWFLAKE)) {
-            Expression* ref = gc_malloc(sizeof(Expression));
+            Expression* ref = malloc(sizeof(Expression));
             ref->span = t->span;
             ref->type = EXPR_TAKEREF;
             ref->expr = NULL;
             *inner = ref;
             inner = (Expression**)&ref->expr;
         } else if (token_compare(t, "*", SNOWFLAKE)) {
-            Expression* deref = gc_malloc(sizeof(Expression));
+            Expression* deref = malloc(sizeof(Expression));
             deref->span = t->span;
             deref->type = EXPR_DEREF;
             deref->expr = NULL;
@@ -317,7 +317,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
             Token* n = next_token(stream);
             if (n->type == SNOWFLAKE && (str_eq("=", n->string) || str_eq("|", n->string) || str_eq("&", n->string) || str_eq("<", n->string) || str_eq(">", n->string))) {
                 str s = t->string;
-                t->string = gc_malloc(3);
+                t->string = malloc(3);
                 t->string[0] = s[0];
                 t->string[1] = n->string[0];
                 t->string[2] = 0;
@@ -326,10 +326,10 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                 stream->peek = n;
                 if (str_eq("=", t->string)) {
                     Expression* value = parse_expression(stream, allow_lit);
-                    Assign* assign = gc_malloc(sizeof(Assign));
+                    Assign* assign = malloc(sizeof(Assign));
                     assign->asignee = expr;
                     assign->value = value;
-                    Expression* assignment = gc_malloc(sizeof(Expression));
+                    Expression* assignment = malloc(sizeof(Expression));
                     assignment->span = from_points(&expr->span.left, &value->span.right);
                     assignment->type = EXPR_ASSIGN;
                     assignment->expr = assign;
@@ -343,14 +343,14 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                     Expression* a = expr;
                     Expression* b = rhs_inner->lhs;
                     Expression* c = rhs_inner->rhs;
-                    BinOp* op = gc_malloc(sizeof(BinOp));
+                    BinOp* op = malloc(sizeof(BinOp));
                     op->lhs = a;
                     op->rhs = b;
                     op->op = t->string;
                     op->op_span = t->span;
                     t->string = rhs_inner->op;
                     t->span = rhs_inner->op_span;
-                    Expression* op_expr = gc_malloc(sizeof(Expression));
+                    Expression* op_expr = malloc(sizeof(Expression));
                     op_expr->expr = op;
                     op_expr->type = EXPR_BIN_OP;
                     op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
@@ -358,12 +358,12 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                     rhs = c;
                 }
             }
-            BinOp* op = gc_malloc(sizeof(BinOp));
+            BinOp* op = malloc(sizeof(BinOp));
             op->lhs = expr;
             op->rhs = rhs;
             op->op = t->string;
             op->op_span = t->span;
-            Expression* parent = gc_malloc(sizeof(Expression));
+            Expression* parent = malloc(sizeof(Expression));
             parent->expr = op;
             parent->type = EXPR_BIN_OP;
             parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
@@ -400,7 +400,7 @@ Path* parse_path(TokenStream* stream) {
 
 TypeValue* parse_type_value(TokenStream* stream) {
     Path* name = parse_path(stream);
-    TypeValue* tval = gc_malloc(sizeof(TypeValue));
+    TypeValue* tval = malloc(sizeof(TypeValue));
     tval->name = name;
     tval->generics = NULL;
     tval->def = NULL;
@@ -418,7 +418,7 @@ TypeValue* parse_type_value(TokenStream* stream) {
 Identifier* parse_identifier(TokenStream* stream) {
     Token* t = next_token(stream);
     if (t->type != IDENTIFIER) unexpected_token(t);
-    Identifier* identifier = gc_malloc(sizeof(Identifier));
+    Identifier* identifier = malloc(sizeof(Identifier));
     identifier->name = t->string;
     identifier->span = t->span;;
     return identifier;
@@ -457,7 +457,7 @@ Block* parse_block(TokenStream* stream) {
         stream->peek = t;
     }
 empty: {}
-    Block* block = gc_malloc(sizeof(Block));
+    Block* block = malloc(sizeof(Block));
     block->expressions = expressions;
     block->yield_last = yield_last;
     block->span = from_points(&start, &end);
@@ -481,7 +481,7 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
         }
     }
     CodePoint right = t->span.right;
-    GenericKeys* keys = gc_malloc(sizeof(GenericKeys));
+    GenericKeys* keys = malloc(sizeof(GenericKeys));
     keys->generics = generics;
     keys->span = from_points(&left, &right);
     keys->resolved = map_new();
@@ -492,7 +492,7 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
 
 GenericValues* parse_generic_values(TokenStream* stream) {
     Token* t = next_token(stream);
-    GenericValues* generics = gc_malloc(sizeof(GenericValues));
+    GenericValues* generics = malloc(sizeof(GenericValues));
     generics->span.left = t->span.left;
     generics->generics = list_new(TypeValueList);
     generics->resolved = map_new();
@@ -538,8 +538,8 @@ FuncDef* parse_function_definition(TokenStream* stream) {
             } else {
                 stream->peek = t;
             }
-            Argument* argument = gc_malloc(sizeof(Argument));
-            Variable* var = gc_malloc(sizeof(Variable));
+            Argument* argument = malloc(sizeof(Argument));
+            Variable* var = malloc(sizeof(Variable));
             var->id = 0;
             var->name = parse_identifier(stream);
             argument->var = var;
@@ -570,7 +570,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     }
     body = parse_block(stream);
     no_body: {}
-    FuncDef* func = gc_malloc(sizeof(FuncDef));
+    FuncDef* func = malloc(sizeof(FuncDef));
     func->body = body;
     func->name = name;
     func->return_type = return_type;

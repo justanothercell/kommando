@@ -7,7 +7,6 @@
 #include "ast.h"
 #include "lib/defines.h"
 #include "lib/exit.h"
-#include "lib/gc.h"
 #include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
@@ -105,7 +104,7 @@ str gen_c_fn_name(FuncDef* def, GenericValues* generics) {
 
 GenericValues* expand_generics(GenericValues* generics, GenericValues* context) {
     if (generics == NULL || context == NULL) return generics;
-    GenericValues* expanded = gc_malloc(sizeof(GenericValues));
+    GenericValues* expanded = malloc(sizeof(GenericValues));
     expanded->resolved = map_new();
     expanded->span = generics->span;
     expanded->generics = list_new(TypeValueList);
@@ -124,7 +123,7 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
         } else {
             TypeValue* concrete = generic;
             GenericValues* c_e = expand_generics(concrete->generics, context);
-            TypeValue* concrete_expanded = gc_malloc(sizeof(TypeValue));
+            TypeValue* concrete_expanded = malloc(sizeof(TypeValue));
             concrete_expanded->ctx = NULL;
             concrete_expanded->generics = c_e;
             concrete_expanded->def = concrete->def;
@@ -306,7 +305,7 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
                     mode = c;
                 } else if (op != '\0') {
                     if (op == '@') {
-                        str key = gc_malloc(2);
+                        str key = malloc(2);
                         key[0] = c;
                         key[1] = '\0';
                         TypeValue* tv = map_get(ci->type_bindings, key);
@@ -320,7 +319,7 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
                             fprintf(code_stream, "%s", c_ty);
                         } else spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
                     } else if (op == '$') {
-                        str key = gc_malloc(2);
+                        str key = malloc(2);
                         key[0] = c;
                         key[1] = '\0';
                         Variable* v = map_get(ci->var_bindings, key);
@@ -394,7 +393,6 @@ static bool is_fully_defined(GenericValues* instance) {
     for (usize i = 0;i < instance->generics.length;i++) {
         TypeValue* t = instance->generics.elements[i];
         if (t->def->module == NULL) {
-            log("discarding %s %p", t->def->name->name, t->generics);
             return false;
         }   
         if (!is_fully_defined(t->generics)) return false;
@@ -405,8 +403,8 @@ static bool is_fully_defined(GenericValues* instance) {
 bool monomorphize(GenericValues* instance, GenericKeys* instance_host) {
     if (instance == NULL) return true;
     TypeValue* contexted = find_contexted(instance);
-    if (!contexted) {
-        if (!is_fully_defined(instance)) spanned_error("Not fully defined", instance->span, "This is probably a compiler error.");
+    if (contexted == NULL) {
+        if (!is_fully_defined(instance)) spanned_error("Not fully defined", instance->span, "This is probably a compiler error. For now just supply more generic hints.");
         return true;
     }
     map_foreach(contexted->ctx->generic_uses, lambda(void, str key, GenericValues* context, {
@@ -487,7 +485,7 @@ void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, Func
 void transpile_typedef_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, TypeDef* ty, GenericValues* generics, bool body) {
     UNUSED(code_stream);
     if (!ty->extern_ref) {
-        TypeValue* tv = gc_malloc(sizeof(TypeValue));
+        TypeValue* tv = malloc(sizeof(TypeValue));
         tv->ctx = NULL;
         tv->def = ty;
         tv->name = NULL;
