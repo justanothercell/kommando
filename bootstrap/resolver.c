@@ -1,13 +1,15 @@
-#include "lib.h"
-#include "resolver.h"
-#include "ast.h"
-#include "lib/str.h"
-#include "module.h"
-#include "parser.h"
-#include "token.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+#include "lib.h"
+LIB
+#include "resolver.h"
+#include "ast.h"
+#include "module.h"
+#include "parser.h"
+#include "resolver.h"
+#include "token.h"
 
 void fprint_res_tv(FILE* stream, TypeValue* tv) {
     if (tv->def == NULL) panic("TypeValue was not resolved %s @ %s", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->name->elements.elements[0]->span)));
@@ -98,7 +100,7 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
     get_item: {}
     ModuleItem* it = map_get(module->items, name->name);
     if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[kind], name->name);
-    if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
+    if (kind != MIT_ANY) if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
     return it;
 }
 
@@ -261,6 +263,7 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
         }
     }
     generic_end: {}
+    if (kind == MIT_ANY) return mi;
     return mi->item;
 }
 
@@ -334,25 +337,55 @@ void assert_types_equal(Program* program, Module* module, TypeValue* tv1, TypeVa
         }
     }
 }
-typedef struct VarBox {
-    str name;
-    usize id;
-    TVBox* resolved;
-} VarBox;
-LIST(VarList, VarBox*);
-static VarBox* var_find(VarList* vars, Variable* var) {
-    for (int i = vars->length-1;i >= 0;i--) {
-        if (str_eq(vars->elements[i]->name, var->name->name)) return vars->elements[i];
+
+static void var_find(Program* program, Module* module, VarList* vars, Variable* var) {
+    Path* path = var->path;
+    Identifier* name = path->elements.elements[path->elements.length-1];
+    if (!path->absolute && path->elements.length == 1) {
+        for (int i = vars->length-1;i >= 0;i--) {
+            if (str_eq(vars->elements[i]->name, name->name)) {
+                var->box = vars->elements[i];
+                return;
+            }
+        }
     }
-    spanned_error("No such variable", var->name->span, "`%s` does not exist", var->name->name);
+    GenericValues* values = NULL;
+    ModuleItem* item = resolve_item(program, module, path, MIT_ANY, NULL, NULL, &values);
+    VarBox* box = malloc(sizeof(VarBox));
+    box->id = ~0;
+    box->name = NULL;
+    box->mi = item;
+    box->values = values;
+    var->box = box;
+    switch (item->type) {
+        case MIT_FUNCTION: {
+            TypeValue* tv = gen_typevalue("std::function_ptr", &name->span);
+            resolve_typevalue(program, module, tv, NULL, NULL);
+            box->resolved = malloc(sizeof(TVBox));
+            box->resolved->type = tv;
+        } break;
+        case MIT_STRUCT:
+            spanned_error("Expected variable", name->span, "Expected variable or function ref, got struct");
+            break;
+        case MIT_MODULE:
+            spanned_error("Expected variable", name->span, "Expected variable or function ref, got module");
+            break;
+        case MIT_ANY:
+            unreachable();
+    }
+    
 }
 static VarBox* var_register(VarList* vars, Variable* var) {
+    Identifier* name = var->path->elements.elements[var->path->elements.length-1];
+    if (var->path->absolute || var->path->elements.length != 1) spanned_error("Variable has too much path", name->span, "This should look more like a single variable and should have been caught earlier, that's a compiler bug.");
     VarBox* v = malloc(sizeof(VarBox));
-    v->name = var->name->name;
+    v->name = name->name;
     v->id = vars->length;
     v->resolved = malloc(sizeof(TVBox));
     v->resolved->type = NULL;
-    var->id = v->id;
+    v->mi = NULL;
+    v->values = NULL;
+    var->box = v;
     list_append(vars, v);
     return v;
 }
@@ -576,22 +609,19 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_VARIABLE: {
             Variable* var = expr->expr;
-            VarBox* vb = var_find(vars, var);
-            var->id = vb->id;
-            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, vb->resolved->type);
+            var_find(program, func->module, vars, var);
+            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, var->box->resolved->type);
         } break;
         case EXPR_LET: {
             LetExpr* let = expr->expr;
 
-            VarBox* v = var_register(vars, let->var);
-            let->var->id = v->id;
-            v->resolved = new_tvbox();
+            var_register(vars, let->var);
             if (let->type != NULL) {
                 resolve_typevalue(program, func->module, let->type, func->generics, type_generics);
-                fill_tvbox(program, func->module, expr->span, func->generics, type_generics, v->resolved, let->type);
+                fill_tvbox(program, func->module, expr->span, func->generics, type_generics, let->var->box->resolved, let->type);
             }
-            resolve_expr(program, func, type_generics, let->value, vars, v->resolved);
-            patch_tvs(&let->type, &v->resolved->type);
+            resolve_expr(program, func, type_generics, let->value, vars, let->var->box->resolved);
+            patch_tvs(&let->type, &let->var->box->resolved->type);
 
             TypeValue* tv = gen_typevalue("::std::unit", &expr->span);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, tv);
@@ -728,8 +758,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             CIntrinsic* ci = expr->expr;
             map_foreach(ci->var_bindings, lambda(void, str key, Variable* var, {
                 UNUSED(key);
-                VarBox* vb = var_find(vars, var);
-                var->id = vb->id;
+                var_find(program, func->module, vars, var);
             }));
             map_foreach(ci->type_bindings, lambda(void, str key, TypeValue* tv, {
                 UNUSED(key);
@@ -907,6 +936,8 @@ void resolve_module(Program* program, Module* module) {
                 Module* mod = item->item;
                 if (!mod->resolved && !mod->in_resolution) resolve_module(program, mod);
             } break;
+            case MIT_ANY: 
+                unreachable();
         }
     }));
 

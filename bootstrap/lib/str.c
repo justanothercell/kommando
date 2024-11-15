@@ -163,7 +163,7 @@ StrList rsplitn(str s, char delimeter, usize n) {
             n -= 1;
         }
     }
-    if (end != 0) list_append(&list, copy_slice(s, end + 1));
+    if (end != 0) list_append(&list, copy_slice(s, end));
     list_reverse(&list);
     return list;
 }

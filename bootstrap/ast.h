@@ -20,6 +20,7 @@ typedef struct Path {
 } Path;
 LIST(PathList, Path*);
 Path* path_new(bool absolute, IdentList elements);
+Path* path_simple(Identifier* name);
 void path_append(Path* parent, Identifier* child);
 Path* path_join(Path* parent, Path* child);
 void fprint_path(FILE* file, Path* path);
@@ -35,6 +36,7 @@ typedef struct TypeDef {
     Identifier* name;
     GenericKeys* generics;
     str extern_ref;
+    IdentList flist;
     Map* fields;
     u32 transpile_state;
     Module* module;
@@ -65,9 +67,10 @@ typedef struct TypeValue {
 } TypeValue;
 void fprint_typevalue(FILE* file, TypeValue* tval);
 
+typedef struct VarBox VarBox;
 typedef struct Variable {
-    Identifier* name;
-    usize id;
+    Path* path;
+    VarBox* box;
 } Variable;
 
 ENUM(ExprType, 

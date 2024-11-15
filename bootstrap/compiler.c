@@ -5,11 +5,7 @@
 #include "compiler.h"
 #include "ast.h"
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
+LIB;
 #include "module.h"
 #include "parser.h"
 #include "resolver.h"
@@ -195,6 +191,7 @@ void compile(CompilerOptions options) {
         if (nx) file = nodename;
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
         Module* mod = parse_module_contents(s, modpath);
+        mod->name = sm.mod;
         mod->filepath = file;
         insert_module(program, mod, sm.pub);
     }
