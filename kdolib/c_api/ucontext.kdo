@@ -1,0 +1,173 @@
+// struct layout on arch x86_64.
+// sizeof(ucontext_t) = 968
+
+/// Initalizes the structure pointed to by ucp.
+/// returns -1 on error and 0 on success,
+fn getcontext(ucp: std::ptr<ucontext_t>) -> std::i32;
+
+/// Restore the context to the structure pointed to by ucp.
+/// returns -1 on error, does not return on success.
+fn setcontext(ucp: std::ptr<ucontext_t>) -> std::i32;
+
+/// Fill the context with this execution info.
+/// Note: the va_args of length count need to be of type i32.
+fn makecontext(ucp: std::ptr<ucontext_t>, function: std::function_ptr, count: std::i32, *);
+
+/// save the current instruction context in uocp and continue with ucp.
+/// returns -1 on error and 0 on success (when returning back from a different context)
+fn swapcontext(uocp: std::ptr<ucontext_t>, ucp: std::ptr<ucontext_t>) -> std::i32;
+
+struct stack_t {
+    ss_sp: std::opaque_ptr,
+    ss_flags: std::i32,
+    ss_size: std::usize
+}
+
+struct ucontext_t {
+    uc_flags: std::u64,
+    uc_link: std::ptr<ucontext_t>,
+    uc_stack: stack_t,
+    uc_mcontext: mcontext_t,
+    uc_sigmask: sigset_t,
+    __fpregs_mem: _libc_fpstate,
+    __ssp0: std::u64,
+    __ssp1: std::u64,
+    __ssp2: std::u64,
+    __ssp3: std::u64,
+}
+
+struct mcontext_t {
+    gregs: gregset_t,
+    fpregs: std::opaque_ptr,
+    __reserved0: std::u64,
+    __reserved1: std::u64,
+    __reserved2: std::u64,
+    __reserved3: std::u64,
+    __reserved4: std::u64,
+    __reserved5: std::u64,
+    __reserved6: std::u64,
+    __reserved7: std::u64,
+}
+
+struct gregset_t {
+    g0: std::i64,
+    g1: std::i64,
+    g2: std::i64,
+    g3: std::i64,
+    g4: std::i64,
+    g5: std::i64,
+    g6: std::i64,
+    g7: std::i64,
+    g8: std::i64,
+    g9: std::i64,
+    g10: std::i64,
+    g11: std::i64,
+    g12: std::i64,
+    g13: std::i64,
+    g14: std::i64,
+    g15: std::i64,
+    g16: std::i64,
+    g17: std::i64,
+    g18: std::i64,
+    g19: std::i64,
+    g20: std::i64,
+    g21: std::i64,
+    g22: std::i64,
+}
+
+struct sigset_t {
+    __val0: std::u64,
+    __val1: std::u64,
+    __val2: std::u64,
+    __val3: std::u64,
+    __val4: std::u64,
+    __val5: std::u64,
+    __val6: std::u64,
+    __val7: std::u64,
+    __val8: std::u64,
+    __val9: std::u64,
+    __val10: std::u64,
+    __val11: std::u64,
+    __val12: std::u64,
+    __val13: std::u64,
+    __val14: std::u64,
+    __val15: std::u64,
+}
+
+struct _libc_fpstate {
+    /* 64-bit FXSAVE format.  */
+    cwd: std::u16,
+    swd: std::u16,
+    ftw: std::u16,
+    fop: std::u16,
+    rip: std::u64,
+    rdp: std::u64,
+    mxcsr: std::u32,
+    mxcr_mask: std::u32,
+    _st0: _libc_fpxreg,
+    _st1: _libc_fpxreg,
+    _st2: _libc_fpxreg,
+    _st3: _libc_fpxreg,
+    _st4: _libc_fpxreg,
+    _st5: _libc_fpxreg,
+    _st6: _libc_fpxreg,
+    _st7: _libc_fpxreg,
+    _xmm0: _libc_xmmreg,
+    _xmm1: _libc_xmmreg,
+    _xmm2: _libc_xmmreg,
+    _xmm3: _libc_xmmreg,
+    _xmm4: _libc_xmmreg,
+    _xmm5: _libc_xmmreg,
+    _xmm6: _libc_xmmreg,
+    _xmm7: _libc_xmmreg,
+    _xmm8: _libc_xmmreg,
+    _xmm9: _libc_xmmreg,
+    _xmm10: _libc_xmmreg,
+    _xmm11: _libc_xmmreg,
+    _xmm12: _libc_xmmreg,
+    _xmm13: _libc_xmmreg,
+    _xmm14: _libc_xmmreg,
+    _xmm15: _libc_xmmreg,
+    __glibc_reserved0: std::u32,
+    __glibc_reserved1: std::u32,
+    __glibc_reserved2: std::u32,
+    __glibc_reserved3: std::u32,
+    __glibc_reserved4: std::u32,
+    __glibc_reserved5: std::u32,
+    __glibc_reserved6: std::u32,
+    __glibc_reserved7: std::u32,
+    __glibc_reserved8: std::u32,
+    __glibc_reserved9: std::u32,
+    __glibc_reserved10: std::u32,
+    __glibc_reserved11: std::u32,
+    __glibc_reserved12: std::u32,
+    __glibc_reserved13: std::u32,
+    __glibc_reserved14: std::u32,
+    __glibc_reserved15: std::u32,
+    __glibc_reserved16: std::u32,
+    __glibc_reserved17: std::u32,
+    __glibc_reserved18: std::u32,
+    __glibc_reserved19: std::u32,
+    __glibc_reserved20: std::u32,
+    __glibc_reserved21: std::u32,
+    __glibc_reserved22: std::u32,
+    __glibc_reserved23: std::u32,
+}
+
+struct _libc_fpxreg {
+    significand0: ::std::u16,
+    significand1: ::std::u16,
+    significand2: ::std::u16,
+    significand3: ::std::u16,
+    exponent: std::u16,
+    __glibc_reserved0: std::u16,
+    __glibc_reserved1: std::u16,
+    __glibc_reserved2: std::u16,
+}
+
+struct _libc_xmmreg {
+    element0: std::u32,
+    element1: std::u32,
+    element2: std::u32,
+    element3: std::u32,
+}

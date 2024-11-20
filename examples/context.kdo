@@ -1,0 +1,56 @@
+use std::*;
+use c_api::exit;
+use c_api::fprintf;
+use c_api::printf;
+use c_api::ucontext::*;
+
+fn foo(main_ctx_ref: ptr<ucontext_t>, runner_ctx_ref: ptr<ucontext_t>) {
+    printf("foo: start, swap\n");
+    if swapcontext(runner_ctx_ref, main_ctx_ref) == 0-1 {
+        fprintf(io::stderr(), "Error: swapcontext\n");
+        exit(1);
+    };
+    printf("foo: returned, swapping back\n");
+    if swapcontext(runner_ctx_ref, main_ctx_ref) == 0-1 {
+        fprintf(io::stderr(), "Error: swapcontext\n");
+        exit(1);
+    };
+    printf("foo: returned, done, exiting foo\n");
+}
+
+fn main() {
+    let stack_size: usize = 256 * 64;
+    let stack = c_api::alloca(stack_size);
+    let main_ctx: ucontext_t = mem::new_uninit();
+    let runner_ctx: ucontext_t = mem::new_uninit();
+
+    if getcontext(&runner_ctx) == 0-1 {
+        fprintf(io::stderr(), "Error: getcontext\n");
+        exit(1);
+    };
+
+    runner_ctx.uc_stack.ss_sp = stack;
+    runner_ctx.uc_stack.ss_size = stack_size;
+    runner_ctx.uc_link = (&main_ctx);
+
+    makecontext(&runner_ctx, foo, 4, &main_ctx, &runner_ctx);
+
+    printf("main: start, swap...\n");
+    if swapcontext(&main_ctx, &runner_ctx) == 0-1 {
+        fprintf(io::stderr(), "Error: swapcontext\n");
+        exit(1);
+    };
+    printf("main: returned, swapping\n");
+    if swapcontext(&main_ctx, &runner_ctx) == 0-1 {
+        fprintf(io::stderr(), "Error: swapcontext\n");
+        exit(1);
+    };
+    if env::argc() > 1 {
+        printf("main: final swapping\n");
+        if swapcontext(&main_ctx, &runner_ctx) == 0-1 {
+            fprintf(io::stderr(), "Error: swapcontext\n");
+            exit(1);
+        };
+    };
+    printf("main: done\n");
+}

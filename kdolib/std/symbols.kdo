@@ -1,0 +1,5 @@
+struct __global_argc {}
+struct __global_argv {}
+struct stdin {}
+struct stdout {}
+struct stderr {}
