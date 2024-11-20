@@ -1,0 +1,44 @@
+pub mod math;
+pub mod str;
+pub mod ucontext;
+
+fn printf(fmt: std::c_const_str_ptr, *) -> std::i32;
+fn fprintf(stream: std::opaque_ptr, fmt: std::c_const_str_ptr, *) -> std::i32;
+
+fn fopen(path: std::c_const_str_ptr, mode: std::c_const_str_ptr) -> std::opaque_ptr;
+fn fclose(stream: std::opaque_ptr) -> std::i32;
+fn fflush(stream: std::opaque_ptr) -> std::i32;
+
+fn exit(code: std::i32) -> std::c_void;
+
+fn malloc(size: std::usize) -> std::opaque_ptr;
+fn alloca(size: std::usize) -> std::opaque_ptr;
+fn realloc(ptr: std::opaque_ptr, size: std::usize) -> std::opaque_ptr;
+fn free(ptr: std::opaque_ptr) -> std::c_void;
+
+fn alligned_alloc(alignment: std::usize, size: std::usize) -> std::opaque_ptr;
+fn getpagesize() -> std::usize;
+
+// we do not have constants yet
+fn null() -> std::opaque_ptr {
+    intrinsics::typecast(0usize)
+}
+
+// we do not have constants yet
+fn nullstr() -> std::c_const_str_ptr {
+    intrinsics::typecast(0usize)
+}
+
+// gnu-c
+fn getline(out_line: std::ptr<std::c_const_str_ptr>, out_size: std::ptr<std::usize>, stream: std::opaque_ptr) -> std::i32;
+
+fn raise(signal: std::i32) -> std::i32;
+fn kill(pid: std::i32, signal: std::i32) -> std::i32;
+fn signal(signal: std::i32, handler: std::function_ptr) -> std::function_ptr;
+
+fn system(cmd: std::c_const_str_ptr) -> std::i32;
+fn shell_exists() -> std::bool {
+    system(nullstr()) != 0
+}
+
+fn fork() -> std::i32;

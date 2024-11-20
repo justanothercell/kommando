@@ -1,0 +1,67 @@
+struct Arena {
+    page: std::ptr<Page>,
+    page_size: std::usize
+}
+
+struct Page {
+    filled: std::usize,
+    prev: std::ptr<Page>
+}
+
+fn arena_new() -> std::ptr<Arena> {
+    let arena: _<Arena> = std::mem::malloc();
+    (*arena).page = std::null();
+    (*arena).page_size = c_api::getpagesize();
+    arena
+}
+
+fn arena_clear(arena: std::ptr<Arena>) {
+    let page = (*arena).page;
+    while (page != std::null()) {
+        let prev_page = (*page).prev;
+        std::mem::free(page);
+        page = prev_page;
+    }
+}
+
+fn arena_alloc<T>(arena: std::ptr<Arena>) -> std::ptr<T> {
+    let size = intrinsics::sizeof::<T>();
+    let align = intrinsics::alignof::<T>();
+    let max_free = (*page).size - intrinsics::sizeof::<Page>();
+    if size > max_free - max_free % align { // no page can fit T
+        c_api::fprintf(intrinsics::stderr(), "Type %s does not fit memory page", intrinsics::typename::<T>());
+        c_api::exit(1);
+    };
+    if (*arena).page == std::null() {
+        (*arena).page = page_new((*arena).page_size);
+    };
+    let page = (*arena).page;
+    let free = (*page).size - (*page).filled;
+    if size > free - (*page).filled % align { // this page does not fit T: new page!
+        (*arena).page = page_new((*arena).page_size);
+        (*page).prev = page;
+    };
+    (*page).filled = (*page).filled + (align - (*page).filled % align); // align to T
+    let ptr: std::ptr<T> = std::typecast(std::typecast::<_, std::usize>(page) + (*page).filled);
+    (*page).filled = (*page).filled + size;
+    ptr
+}
+
+fn arena_free(arena: std::ptr<Arena>) {
+    arena_clear(arena);
+    std::mem::free(arena);
+}
+
+fn page_new(size: std::usize) -> std::ptr<Page> {
+    let buffer = c_api::alligned_alloc(size, size);
+    if (buffer == NULL) {
+        c_api::fprintf(intrinsics::stderr(), "Program is out of memory");
+        c_api::exit(1);
+    };
+    // the first entry in our page is the page itself
+    let page = std::typecast::<std::opaque_ptr, std::ptr<Page>>(buffer);
+    (*page).filled = intrinsics::sizeof::<Page>();
+    (*page).prev = std::null();
+    page
+}
+

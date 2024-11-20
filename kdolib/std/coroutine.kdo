@@ -1,0 +1,74 @@
+struct CoroContext<A, T> {
+    main_ctx: c_api::ucontext::ucontext_t,
+    runner_ctx: c_api::ucontext::ucontext_t,
+    stack: std::opaque_ptr,
+    state: std::u8,
+    arg: A,
+    ret: T,
+}
+
+struct Coroutine<A, T> {
+    // needs to be heaped so it doesnt move
+    ctx: std::ptr<CoroContext<A, T>>
+}
+
+fn coro_new<A, T>(function: std::function_ptr, arg: A) -> Coroutine<A, T> {
+    let stack_size: std::usize = 256 * 64;
+    let stack = c_api::malloc(stack_size);
+
+    let ctx = std::mem::malloc::<CoroContext<A, T>>();
+    (*ctx).main_ctx = std::mem::new_uninit();
+    (*ctx).runner_ctx = std::mem::new_uninit();
+    (*ctx).stack = stack;
+    (*ctx).state = 0;
+    (*ctx).arg = arg;
+
+    if c_api::ucontext::getcontext(&(*ctx).runner_ctx) == 0-1 {
+        c_api::fprintf(std::io::stderr(), "Error: getcontext\n");
+        c_api::exit(1);
+    };
+
+    (*ctx).runner_ctx.uc_stack.ss_sp = stack;
+    (*ctx).runner_ctx.uc_stack.ss_size = stack_size;
+    (*ctx).runner_ctx.uc_link = (&(*ctx).main_ctx);
+
+    c_api::ucontext::makecontext(&(*ctx).runner_ctx, function, 2, ctx);
+
+    Coroutine {
+        ctx: ctx
+    }
+}
+
+fn coro_step<A, T>(coro: std::ptr<Coroutine<A, T>>) -> T {
+    let ctx = (*coro).ctx;
+    if (*ctx).state != 0 {
+        c_api::fprintf(std::io::stderr(), "Error: coroutine cannot be stepped, is already done\n");
+        c_api::exit(1);
+    };
+    (*ctx).state = 1;
+    if c_api::ucontext::swapcontext(&(*ctx).main_ctx, &(*ctx).runner_ctx) == 0-1 {
+        c_api::fprintf(std::io::stderr(), "Error: swapcontext\n");
+        c_api::exit(1);
+    };
+    if (*ctx).state == 1 {
+        coro_free(coro);
+    };
+    (*ctx).ret
+}
+
+fn coro_yield<A, T>(ctx: std::ptr<CoroContext<A, T>>, ret: T) {
+    (*ctx).state = 0;
+    (*ctx).ret = ret;
+    if c_api::ucontext::swapcontext(&(*ctx).runner_ctx, &(*ctx).main_ctx) == 0-1 {
+        c_api::fprintf(std::io::stderr(), "Error: swapcontext\n");
+        c_api::exit(1);
+    };
+}
+
+fn coro_free<A, T>(coro: std::ptr<Coroutine<A, T>>) {
+    let ctx = (*coro).ctx;
+    c_api::free((*ctx).stack);
+    (*ctx).stack = c_api::null();
+    std::mem::free(ctx);
+    (*coro).ctx = std::mem::null();
+}
