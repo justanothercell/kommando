@@ -3,13 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+#include "lib.h"
+#include "lib/exit.h"
+#include "lib/str.h"
+LIB
 #include "transpiler_c.h"
 #include "ast.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 #include "module.h"
 #include "parser.h"
 #include "resolver.h"
@@ -136,7 +136,20 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
 }
 
 str gen_c_var_name(Variable* v) {
-    return to_str_writer(stream, fprintf(stream,"%s%llx", v->name->name, v->id));
+    if (v->box->name == NULL && v->box->mi == NULL) panic("Compiler error: not a var or similar");
+    if (v->box->name != NULL && v->box->mi != NULL) panic("Compiler error: both a var or similar");
+    if (v->box->name != NULL) {
+        return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, (usize)v->box));
+    } else {
+        switch (v->box->mi->type) {
+            case MIT_FUNCTION: {
+                FuncDef* func = v->box->mi->item;
+                return gen_c_fn_name(func, NULL);
+            } break;
+            default:
+                unreachable();
+        }
+    }
 }
 
 str gen_temp_c_name() {
@@ -325,7 +338,8 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
                         Variable* v = map_get(ci->var_bindings, key);
                         if (v == NULL) spanned_error("Invalid c intrinsic", expr->span, "intrinsic does not bind variale $%s: `%s`", key, ci->c_expr);
                         if (mode == ':') {
-                            str name = v->name->name;
+                            if (v->box->name == NULL) panic("Compiler error: Add a check here");
+                            str name = v->box->name;
                             fprintf(code_stream, "%s", name);
                         } else if (mode == '!') {
                             str c_var = gen_c_var_name(v);
@@ -497,9 +511,10 @@ void transpile_typedef_generic_variant(FILE* header_stream, FILE* code_stream, s
             fprintf(header_stream, " {");
             if (map_size(ty->fields) > 0) fprintf(header_stream, "\n");
             else fprintf(header_stream, " ");
-            map_foreach(ty->fields, lambda(void, str key, Field* f, {
+            list_foreach(&ty->flist, lambda(void, Identifier* name, {
+                Field* f = map_get(ty->fields, name->name);
                 str c_field_ty = gen_c_type_name(f->type, generics);
-                str c_field_name = key;
+                str c_field_name = name->name;
                 fprintf(header_stream, "   %s %s;\n", c_field_ty, c_field_name);
             }));
             fprintf(header_stream, "}");
@@ -546,7 +561,9 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
 }
 
 void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, ModuleItemType type) {
+    log("Transpiling module %s [%s pass]", to_str_writer(s, fprint_path(s, module->path)), ModuleItemType__NAMES[type]);
     map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
+        if (item->module != module) return;
         switch (item->type) {
             case MIT_MODULE:
                 transpile_module(header_stream, code_stream, key, item->item, type);
@@ -555,8 +572,11 @@ void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module
                 if (type == MIT_FUNCTION) transpile_function(header_stream, code_stream, modkey, item->item);
                 break;
             case MIT_STRUCT:
+            log("s: %s", ((TypeDef*)item->item)->name->name);
                 if (type == MIT_STRUCT) transpile_typedef(header_stream, code_stream, modkey, item->item, true);
                 break;
+            case MIT_ANY: 
+                unreachable();
         }
     }));
 }
@@ -566,6 +586,9 @@ void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_str
     if (!options.raw) {
         fprintf(header_stream, "#include <stdint.h>\n");
         fprintf(header_stream, "#include <stdbool.h>\n");
+        fprintf(header_stream, "#include <stdalign.h>\n");
+        fprintf(header_stream, "#include <assert.h>\n");
+        fprintf(header_stream, "\n");
         fprintf(header_stream, "extern void* stdin;\n");
         fprintf(header_stream, "extern void* stdout;\n");
         fprintf(header_stream, "extern void* stderr;\n");

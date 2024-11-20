@@ -1,6 +1,10 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/defines.h"
+#include "lib/exit.h"
+#include "lib/list.h"
+#include "lib/str.h"
 #include "module.h"
 #include "token.h"
 #include <stdbool.h>
@@ -23,6 +27,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     if (!token_compare(t, "struct", IDENTIFIER)) unexpected_token(t);
     Identifier* name = parse_identifier(stream);
     Map* fields = map_new();
+    IdentList flist = list_new(IdentList);
     t = next_token(stream);
     GenericKeys* keys = NULL;
     if (token_compare(t, "<", SNOWFLAKE)) {
@@ -44,6 +49,7 @@ TypeDef* parse_struct(TokenStream* stream) {
         field->name = name;
         field->type = tv;
         map_put(fields, field_name->name, field);
+        list_append(&flist, field_name);
         t = next_token(stream);
         if (token_compare(t, "}", SNOWFLAKE)) break;
         if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
@@ -51,6 +57,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     TypeDef* type = malloc(sizeof(TypeDef));
     type->extern_ref = NULL;
     type->generics = keys;
+    type->flist = flist;
     type->fields = fields;
     type->transpile_state = 0;
     type->name = name;
@@ -60,29 +67,103 @@ TypeDef* parse_struct(TokenStream* stream) {
 
 Module* parse_module_contents(TokenStream* stream, Path* path) {
     Module* module = malloc(sizeof(Module));
-    module->imports = list_new(PathList);
+    module->imports = list_new(ImportList);
     module->items = map_new();
     module->path = path;
     module->resolved = false;
     module->in_resolution = false;
+    module->filepath = NULL;
+    module->subs = list_new(ModDefList);
 
     while (has_next(stream)) {
         Token* t = next_token(stream);
         stream->peek = t;
+
+        bool pub = false;
+        if (token_compare(t, "pub", IDENTIFIER)) {
+            pub = true;
+            t = next_token(stream); // skip peek 
+            t = next_token(stream); // setting new peek
+            stream->peek = t;
+        }
         if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
             ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = function;
             mi->type = MIT_FUNCTION;
+            mi->module = module;
+            mi->pub = pub;
             function->module = module;
-            map_put(module->items, function->name->name, mi);
+            ModuleItem* old = map_put(module->items, function->name->name, mi);
+            if (old != NULL) {
+                Span span;
+                switch (old->type) {
+                    case MIT_FUNCTION:
+                       span = ((FuncDef*)old->item)->name->span;
+                       break;
+                    case MIT_STRUCT:
+                       span = ((TypeDef*)old->item)->name->span;
+                       break;
+                    case MIT_MODULE:
+                       span = ((Module*)old->item)->name->span;
+                       break;
+                    case MIT_ANY: 
+                        unreachable();
+                }
+                spanned_error("Name conflict", function->name->span, "Name %s is already defined in this scope at %s", function->name->name, to_str_writer(s, fprint_span(s, &span)));
+            }
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
             ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = type;
             mi->type = MIT_STRUCT;
+            mi->module = module;
+            mi->pub = pub;
             type->module = module;
-            map_put(module->items, type->name->name, mi);
+            ModuleItem* old = map_put(module->items, type->name->name, mi);
+            if (old != NULL) {
+                Span span;
+                switch (old->type) {
+                    case MIT_FUNCTION:
+                       span = ((FuncDef*)old->item)->name->span;
+                       break;
+                    case MIT_STRUCT:
+                       span = ((TypeDef*)old->item)->name->span;
+                       break;
+                    case MIT_MODULE:
+                       span = ((Module*)old->item)->name->span;
+                       break;
+                    case MIT_ANY: 
+                        unreachable();
+                }
+                spanned_error("Name conflict", type->name->span, "Name %s is already defined in this scope at %s", type->name->name, to_str_writer(s, fprint_span(s, &span)));
+            }
+        } else if (token_compare(t, "mod", IDENTIFIER)) {
+            t = next_token(stream); // skip mod
+            Identifier* name = parse_identifier(stream);
+            t = next_token(stream);
+            if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
+            ModDef* mod = malloc(sizeof(ModDef));
+            mod->name = name;
+            mod->pub = pub;
+            list_append(&module->subs, mod);
+        } else if (token_compare(t, "use", IDENTIFIER)) {
+            t = next_token(stream); // skip use
+            Path* path = parse_path(stream);
+            bool wildcard = false;
+            if (path->ends_in_double_colon) {
+                t = next_token(stream);
+                if (token_compare(t, "*", SNOWFLAKE)) wildcard = true;
+                else stream->peek = t;
+
+            }
+            t = next_token(stream);
+            if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
+            Import* imp = malloc(sizeof(Import));
+            imp->path = path;
+            imp->wildcard = wildcard;
+            imp->container = module;
+            list_append(&module->imports, imp);
         } else {
             unexpected_token(t);
         }
@@ -105,8 +186,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         end = name->span.right;
         LetExpr* let = malloc(sizeof(LetExpr));
         Variable* var = malloc(sizeof(Variable));
-        var->id = 0;
-        var->name = name;
+        var->path = path_simple(name);
         let->var = var;
         t = next_token(stream);
         if (token_compare(t, ":", SNOWFLAKE)) {
@@ -235,11 +315,11 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             expression->type = EXPR_STRUCT_LITERAL;
         } else {
             if (generics != NULL) unexpected_token(gen_start);
-            if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s @ %s", to_str_writer(stream, fprint_path(stream, path)), to_str_writer(stream, fprint_span(stream, &path->elements.elements[0]->span)));
+            // other items are now allowed, disabling this check
+            // if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s @ %s", to_str_writer(stream, fprint_path(stream, path)), to_str_writer(stream, fprint_span(stream, &path->elements.elements[0]->span)));
             stream->peek = t;
             Variable* var = malloc(sizeof(Variable));
-            var->id = 0;
-            var->name = path->elements.elements[0];
+            var->path = path;
             expression->expr = var;
             expression->type = EXPR_VARIABLE;
         }
@@ -540,8 +620,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
             }
             Argument* argument = malloc(sizeof(Argument));
             Variable* var = malloc(sizeof(Variable));
-            var->id = 0;
-            var->name = parse_identifier(stream);
+            var->path = path_simple(parse_identifier(stream));
             argument->var = var;
             t = next_token(stream);
             if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);

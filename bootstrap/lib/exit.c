@@ -93,7 +93,7 @@ void fprint_stacktrace(FILE* file) {
             StrList dir_file = rsplitn(path, __PATH_SEP__, 1);
             str dir = dir_file.elements[0];
             str filename = dir_file.elements[1];
-            fprintf(file, ANSI(ANSI_FAINT)" %s"ANSI_RESET_SEQUENCE""ANSI(ANSI_BOLD)"%s:%s"ANSI_RESET_SEQUENCE"\n", dir, filename, line);
+            fprintf(file, ANSI(ANSI_FAINT)" %s/"ANSI_RESET_SEQUENCE""ANSI(ANSI_BOLD)"%s:%s"ANSI_RESET_SEQUENCE"\n", dir, filename, line);
         }
         else fprintf(file, " "ANSI(ANSI_FAINT)"%s:%s"ANSI_RESET_SEQUENCE"\n", loc.elements[0], loc.elements[1]);
     }

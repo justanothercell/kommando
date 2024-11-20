@@ -1,13 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+
+#include "lib.h"
+LIB;
 #include "compiler.h"
 #include "ast.h"
-#include "lib.h"
-#include "lib/defines.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 #include "module.h"
 #include "parser.h"
 #include "resolver.h"
@@ -124,7 +123,7 @@ void compile(CompilerOptions options) {
     program->packages = map_new();
 
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
-    log("Parsing module ::main");
+    log("Parsing package ::main");
     Module* main = parse_module_contents(stream, gen_path("::main"));
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
@@ -134,22 +133,69 @@ void compile(CompilerOptions options) {
 
     program->main_module = main;
 
-    insert_module(program, main);
-    insert_module(program, intrinsics);
-    insert_module(program, intrinsics_types);
+    insert_module(program, main, true);
+    insert_module(program, intrinsics, true);
+    insert_module(program, intrinsics_types, true);
 
     list_foreach(&options.module_names, lambda(void, str modname, {
-        str file = map_get(options.modules, modname);
+        str fp = map_get(options.modules, modname);
+        str file = to_str_writer(s, fprintf(s, "%s/lib.kdo", fp));
+        if (access(file, F_OK) != 0) panic("Could not load package %s: no such file %s", file, modname);
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
-    log("Parsing module %s", modname);
-        Module* mod = parse_module_contents(s, gen_path(modname));
-        insert_module(program, mod);
+    log("Parsing library package %s", modname);
+        Path* modpath = gen_path(modname);
+        if (modpath->elements.length != 1) panic("Library path may not be a submodule: expected path to look like ::foo, not %s", modpath);
+        if (!modpath->absolute) panic("Library path must be absolute: expected path to look like ::foo, not %s", modpath);
+        Module* mod = parse_module_contents(s, modpath);
+        mod->filepath = file;
+        insert_module(program, mod, true);
     }));
 
-    Module* std = map_get(program->packages, "std");
-    map_foreach(intrinsics_types->items, lambda(void, str key, ModuleItem* item, {
-        map_put(std->items, key, item);
+    typedef struct Submodule {
+        Path* current;
+        str parentfile;
+        Identifier* mod;
+        bool pub;
+    } Submodule;
+    LIST(SubList, Submodule);
+    SubList sublist = list_new(SubList);
+    map_foreach(program->packages, lambda(void, str key, Module* item, {
+        UNUSED(key);
+        list_foreach(&item->subs, lambda(void, ModDef* m, {({
+            if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, item->path)));
+            if (item->filepath == NULL) spanned_error("Synthetic", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
+                    to_str_writer(s, fprint_path(s, item->path)), m->name->name);
+            Submodule sm = (Submodule){ .current = item->path, .parentfile=item->filepath, .mod = m->name, .pub = m->pub};
+            list_append(&sublist, sm);
+        });}));
     }));
+
+    for (usize i = 0;i < sublist.length;i++) {
+        Submodule sm = sublist.elements[i];
+        Path* modpath = path_new(true, sm.current->elements);
+        path_append(modpath, sm.mod);
+        str pf = sm.parentfile;
+        StrList split = rsplitn(pf, '/', 1);
+        str fp = split.elements[0];
+        str parent = split.elements[1];
+        if (!str_eq(parent, "mod.kdo") && !str_eq(parent, "lib.kdo")) spanned_error("Invalid parent", sm.mod->span, "%s may not register the child module %s as it is located at %s, such is reserved for files named mod.kdo or lib.kdo", to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name, pf);
+        str leafname = to_str_writer(s, fprintf(s, "%s/%s.kdo", fp, sm.mod->name));
+        str nodename = to_str_writer(s, fprintf(s, "%s/%s/mod.kdo", fp, sm.mod->name));
+        bool lx = false;
+        bool nx = false;
+        if (access(leafname, F_OK) == 0) lx = true;
+        if (access(nodename, F_OK) == 0) nx = true;
+        if (!lx && !nx) spanned_error("No such module", sm.mod->span, "%s::%s could not be found in %s or %s", to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name, leafname, nodename);
+        if (lx && nx) spanned_error("Ambigous module file", sm.mod->span, "Found both %s and %s for %s::%s, remove on of them", leafname, nodename, to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name);
+        str file = NULL;
+        if (lx) file = leafname;
+        if (nx) file = nodename;
+        TokenStream* s = tokenstream_new(file, read_file_to_string(file));
+        Module* mod = parse_module_contents(s, modpath);
+        mod->name = sm.mod;
+        mod->filepath = file;
+        insert_module(program, mod, sm.pub);
+    }
 
     resolve(program);
 
@@ -168,4 +214,6 @@ void compile(CompilerOptions options) {
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
         info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Done!");
     }
+
+    report_item_cache_stats();
 }

@@ -1,4 +1,6 @@
-fn printf(fmt: ::std::c_const_str_ptr, *) -> ::std::i32;
+use std::*;
+
+fn printf(fmt: c_const_str_ptr, *) -> i32;
 
 fn main() {
     let number = 42u32;
@@ -10,7 +12,7 @@ fn main() {
     }
 }
 
-fn is_prime(n: ::std::u32, divisor: ::std::u32) -> ::std::u32 {
+fn is_prime(n: u32, divisor: u32) -> u32 {
     if n < 2u32 {
         0u32
     } else {

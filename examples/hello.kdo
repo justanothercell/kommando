@@ -1,5 +1,7 @@
+use std::*;
+
 struct Hello {
-    name: std::c_const_str_ptr
+    name: c_const_str_ptr
 }
 
 fn greet(hello: Hello) {
@@ -21,7 +23,7 @@ fn main() {
     c_api::fclose(stream);
 }
 
-fn fib(n: std::u32) -> std::u32 {
+fn fib(n: u32) -> u32 {
     if n < 2u32 { n }
     else { fib(n - 1u32) + fib(n - 2u32) }
 }

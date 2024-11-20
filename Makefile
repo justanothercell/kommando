@@ -21,6 +21,7 @@ test: build
 	@success=0; \
 	fail=0; \
 	for file in $(shell find ./examples -name "*.kdo"); do \
+		echo "Running test: $$file"; \
 		if make compile file=$$file > /dev/null; then \
 			echo "Successfully compiled $$file"; \
 			success=$$((success + 1)); \

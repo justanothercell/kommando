@@ -1,6 +1,8 @@
 #ifndef LIB_H
 #define LIB_H
 
+#define LIB
+
 #include "lib/defines.h"
 #include "lib/list.h"
 #include "lib/str.h"

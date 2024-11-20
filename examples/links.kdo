@@ -1,19 +1,21 @@
+use std::*;
+
 struct Link<T> {
-    prev: std::ptr<Link<T>>,
-    next: std::ptr<Link<T>>,
+    prev: ptr<Link<T>>,
+    next: ptr<Link<T>>,
     item: T
 }
 
-fn link_new<T>(item: T) -> std::ptr<Link<T>> {
-    let link = std::mem::malloc::<Link<T>>();
+fn link_new<T>(item: T) -> ptr<Link<T>> {
+    let link = mem::malloc::<Link<T>>();
     (*link).item = item;
     link
 }
 
 
-fn link_insert_after<T>(link: std::ptr<Link<T>>, item: T) -> std::ptr<Link<T>> {
+fn link_insert_after<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
     let next = link_new::<T>(item);
-    if (*link).next != std::mem::null::<Link<T>>() {
+    if (*link).next != mem::null::<Link<T>>() {
         (*next).next = (*link).next;
         (*(*link).next).prev = next;
     };
@@ -22,9 +24,9 @@ fn link_insert_after<T>(link: std::ptr<Link<T>>, item: T) -> std::ptr<Link<T>> {
     next
 }
 
-fn link_insert_before<T>(link: std::ptr<Link<T>>, item: T) -> std::ptr<Link<T>> {
+fn link_insert_before<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
     let prev = link_new::<T>(item);
-    if (*link).prev != std::mem::null::<Link<T>>() {
+    if (*link).prev != mem::null::<Link<T>>() {
         (*prev).prev = (*link).prev;
         (*(*link).prev).next = prev;
     };
@@ -33,15 +35,15 @@ fn link_insert_before<T>(link: std::ptr<Link<T>>, item: T) -> std::ptr<Link<T>> 
     prev
 }
 
-fn link_goto_start<T>(link: std::ptr<Link<T>>) -> std::ptr<Link<T>> {
-    while (*link).prev != std::mem::null::<Link<T>>() {
+fn link_goto_start<T>(link: ptr<Link<T>>) -> ptr<Link<T>> {
+    while (*link).prev != mem::null::<Link<T>>() {
         link = (*link).prev;
     };
     link
 }
 
-fn link_goto_end<T>(link: std::ptr<Link<T>>) -> std::ptr<Link<T>> {
-    while (*link).next != std::mem::null::<Link<T>>() {
+fn link_goto_end<T>(link: ptr<Link<T>>) -> ptr<Link<T>> {
+    while (*link).next != mem::null::<Link<T>>() {
         link = (*link).next;
     };
     link
@@ -62,7 +64,7 @@ fn main() {
     link = link_goto_start(link);
     c_api::printf("0: %d\n", (*link).item);
     let elem = 1;
-    while (*link).next != std::mem::null() {
+    while (*link).next != mem::null() {
         link = (*link).next;
         c_api::printf("%d: %d\n", elem, (*link).item);
         elem = elem + 1;

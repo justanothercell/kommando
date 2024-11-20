@@ -1,13 +1,21 @@
-#include "resolver.h"
-#include "ast.h"
-#include "lib.h"
-#include "lib/str.h"
-#include "module.h"
-#include "parser.h"
-#include "token.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+#include "lib.h"
+#include "lib/defines.h"
+#include "lib/exit.h"
+#include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
+LIB
+#include "resolver.h"
+#include "ast.h"
+#include "module.h"
+#include "parser.h"
+#include "resolver.h"
+#include "token.h"
 
 void fprint_res_tv(FILE* stream, TypeValue* tv) {
     if (tv->def == NULL) panic("TypeValue was not resolved %s @ %s", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->name->elements.elements[0]->span)));
@@ -65,45 +73,54 @@ str gvals_to_key(GenericValues* generics) {
 str gvals_to_c_key(GenericValues* generics) {
     return __gvals_to_key(generics, true);
 }
-
-static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind) {
+void resovle_imports(Program* program, Module* module, List* mask);
+static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
     Identifier* name = path->elements.elements[path->elements.length-1];
-
-    if (path->elements.length == 1 && !path->absolute) goto get_item;
     
     usize i = 0;
     Identifier* m = path->elements.elements[0];
     ModuleItem* mod = NULL;
     if (!path->absolute) mod = map_get(module->items, m->name);
     if (mod != NULL) { // try local
+        if (mod->type == MIT_MODULE && during_imports_mask != NULL) resovle_imports(program, mod->item, during_imports_mask);
+        if (path->elements.length == 1) {
+            if (kind != MIT_ANY) if (mod->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[mod->type], ModuleItemType__NAMES[kind]);
+            return mod;
+        }
         if (mod->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[mod->type]);
         module = mod->item;
         i += 1;
     } else { // try global
         Module* package = map_get(program->packages, m->name);
         if (package != NULL) {
+            if (during_imports_mask != NULL) resovle_imports(program, package, during_imports_mask);
+            if (path->elements.length == 1) {
+                if (MIT_MODULE != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[MIT_MODULE], ModuleItemType__NAMES[kind]);
+                mod = malloc(sizeof(ModuleItem));
+                mod->item = package;
+                mod->type = MIT_MODULE;
+                mod->pub = true;
+                mod->module = NULL;
+                return mod;
+            }
             i += 1;
             module = package;
-        } else if (path->absolute) spanned_error("No such package", m->span, "Package %s does not exist. Try including it with the command line args: ::%s=path/to/package.kdo", m->name, m->name);
+        } else {
+            spanned_error("No such item", m->span, "Item %s does not exist", m->name);
+        }
     }
-    if (i == 0) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
     while (i < path->elements.length - 1) {
         Identifier* m = path->elements.elements[i];
         i += 1;
         ModuleItem* it = map_get(module->items, m->name);
-        log("%p %s", it, to_str_writer(s, fprint_path(s, path)));
         if (it == NULL) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
-        log("%s", to_str_writer(s, fprint_span(s, &m->span)));
-        log("%u %u", it->type, MIT_MODULE);
-        log("%p", it->item);
-        log("%p", it);
         if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
         module = it->item;
+        if (during_imports_mask != NULL) resovle_imports(program, module, during_imports_mask); 
     }
-    get_item: {}
     ModuleItem* it = map_get(module->items, name->name);
     if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[kind], name->name);
-    if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
+    if (kind != MIT_ANY) if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
     return it;
 }
 
@@ -111,9 +128,7 @@ void register_item(GenericValues* item_values, GenericKeys* gkeys) {
     // no need to register if we are not generic - we just complie the one default nongeneric variant in that case
     if (item_values != NULL) {
         str key = gvals_to_key(item_values);
-        log("trying to register %s", key);
         if (!map_contains(gkeys->generic_uses, key)) {
-            log("Registered!");
             map_put(gkeys->generic_uses, key, item_values);
             list_append(&gkeys->generic_use_keys, key);
         }
@@ -123,6 +138,11 @@ void register_item(GenericValues* item_values, GenericKeys* gkeys) {
 void resolve_funcdef(Program* program, FuncDef* func);
 void resolve_typedef(Program* program, TypeDef* ty);
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
+static int item_cache_hits = 0;
+static int item_cache_misses = 0;
+void report_item_cache_stats() {
+    log("Item cache hits: %d misses: %d", item_cache_hits, item_cache_misses);
+}
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
     typedef struct {
         str key;
@@ -131,6 +151,27 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
     LIST(MICList, MICacheItem);
     static MICList LOOKUP_CACHE = list_new(MICList);
     const usize CACHE_SIZE = 16;
+    /*
+        // examples/generics.kdo
+        // note that this is still a rather small example so it only is partially representative.
+        size: hits/misses
+            1:   40/295
+            2:   71/264
+            3:   90/245
+            4:   95/240
+            6:  109/226
+            8:  112/223
+           12:  145/190
+           16:  161/174
+           24:  193/142
+           32:  197/138
+           48:  214/121
+           64:  217/118
+           96:  246/ 89
+          128:  246/ 89
+          192:  246/ 89
+          256:  246/ 89
+    */
     str key = to_str_writer(s, {
         fprint_path(s, path);
         if (!path->absolute) {
@@ -148,15 +189,33 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
                 LOOKUP_CACHE.elements[i] = LOOKUP_CACHE.elements[i - 1];
                 LOOKUP_CACHE.elements[i - 1] = t;
             }
+            item_cache_hits += 1;
+            break;
         }
     }
 
     if (mi == NULL) {
-        mi = resolve_item_raw(program, module, path, kind);
+        mi = resolve_item_raw(program, module, path, kind, NULL);
         MICacheItem mic = (MICacheItem) { .key=key, .item = mi };
         if (LOOKUP_CACHE.length < CACHE_SIZE) list_append(&LOOKUP_CACHE, mic);
         else LOOKUP_CACHE.elements[CACHE_SIZE - 1] = mic;
+        item_cache_misses += 1;
     }
+#ifdef DEBUG_CACHE
+        FILE* cachelog = NULL;
+        if (hits + misses == 1) {
+            cachelog = fopen("CACHELOG.txt", "w");
+        } else {
+            cachelog = fopen("CACHELOG.txt", "a");
+        }
+        list_foreach_i(&LOOKUP_CACHE, lambda(void, usize i, MICacheItem item, {
+            if (i > 0) fprintf(cachelog, ", ");
+            fprintf(cachelog, "%s", item.key);
+        }));
+        fprintf(cachelog, "\n");
+        fclose(cachelog);
+    }
+#endif
     switch (mi->type) {
         case MIT_FUNCTION: {
             FuncDef* func = mi->item;
@@ -223,6 +282,7 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
         }
     }
     generic_end: {}
+    if (kind == MIT_ANY) return mi;
     return mi->item;
 }
 
@@ -296,25 +356,55 @@ void assert_types_equal(Program* program, Module* module, TypeValue* tv1, TypeVa
         }
     }
 }
-typedef struct VarBox {
-    str name;
-    usize id;
-    TVBox* resolved;
-} VarBox;
-LIST(VarList, VarBox*);
-static VarBox* var_find(VarList* vars, Variable* var) {
-    for (int i = vars->length-1;i >= 0;i--) {
-        if (str_eq(vars->elements[i]->name, var->name->name)) return vars->elements[i];
+
+static void var_find(Program* program, Module* module, VarList* vars, Variable* var) {
+    Path* path = var->path;
+    Identifier* name = path->elements.elements[path->elements.length-1];
+    if (!path->absolute && path->elements.length == 1) {
+        for (int i = vars->length-1;i >= 0;i--) {
+            if (str_eq(vars->elements[i]->name, name->name)) {
+                var->box = vars->elements[i];
+                return;
+            }
+        }
     }
-    spanned_error("No such variable", var->name->span, "`%s` does not exist", var->name->name);
+    GenericValues* values = NULL;
+    ModuleItem* item = resolve_item(program, module, path, MIT_ANY, NULL, NULL, &values);
+    VarBox* box = malloc(sizeof(VarBox));
+    box->id = ~0;
+    box->name = NULL;
+    box->mi = item;
+    box->values = values;
+    var->box = box;
+    switch (item->type) {
+        case MIT_FUNCTION: {
+            TypeValue* tv = gen_typevalue("std::function_ptr", &name->span);
+            resolve_typevalue(program, module, tv, NULL, NULL);
+            box->resolved = malloc(sizeof(TVBox));
+            box->resolved->type = tv;
+        } break;
+        case MIT_STRUCT:
+            spanned_error("Expected variable", name->span, "Expected variable or function ref, got struct");
+            break;
+        case MIT_MODULE:
+            spanned_error("Expected variable", name->span, "Expected variable or function ref, got module");
+            break;
+        case MIT_ANY:
+            unreachable();
+    }
+    
 }
 static VarBox* var_register(VarList* vars, Variable* var) {
+    Identifier* name = var->path->elements.elements[var->path->elements.length-1];
+    if (var->path->absolute || var->path->elements.length != 1) spanned_error("Variable has too much path", name->span, "This should look more like a single variable and should have been caught earlier, that's a compiler bug.");
     VarBox* v = malloc(sizeof(VarBox));
-    v->name = var->name->name;
+    v->name = name->name;
     v->id = vars->length;
     v->resolved = malloc(sizeof(TVBox));
     v->resolved->type = NULL;
-    var->id = v->id;
+    v->mi = NULL;
+    v->values = NULL;
+    var->box = v;
     list_append(vars, v);
     return v;
 }
@@ -476,7 +566,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             FuncCall* fc = expr->expr;
 
             FuncDef* fd = resolve_item(program, func->module, fc->name, MIT_FUNCTION, func->generics, type_generics, &fc->generics);
-            log("calling %s in %s", fd->name->name, func->name->name);
             // preresolve return
             TypeValue* pre_ret = replace_generic(fd->return_type, fc->generics);
             if (t_return->type != NULL) patch_generics(pre_ret, fd->return_type, t_return->type, fc->generics);
@@ -490,7 +579,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             }
             // resolving args
             list_foreach_i(&fc->arguments, lambda(void, usize i, Expression* arg, {
-                log("%s in %s, arg %llu of %llu", fd->name->name, func->name->name, i, fd->args.length);
                 if (i < fd->args.length) {
                     TVBox* argbox = new_tvbox();
                     TypeValue* arg_tv = replace_generic(fd->args.elements[i]->type, fc->generics);
@@ -508,7 +596,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             TypeValue* ret = replace_generic(fd->return_type, fc->generics);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, ret);
 
-            log("@ %s", gvals_to_key(fc->generics));
             register_item(fc->generics, fd->generics);        
         } break;
         case EXPR_LITERAL: {
@@ -541,22 +628,19 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_VARIABLE: {
             Variable* var = expr->expr;
-            VarBox* vb = var_find(vars, var);
-            var->id = vb->id;
-            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, vb->resolved->type);
+            var_find(program, func->module, vars, var);
+            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, var->box->resolved->type);
         } break;
         case EXPR_LET: {
             LetExpr* let = expr->expr;
 
-            VarBox* v = var_register(vars, let->var);
-            let->var->id = v->id;
-            v->resolved = new_tvbox();
+            var_register(vars, let->var);
             if (let->type != NULL) {
                 resolve_typevalue(program, func->module, let->type, func->generics, type_generics);
-                fill_tvbox(program, func->module, expr->span, func->generics, type_generics, v->resolved, let->type);
+                fill_tvbox(program, func->module, expr->span, func->generics, type_generics, let->var->box->resolved, let->type);
             }
-            resolve_expr(program, func, type_generics, let->value, vars, v->resolved);
-            patch_tvs(&let->type, &v->resolved->type);
+            resolve_expr(program, func, type_generics, let->value, vars, let->var->box->resolved);
+            patch_tvs(&let->type, &let->var->box->resolved->type);
 
             TypeValue* tv = gen_typevalue("::std::unit", &expr->span);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, tv);
@@ -693,8 +777,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             CIntrinsic* ci = expr->expr;
             map_foreach(ci->var_bindings, lambda(void, str key, Variable* var, {
                 UNUSED(key);
-                VarBox* vb = var_find(vars, var);
-                var->id = vb->id;
+                var_find(program, func->module, vars, var);
             }));
             map_foreach(ci->type_bindings, lambda(void, str key, TypeValue* tv, {
                 UNUSED(key);
@@ -771,7 +854,8 @@ void resolve_funcdef(Program* program, FuncDef* func) {
     if (!func->module->resolved && !func->module->in_resolution) {
         resolve_module(program, func->module);
     }
-    log("Resolving function %s", func->name->name);
+    log("Resolving function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
+
     if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
     if (func->return_type == NULL) {
         func->return_type = gen_typevalue("::std::unit", &func->name->span);
@@ -826,7 +910,7 @@ void resolve_typedef(Program* program, TypeDef* ty) {
         ty->head_resolved = true;
         return;
     }
-    log("Resolving type %s", ty->name->name);
+    log("Resolving type %s::%s", to_str_writer(s, fprint_path(s, ty->module->path)), ty->name->name);
     if (str_eq(ty->name->name, "_")) spanned_error("Invalid type name", ty->name->span, "`_` is a reserved name.");
     if (ty->generics != NULL) {
         list_foreach(&ty->generics->generics, lambda(void, Identifier* key, {
@@ -846,6 +930,127 @@ void resolve_typedef(Program* program, TypeDef* ty) {
     }));
 }
 
+void resovle_imports(Program* program, Module* module, List* mask) {
+    if (mask == NULL) {
+        mask = malloc(sizeof(List));
+        *mask = list_new(List);
+    }
+    if (list_contains(mask, m, *m == module)) return;
+    list_append(mask, module);
+
+    list_foreach(&module->imports, lambda(void, Import* import, {
+        if (import->wildcard) {
+            Module* container = resolve_item_raw(program, import->container, import->path, MIT_MODULE, mask)->item;
+            log("star import container '%s' resolved from %s", container->name->name, to_str_writer(s, fprint_path(s, import->path)));
+            log("   pathed %s", to_str_writer(s, fprint_path(s, container->path)));
+            log("   with this = %s", to_str_writer(s, fprint_path(s, import->container->path)));
+            map_foreach(container->items, lambda(void, str key, ModuleItem* item, {
+                log("star import %s", key);
+                Identifier* name = NULL;
+                switch (item->type) {
+                    case MIT_STRUCT:
+                        name = ((TypeDef*)item->item)->name;
+                        break;
+                    case MIT_FUNCTION:
+                        name = ((FuncDef*)item->item)->name;
+                        break;
+                    case MIT_MODULE:
+                        name = ((Module*)item->item)->name;
+                        break;
+                    default:
+                        unreachable();
+                }
+                ModuleItem* imported = malloc(sizeof(ModuleItem));
+                imported->pub = item->pub;
+                imported->type = item->type;
+                imported->module = item->module;
+                imported->item = item->item;
+                if (map_contains(module->items, name->name)) {
+                    ModuleItem* orig = map_get(module->items, name->name);
+                    if (orig->item == imported->item) return;
+                    Identifier* origname = NULL;
+                    switch (orig->type) {
+                        case MIT_STRUCT:
+                            origname = ((TypeDef*)item->item)->name;
+                            break;
+                        case MIT_FUNCTION:
+                            origname = ((FuncDef*)item->item)->name;
+                            break;
+                        case MIT_MODULE:
+                            origname = ((Module*)item->item)->name;
+                            break;
+                        default:
+                            unreachable();
+                    }
+                    spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", name->name, 
+                                                                    TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &origname->span)),
+                                                                    TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &name->span)));
+                }
+                map_put(module->items, name->name, imported);
+            }));
+        } else {
+            ModuleItem* item = resolve_item_raw(program, import->container, import->path, MIT_ANY, mask);
+            Identifier* name = NULL;
+            switch (item->type) {
+                case MIT_STRUCT:
+                    name = ((TypeDef*)item->item)->name;
+                    break;
+                case MIT_FUNCTION:
+                    name = ((FuncDef*)item->item)->name;
+                    break;
+                case MIT_MODULE:
+                    name = ((Module*)item->item)->name;
+                    break;
+                default:
+                    unreachable();
+            }
+            ModuleItem* imported = malloc(sizeof(ModuleItem));
+            imported->pub = item->pub;
+            imported->type = item->type;
+            imported->module = item->module;
+            imported->item = item->item;
+            if (map_contains(module->items, name->name)) {
+                ModuleItem* orig = map_get(module->items, name->name);
+                if (orig->item == imported->item) return;
+                Identifier* origname = NULL;
+                switch (orig->type) {
+                    case MIT_STRUCT:
+                        origname = ((TypeDef*)item->item)->name;
+                        break;
+                    case MIT_FUNCTION:
+                        origname = ((FuncDef*)item->item)->name;
+                        break;
+                    case MIT_MODULE:
+                        origname = ((Module*)item->item)->name;
+                        break;
+                    default:
+                        unreachable();
+                }
+                spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", name->name, 
+                                                                TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &origname->span)),
+                                                                TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &name->span)));
+            }
+            map_put(module->items, name->name, imported);
+        }
+    }));
+}
+
+void resolve_module_imports(Program* program, Module* module) {
+    str path_str = to_str_writer(stream, fprint_path(stream, module->path));
+    log("resolving imports of %s", path_str);
+    resovle_imports(program, module, NULL);
+    map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
+        UNUSED(key);
+        switch (item->type) {
+            case MIT_MODULE: {
+                Module* mod = item->item;
+                resolve_module_imports(program, mod);
+            } break;
+            default: 
+                break;
+        }
+    }));
+}
 void resolve_module(Program* program, Module* module) {
     if (module->resolved) return;
     str path_str = to_str_writer(stream, fprint_path(stream, module->path));
@@ -869,8 +1074,10 @@ void resolve_module(Program* program, Module* module) {
             } break;
             case MIT_MODULE: {
                 Module* mod = item->item;
-                resolve_module(program, mod);
+                if (!mod->resolved && !mod->in_resolution) resolve_module(program, mod);
             } break;
+            case MIT_ANY: 
+                unreachable();
         }
     }));
 
@@ -879,6 +1086,10 @@ void resolve_module(Program* program, Module* module) {
 }
 
 void resolve(Program* program) {
+    map_foreach(program->packages, lambda(void, str key, Module* mod, {
+        UNUSED(key);
+        resolve_module_imports(program, mod);
+    }));
     map_foreach(program->packages, lambda(void, str key, Module* mod, {
         UNUSED(key);
         resolve_module(program, mod);
