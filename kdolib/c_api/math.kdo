@@ -1,1 +1,2 @@
 fn pow(a: std::f64, b: std::f64) -> std::f64;
+fn powf(a: std::f32, b: std::f32) -> std::f32;

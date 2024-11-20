@@ -27,7 +27,7 @@ typedef struct Module {
     Identifier* name;
     Path* path;
     Map* items;
-    PathList imports;
+    ImportList imports;
     bool resolved;
     bool in_resolution;
     ModDefList subs;

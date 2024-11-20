@@ -190,6 +190,8 @@ typedef struct FuncDef {
 
 typedef struct Import {
     Path* path;
+    Module* container;
+    bool wildcard;
 } Import;
 
 typedef struct ModDef {

@@ -18,6 +18,6 @@ str gvals_to_key(GenericValues* generics);
 str gvals_to_c_key(GenericValues* generics);
 void fprint_res_tv(FILE* stream, TypeValue* tv);
 
-void report_cache();
+void report_item_cache_stats();
 
 #endif

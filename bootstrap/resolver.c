@@ -1,8 +1,14 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 #include "lib.h"
+#include "lib/defines.h"
+#include "lib/exit.h"
+#include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
 LIB
 #include "resolver.h"
 #include "ast.h"
@@ -67,28 +73,42 @@ str gvals_to_key(GenericValues* generics) {
 str gvals_to_c_key(GenericValues* generics) {
     return __gvals_to_key(generics, true);
 }
-
-static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind) {
+void resovle_imports(Program* program, Module* module, List* mask);
+static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
     Identifier* name = path->elements.elements[path->elements.length-1];
-
-    if (path->elements.length == 1 && !path->absolute) goto get_item;
     
     usize i = 0;
     Identifier* m = path->elements.elements[0];
     ModuleItem* mod = NULL;
     if (!path->absolute) mod = map_get(module->items, m->name);
     if (mod != NULL) { // try local
+        if (mod->type == MIT_MODULE && during_imports_mask != NULL) resovle_imports(program, mod->item, during_imports_mask);
+        if (path->elements.length == 1) {
+            if (kind != MIT_ANY) if (mod->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[mod->type], ModuleItemType__NAMES[kind]);
+            return mod;
+        }
         if (mod->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[mod->type]);
         module = mod->item;
         i += 1;
     } else { // try global
         Module* package = map_get(program->packages, m->name);
         if (package != NULL) {
+            if (during_imports_mask != NULL) resovle_imports(program, package, during_imports_mask);
+            if (path->elements.length == 1) {
+                if (MIT_MODULE != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[MIT_MODULE], ModuleItemType__NAMES[kind]);
+                mod = malloc(sizeof(ModuleItem));
+                mod->item = package;
+                mod->type = MIT_MODULE;
+                mod->pub = true;
+                mod->module = NULL;
+                return mod;
+            }
             i += 1;
             module = package;
-        } else if (path->absolute) spanned_error("No such package", m->span, "Package %s does not exist. Try including it with the command line args: ::%s=path/to/package.kdo", m->name, m->name);
+        } else {
+            spanned_error("No such item", m->span, "Item %s does not exist", m->name);
+        }
     }
-    if (i == 0) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
     while (i < path->elements.length - 1) {
         Identifier* m = path->elements.elements[i];
         i += 1;
@@ -96,8 +116,8 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
         if (it == NULL) spanned_error("No such module", m->span, "Module %s does not exist.", m->name);
         if (it->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[it->type]);
         module = it->item;
+        if (during_imports_mask != NULL) resovle_imports(program, module, during_imports_mask); 
     }
-    get_item: {}
     ModuleItem* it = map_get(module->items, name->name);
     if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[kind], name->name);
     if (kind != MIT_ANY) if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
@@ -118,10 +138,10 @@ void register_item(GenericValues* item_values, GenericKeys* gkeys) {
 void resolve_funcdef(Program* program, FuncDef* func);
 void resolve_typedef(Program* program, TypeDef* ty);
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
-static int hits = 0;
-static int misses = 0;
-void report_cache() {
-    log("Item cache hits: %d misses: %d", hits, misses);
+static int item_cache_hits = 0;
+static int item_cache_misses = 0;
+void report_item_cache_stats() {
+    log("Item cache hits: %d misses: %d", item_cache_hits, item_cache_misses);
 }
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
     typedef struct {
@@ -169,20 +189,19 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
                 LOOKUP_CACHE.elements[i] = LOOKUP_CACHE.elements[i - 1];
                 LOOKUP_CACHE.elements[i - 1] = t;
             }
-            hits += 1;
+            item_cache_hits += 1;
             break;
         }
     }
 
     if (mi == NULL) {
-        mi = resolve_item_raw(program, module, path, kind);
+        mi = resolve_item_raw(program, module, path, kind, NULL);
         MICacheItem mic = (MICacheItem) { .key=key, .item = mi };
         if (LOOKUP_CACHE.length < CACHE_SIZE) list_append(&LOOKUP_CACHE, mic);
         else LOOKUP_CACHE.elements[CACHE_SIZE - 1] = mic;
-        misses += 1;
+        item_cache_misses += 1;
     }
 #ifdef DEBUG_CACHE
-    {
         FILE* cachelog = NULL;
         if (hits + misses == 1) {
             cachelog = fopen("CACHELOG.txt", "w");
@@ -911,6 +930,127 @@ void resolve_typedef(Program* program, TypeDef* ty) {
     }));
 }
 
+void resovle_imports(Program* program, Module* module, List* mask) {
+    if (mask == NULL) {
+        mask = malloc(sizeof(List));
+        *mask = list_new(List);
+    }
+    if (list_contains(mask, m, *m == module)) return;
+    list_append(mask, module);
+
+    list_foreach(&module->imports, lambda(void, Import* import, {
+        if (import->wildcard) {
+            Module* container = resolve_item_raw(program, import->container, import->path, MIT_MODULE, mask)->item;
+            log("star import container '%s' resolved from %s", container->name->name, to_str_writer(s, fprint_path(s, import->path)));
+            log("   pathed %s", to_str_writer(s, fprint_path(s, container->path)));
+            log("   with this = %s", to_str_writer(s, fprint_path(s, import->container->path)));
+            map_foreach(container->items, lambda(void, str key, ModuleItem* item, {
+                log("star import %s", key);
+                Identifier* name = NULL;
+                switch (item->type) {
+                    case MIT_STRUCT:
+                        name = ((TypeDef*)item->item)->name;
+                        break;
+                    case MIT_FUNCTION:
+                        name = ((FuncDef*)item->item)->name;
+                        break;
+                    case MIT_MODULE:
+                        name = ((Module*)item->item)->name;
+                        break;
+                    default:
+                        unreachable();
+                }
+                ModuleItem* imported = malloc(sizeof(ModuleItem));
+                imported->pub = item->pub;
+                imported->type = item->type;
+                imported->module = item->module;
+                imported->item = item->item;
+                if (map_contains(module->items, name->name)) {
+                    ModuleItem* orig = map_get(module->items, name->name);
+                    if (orig->item == imported->item) return;
+                    Identifier* origname = NULL;
+                    switch (orig->type) {
+                        case MIT_STRUCT:
+                            origname = ((TypeDef*)item->item)->name;
+                            break;
+                        case MIT_FUNCTION:
+                            origname = ((FuncDef*)item->item)->name;
+                            break;
+                        case MIT_MODULE:
+                            origname = ((Module*)item->item)->name;
+                            break;
+                        default:
+                            unreachable();
+                    }
+                    spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", name->name, 
+                                                                    TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &origname->span)),
+                                                                    TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &name->span)));
+                }
+                map_put(module->items, name->name, imported);
+            }));
+        } else {
+            ModuleItem* item = resolve_item_raw(program, import->container, import->path, MIT_ANY, mask);
+            Identifier* name = NULL;
+            switch (item->type) {
+                case MIT_STRUCT:
+                    name = ((TypeDef*)item->item)->name;
+                    break;
+                case MIT_FUNCTION:
+                    name = ((FuncDef*)item->item)->name;
+                    break;
+                case MIT_MODULE:
+                    name = ((Module*)item->item)->name;
+                    break;
+                default:
+                    unreachable();
+            }
+            ModuleItem* imported = malloc(sizeof(ModuleItem));
+            imported->pub = item->pub;
+            imported->type = item->type;
+            imported->module = item->module;
+            imported->item = item->item;
+            if (map_contains(module->items, name->name)) {
+                ModuleItem* orig = map_get(module->items, name->name);
+                if (orig->item == imported->item) return;
+                Identifier* origname = NULL;
+                switch (orig->type) {
+                    case MIT_STRUCT:
+                        origname = ((TypeDef*)item->item)->name;
+                        break;
+                    case MIT_FUNCTION:
+                        origname = ((FuncDef*)item->item)->name;
+                        break;
+                    case MIT_MODULE:
+                        origname = ((Module*)item->item)->name;
+                        break;
+                    default:
+                        unreachable();
+                }
+                spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", name->name, 
+                                                                TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &origname->span)),
+                                                                TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &name->span)));
+            }
+            map_put(module->items, name->name, imported);
+        }
+    }));
+}
+
+void resolve_module_imports(Program* program, Module* module) {
+    str path_str = to_str_writer(stream, fprint_path(stream, module->path));
+    log("resolving imports of %s", path_str);
+    resovle_imports(program, module, NULL);
+    map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
+        UNUSED(key);
+        switch (item->type) {
+            case MIT_MODULE: {
+                Module* mod = item->item;
+                resolve_module_imports(program, mod);
+            } break;
+            default: 
+                break;
+        }
+    }));
+}
 void resolve_module(Program* program, Module* module) {
     if (module->resolved) return;
     str path_str = to_str_writer(stream, fprint_path(stream, module->path));
@@ -946,6 +1086,10 @@ void resolve_module(Program* program, Module* module) {
 }
 
 void resolve(Program* program) {
+    map_foreach(program->packages, lambda(void, str key, Module* mod, {
+        UNUSED(key);
+        resolve_module_imports(program, mod);
+    }));
     map_foreach(program->packages, lambda(void, str key, Module* mod, {
         UNUSED(key);
         resolve_module(program, mod);

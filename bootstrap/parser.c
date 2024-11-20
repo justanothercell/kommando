@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/defines.h"
 #include "lib/exit.h"
 #include "lib/list.h"
 #include "lib/str.h"
@@ -66,7 +67,7 @@ TypeDef* parse_struct(TokenStream* stream) {
 
 Module* parse_module_contents(TokenStream* stream, Path* path) {
     Module* module = malloc(sizeof(Module));
-    module->imports = list_new(PathList);
+    module->imports = list_new(ImportList);
     module->items = map_new();
     module->path = path;
     module->resolved = false;
@@ -146,6 +147,23 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mod->name = name;
             mod->pub = pub;
             list_append(&module->subs, mod);
+        } else if (token_compare(t, "use", IDENTIFIER)) {
+            t = next_token(stream); // skip use
+            Path* path = parse_path(stream);
+            bool wildcard = false;
+            if (path->ends_in_double_colon) {
+                t = next_token(stream);
+                if (token_compare(t, "*", SNOWFLAKE)) wildcard = true;
+                else stream->peek = t;
+
+            }
+            t = next_token(stream);
+            if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
+            Import* imp = malloc(sizeof(Import));
+            imp->path = path;
+            imp->wildcard = wildcard;
+            imp->container = module;
+            list_append(&module->imports, imp);
         } else {
             unexpected_token(t);
         }

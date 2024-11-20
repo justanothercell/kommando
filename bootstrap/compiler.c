@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "compiler.h"
-#include "ast.h"
+
 #include "lib.h"
 LIB;
+#include "compiler.h"
+#include "ast.h"
 #include "module.h"
 #include "parser.h"
 #include "resolver.h"
@@ -196,11 +197,6 @@ void compile(CompilerOptions options) {
         insert_module(program, mod, sm.pub);
     }
 
-    Module* std = map_get(program->packages, "std");
-    map_foreach(intrinsics_types->items, lambda(void, str key, ModuleItem* item, {
-        map_put(std->items, key, item);
-    }));
-
     resolve(program);
 
     str code_file_name = to_str_writer(stream, fprintf(stream, "%s.c", options.outname));
@@ -219,5 +215,5 @@ void compile(CompilerOptions options) {
         info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Done!");
     }
 
-    report_cache();
+    report_item_cache_stats();
 }

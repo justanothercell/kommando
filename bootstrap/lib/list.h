@@ -86,6 +86,18 @@
     found1234567890; \
 })
 
+#define list_contains(list_ptr, item_var, predicate) ({ \
+    bool found1234567890 = false; \
+    for (usize i1234567890 = 0;i1234567890 < (list_ptr)->length;i1234567890++) { \
+        typeof(((list_ptr)->elements)) item_var = &(list_ptr)->elements[i1234567890]; \
+        if (predicate) { \
+            found1234567890 = true; \
+            break; \
+        } \
+    } \
+    found1234567890; \
+})
+
 #define list_pop(list_ptr) ({ \
     (list_ptr)->length -= 1; \
     (list_ptr)->elements[(list_ptr)->length]; \

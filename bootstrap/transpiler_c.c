@@ -6,6 +6,7 @@
 
 #include "lib.h"
 #include "lib/exit.h"
+#include "lib/str.h"
 LIB
 #include "transpiler_c.h"
 #include "ast.h"
@@ -138,7 +139,7 @@ str gen_c_var_name(Variable* v) {
     if (v->box->name == NULL && v->box->mi == NULL) panic("Compiler error: not a var or similar");
     if (v->box->name != NULL && v->box->mi != NULL) panic("Compiler error: both a var or similar");
     if (v->box->name != NULL) {
-        return to_str_writer(stream, fprintf(stream,"%s%llu", v->box->name, (usize)v->box));
+        return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, (usize)v->box));
     } else {
         switch (v->box->mi->type) {
             case MIT_FUNCTION: {
@@ -560,7 +561,9 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
 }
 
 void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, ModuleItemType type) {
+    log("Transpiling module %s [%s pass]", to_str_writer(s, fprint_path(s, module->path)), ModuleItemType__NAMES[type]);
     map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
+        if (item->module != module) return;
         switch (item->type) {
             case MIT_MODULE:
                 transpile_module(header_stream, code_stream, key, item->item, type);
@@ -569,6 +572,7 @@ void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module
                 if (type == MIT_FUNCTION) transpile_function(header_stream, code_stream, modkey, item->item);
                 break;
             case MIT_STRUCT:
+            log("s: %s", ((TypeDef*)item->item)->name->name);
                 if (type == MIT_STRUCT) transpile_typedef(header_stream, code_stream, modkey, item->item, true);
                 break;
             case MIT_ANY: 

@@ -112,6 +112,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     TokenStream* s = tokenstream_new("<generated>", prototype);
     FuncDef* fd = parse_function_definition(s);
     fd->body->yield_last = true;
+    fd->module = module;
     Expression* expr = malloc(sizeof(Expression));
     CIntrinsic* ci = malloc(sizeof(CIntrinsic));
     ci->var_bindings = var_bindings;
@@ -125,14 +126,14 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     ModuleItem* mi = malloc(sizeof(ModuleItem));
     mi->item = fd;
     mi->type = MIT_FUNCTION;
-    fd->module = module;
+    mi->module = module;
     map_put(module->items, fd->name->name, mi);
 }
 
 Module* gen_intrinsics_types() {
     Module* module = malloc(sizeof(Module));
     module->path = gen_path("::intrinsics::types");
-    module->imports = list_new(PathList);
+    module->imports = list_new(ImportList);
     module->items = map_new();
     module->resolved = false;
     module->in_resolution = false;
@@ -166,6 +167,7 @@ Module* gen_intrinsics_types() {
     ModuleItem* ty_unit_mi = malloc(sizeof(ModuleItem));
     ty_unit_mi->item = ty_unit;
     ty_unit_mi->type = MIT_STRUCT;
+    ty_unit_mi->module = module;
     ty_unit->module = module;
     map_put(module->items, "unit", ty_unit_mi);
 
@@ -176,6 +178,7 @@ Module* gen_intrinsics_types() {
     ModuleItem* ty_ptr_mi = malloc(sizeof(ModuleItem));
     ty_ptr_mi->item = ty_ptr;
     ty_ptr_mi->type = MIT_STRUCT;
+    ty_ptr_mi->module = module;
     ty_ptr->module = module;
     map_put(module->items, "ptr", ty_ptr_mi);
 
@@ -185,7 +188,7 @@ Module* gen_intrinsics_types() {
 Module* gen_intrinsics() {
     Module* module = malloc(sizeof(Module));
     module->path = gen_path("::intrinsics");
-    module->imports = list_new(PathList);
+    module->imports = list_new(ImportList);
     module->items = map_new();
     module->resolved = false;
     module->in_resolution = false;

@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 Path* path_new(bool absolute, IdentList elements) {
     Path* path = malloc(sizeof(Path));
