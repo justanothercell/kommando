@@ -133,9 +133,9 @@ void compile(CompilerOptions options) {
 
     program->main_module = main;
 
-    insert_module(program, main, true);
-    insert_module(program, intrinsics, true);
-    insert_module(program, intrinsics_types, true);
+    insert_module(program, main, V_PUBLIC);
+    insert_module(program, intrinsics, V_PUBLIC);
+    insert_module(program, intrinsics_types, V_PUBLIC);
 
     list_foreach(&options.module_names, lambda(void, str modname, {
         str fp = map_get(options.modules, modname);
@@ -148,14 +148,14 @@ void compile(CompilerOptions options) {
         if (!modpath->absolute) panic("Library path must be absolute: expected path to look like ::foo, not %s", modpath);
         Module* mod = parse_module_contents(s, modpath);
         mod->filepath = file;
-        insert_module(program, mod, true);
+        insert_module(program, mod, V_PUBLIC);
     }));
 
     typedef struct Submodule {
         Path* current;
         str parentfile;
         Identifier* mod;
-        bool pub;
+        Visibility vis;
     } Submodule;
     LIST(SubList, Submodule);
     SubList sublist = list_new(SubList);
@@ -165,7 +165,7 @@ void compile(CompilerOptions options) {
             if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, item->path)));
             if (item->filepath == NULL) spanned_error("Synthetic", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
                     to_str_writer(s, fprint_path(s, item->path)), m->name->name);
-            Submodule sm = (Submodule){ .current = item->path, .parentfile=item->filepath, .mod = m->name, .pub = m->pub};
+            Submodule sm = (Submodule){ .current = item->path, .parentfile=item->filepath, .mod = m->name, .vis = m->vis};
             list_append(&sublist, sm);
         });}));
     }));
@@ -194,7 +194,7 @@ void compile(CompilerOptions options) {
         Module* mod = parse_module_contents(s, modpath);
         mod->name = sm.mod;
         mod->filepath = file;
-        insert_module(program, mod, sm.pub);
+        insert_module(program, mod, sm.vis);
     }
 
     resolve(program);

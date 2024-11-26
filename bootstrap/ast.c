@@ -1,7 +1,6 @@
 #include "ast.h"
 #include "lib.h"
-#include "lib/list.h"
-#include "token.h"
+LIB;
 #include "module.h"
 
 #include <stdbool.h>
@@ -11,7 +10,10 @@
 Path* path_new(bool absolute, IdentList elements) {
     Path* path = malloc(sizeof(Path));
     path->absolute = absolute;
-    path->elements = elements;
+    path->elements = list_new(IdentList);
+    list_foreach(&elements, lambda(void, Identifier* i, {
+        list_append(&path->elements, i);
+    }));
     return path;
 }
 

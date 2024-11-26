@@ -1,21 +1,21 @@
-struct Arena {
+pub struct Arena {
     page: std::ptr<Page>,
     page_size: std::usize
 }
 
-struct Page {
+pub struct Page {
     filled: std::usize,
     prev: std::ptr<Page>
 }
 
-fn arena_new() -> std::ptr<Arena> {
+pub fn arena_new() -> std::ptr<Arena> {
     let arena: _<Arena> = std::mem::malloc();
     (*arena).page = std::null();
     (*arena).page_size = c_api::getpagesize();
     arena
 }
 
-fn arena_clear(arena: std::ptr<Arena>) {
+pub fn arena_clear(arena: std::ptr<Arena>) {
     let page = (*arena).page;
     while (page != std::null()) {
         let prev_page = (*page).prev;
@@ -24,7 +24,7 @@ fn arena_clear(arena: std::ptr<Arena>) {
     }
 }
 
-fn arena_alloc<T>(arena: std::ptr<Arena>) -> std::ptr<T> {
+pub fn arena_alloc<T>(arena: std::ptr<Arena>) -> std::ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let align = intrinsics::alignof::<T>();
     let max_free = (*page).size - intrinsics::sizeof::<Page>();
@@ -47,12 +47,12 @@ fn arena_alloc<T>(arena: std::ptr<Arena>) -> std::ptr<T> {
     ptr
 }
 
-fn arena_free(arena: std::ptr<Arena>) {
+pub fn arena_free(arena: std::ptr<Arena>) {
     arena_clear(arena);
     std::mem::free(arena);
 }
 
-fn page_new(size: std::usize) -> std::ptr<Page> {
+pub fn page_new(size: std::usize) -> std::ptr<Page> {
     let buffer = c_api::alligned_alloc(size, size);
     if (buffer == NULL) {
         c_api::fprintf(intrinsics::stderr(), "Program is out of memory");

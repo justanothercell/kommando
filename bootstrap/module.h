@@ -16,9 +16,11 @@ ENUM(ModuleItemType,
 
 typedef struct ModuleItem {
     void* item;
+    Identifier* name;
     ModuleItemType type;
-    bool pub;
+    Visibility vis;
     Module* module;
+    struct ModuleItem* origin;
 } ModuleItem;
 
 LIST(MIList, ModuleItem*);
@@ -32,6 +34,8 @@ typedef struct Module {
     bool in_resolution;
     ModDefList subs;
     str filepath;
+    Module* parent;
+    Visibility vis;
 } Module;
 
 typedef struct Program {
@@ -39,7 +43,7 @@ typedef struct Program {
     Module* main_module;
 } Program;
 
-void insert_module(Program* program, Module* module, bool pub);
+void insert_module(Program* program, Module* module, Visibility vis);
 
 Module* gen_intrinsics();
 Module* gen_intrinsics_types();

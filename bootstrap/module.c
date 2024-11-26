@@ -9,11 +9,13 @@ LIB;
 #include "parser.h"
 #include "token.h"
 
-void insert_module(Program* program, Module* module, bool pub) {
+void insert_module(Program* program, Module* module, Visibility vis) {
+    module->vis = vis;
+    module->parent = NULL;
     Path* path = module->path;
     if (path->elements.length == 1) {
         Identifier* name = path->elements.elements[0];
-        if (!pub) spanned_error("Package must be public", name->span, "Cannot register package %s as private, this is probably a compiler error.", to_str_writer(s, fprint_path(s, path)));
+        if (vis != V_PUBLIC) spanned_error("Package must be public", name->span, "Cannot register package %s as %s, this is probably a compiler error.", to_str_writer(s, fprint_path(s, path)), Visibility__NAMES[vis]);
         if (map_put(program->packages, name->name, module) != NULL) spanned_error("Package already exists", name->span, "Cannot register package %s, it already exists.", to_str_writer(s, fprint_path(s, path)));
         return;
     }
@@ -36,25 +38,15 @@ void insert_module(Program* program, Module* module, bool pub) {
     item->type = MIT_MODULE;
     item->item = module;
     item->module = current;
+    item->origin = NULL;
+    item->vis = vis;
+    item->name = module->name;
     Identifier* name = path->elements.elements[i];
     
+    module->parent = current;
     ModuleItem* old = map_put(current->items, name->name, item);
     if (old != NULL) {
-        Span span;
-        switch (old->type) {
-            case MIT_FUNCTION:
-                span = ((FuncDef*)old->item)->name->span;
-                break;
-            case MIT_STRUCT:
-                span = ((TypeDef*)old->item)->name->span;
-                break;
-            case MIT_MODULE:
-                span = ((Module*)old->item)->name->span;
-                break;
-            case MIT_ANY: 
-                unreachable();
-        }
-        spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &span)));
+        spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
     }
 }
 
@@ -99,11 +91,14 @@ TypeDef* gen_simple_type(str name) {
 void register_extern_type(Module* module, str name, str extern_ref) {
     TypeDef* ty = gen_simple_type(name);
     ty->extern_ref = extern_ref;
+    ty->module = module;
     ModuleItem* ty_mi = malloc(sizeof(ModuleItem));
     ty_mi->item = ty;
     ty_mi->type = MIT_STRUCT;
-    ty_mi->pub = true;
+    ty_mi->vis = V_PUBLIC;
     ty_mi->module = module;
+    ty_mi->origin = NULL;
+    ty_mi->name = ty->name;
     ty->module = module;
     map_put(module->items, name, ty_mi);
 }
@@ -127,6 +122,9 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     mi->item = fd;
     mi->type = MIT_FUNCTION;
     mi->module = module;
+    mi->origin = NULL;
+    mi->vis = V_PUBLIC;
+    mi->name = fd->name;
     map_put(module->items, fd->name->name, mi);
 }
 
@@ -139,6 +137,7 @@ Module* gen_intrinsics_types() {
     module->in_resolution = false;
     module->filepath = NULL;
     module->subs = list_new(ModDefList);
+    module->name = module->path->elements.elements[module->path->elements.length-1];
 
     register_extern_type(module, "bool", "bool");
     register_extern_type(module, "opaque_ptr", "void*");
@@ -163,24 +162,34 @@ Module* gen_intrinsics_types() {
     register_extern_type(module, "f32", "float");
     register_extern_type(module, "f64", "double");
 
-    TypeDef* ty_unit = gen_simple_type("unit");
-    ModuleItem* ty_unit_mi = malloc(sizeof(ModuleItem));
-    ty_unit_mi->item = ty_unit;
-    ty_unit_mi->type = MIT_STRUCT;
-    ty_unit_mi->module = module;
-    ty_unit->module = module;
-    map_put(module->items, "unit", ty_unit_mi);
+    {
+        TypeDef* ty_unit = gen_simple_type("unit");
+        ModuleItem* ty_unit_mi = malloc(sizeof(ModuleItem));
+        ty_unit_mi->item = ty_unit;
+        ty_unit_mi->type = MIT_STRUCT;
+        ty_unit_mi->module = module;
+        ty_unit_mi->origin = NULL;
+        ty_unit_mi->vis = V_PUBLIC;
+        ty_unit_mi->name = ty_unit->name;
+        ty_unit->module = module;
+        map_put(module->items, "unit", ty_unit_mi);
+    }
 
-    TypeDef* ty_ptr = gen_simple_type("ptr");
-    TokenStream* ty_ptr_gs = tokenstream_new("<generated>", "<T> ");
-    ty_ptr->generics = parse_generic_keys(ty_ptr_gs);
-    ty_ptr->extern_ref = "void*";
-    ModuleItem* ty_ptr_mi = malloc(sizeof(ModuleItem));
-    ty_ptr_mi->item = ty_ptr;
-    ty_ptr_mi->type = MIT_STRUCT;
-    ty_ptr_mi->module = module;
-    ty_ptr->module = module;
-    map_put(module->items, "ptr", ty_ptr_mi);
+    {   
+        TypeDef* ty_ptr = gen_simple_type("ptr");
+        TokenStream* ty_ptr_gs = tokenstream_new("<generated>", "<T> ");
+        ty_ptr->generics = parse_generic_keys(ty_ptr_gs);
+        ty_ptr->extern_ref = "void*";
+        ModuleItem* ty_ptr_mi = malloc(sizeof(ModuleItem));
+        ty_ptr_mi->item = ty_ptr;
+        ty_ptr_mi->type = MIT_STRUCT;
+        ty_ptr_mi->module = module;
+        ty_ptr_mi->origin = NULL;
+        ty_ptr_mi->vis = V_PUBLIC;
+        ty_ptr_mi->name = ty_ptr->name;
+        ty_ptr->module = module;
+        map_put(module->items, "ptr", ty_ptr_mi);
+    }
 
     return module;
 }
@@ -194,6 +203,7 @@ Module* gen_intrinsics() {
     module->in_resolution = false;
     module->filepath = NULL;
     module->subs = list_new(ModDefList);
+    module->name = module->path->elements.elements[module->path->elements.length-1];
 
     {
         Map* var_bindings = map_new();

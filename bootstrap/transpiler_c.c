@@ -563,7 +563,7 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
 void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, ModuleItemType type) {
     log("Transpiling module %s [%s pass]", to_str_writer(s, fprint_path(s, module->path)), ModuleItemType__NAMES[type]);
     map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
-        if (item->module != module) return;
+        if (item->origin != NULL) return; // we are an imported item!
         switch (item->type) {
             case MIT_MODULE:
                 transpile_module(header_stream, code_stream, key, item->item, type);

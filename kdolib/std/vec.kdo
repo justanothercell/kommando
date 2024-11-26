@@ -1,10 +1,10 @@
-struct Vec<T> {
+pub struct Vec<T> {
     length: std::usize,
     capacity: std::usize,
     buffer: std::ptr<T>
 }
 
-fn vec_new<T>() -> Vec<T> {
+pub fn vec_new<T>() -> Vec<T> {
     _ {
         length: 0,
         capacity: 1,
@@ -20,22 +20,22 @@ fn vec_reserve_armortized<T>(v: std::ptr<Vec<T>>, size: std::usize) {
     (*v).buffer = std::mem::arr_resize((*v).buffer, (*v).capacity);
 }
 
-fn vec_push<T>(v: std::ptr<Vec<T>>, item: T) {
+pub fn vec_push<T>(v: std::ptr<Vec<T>>, item: T) {
     vec_reserve_armortized(v, (*v).length + 1);
     *std::mem::arr_offset((*v).buffer, (*v).length) = item;
     (*v).length = (*v).length + 1;
 }
 
-fn vec_get<T>(v: std::ptr<Vec<T>>, i: std::usize) -> T {
+pub fn vec_get<T>(v: std::ptr<Vec<T>>, i: std::usize) -> T {
     //*std::mem::arr_offset((*v).buffer, i)
     *vec_get_ref(v, i)
 }
 
-fn vec_get_ref<T>(v: std::ptr<Vec<T>>, i: std::usize) -> std::ptr<T> {
+pub fn vec_get_ref<T>(v: std::ptr<Vec<T>>, i: std::usize) -> std::ptr<T> {
     std::mem::arr_offset((*v).buffer, i)
 }
 
-fn vec_pop<T>(v: std::ptr<Vec<T>>) -> T {
+pub fn vec_pop<T>(v: std::ptr<Vec<T>>) -> T {
     if (*v).length > 0 {
         (*v).length = (*v).length - 1;
         *std::mem::arr_offset((*v).buffer, (*v).length)

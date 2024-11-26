@@ -4,10 +4,6 @@
 #include <time.h>
 
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/list.h"
-#include "lib/map.h"
 #include "lib/str.h"
 LIB
 #include "resolver.h"
@@ -75,8 +71,9 @@ str gvals_to_c_key(GenericValues* generics) {
 }
 void resovle_imports(Program* program, Module* module, List* mask);
 static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
+    Module* context_module = module;
     Identifier* name = path->elements.elements[path->elements.length-1];
-    
+    ModuleItem* result;
     usize i = 0;
     Identifier* m = path->elements.elements[0];
     ModuleItem* mod = NULL;
@@ -85,7 +82,8 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
         if (mod->type == MIT_MODULE && during_imports_mask != NULL) resovle_imports(program, mod->item, during_imports_mask);
         if (path->elements.length == 1) {
             if (kind != MIT_ANY) if (mod->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[mod->type], ModuleItemType__NAMES[kind]);
-            return mod;
+            result = mod;
+            goto check_vis;
         }
         if (mod->type != MIT_MODULE) spanned_error("Is not a module", m->span, "Item %s is of type %s, expected it to be a module", m->name, ModuleItemType__NAMES[mod->type]);
         module = mod->item;
@@ -99,9 +97,10 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
                 mod = malloc(sizeof(ModuleItem));
                 mod->item = package;
                 mod->type = MIT_MODULE;
-                mod->pub = true;
+                mod->vis = V_PUBLIC; // all packages are public,otherwise they'd be useless
                 mod->module = NULL;
-                return mod;
+                result = mod;
+                goto check_vis;
             }
             i += 1;
             module = package;
@@ -121,7 +120,34 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
     ModuleItem* it = map_get(module->items, name->name);
     if (it == NULL) spanned_error("No such item", name->span, "%s %s does not exist.", ModuleItemType__NAMES[kind], name->name);
     if (kind != MIT_ANY) if (it->type != kind) spanned_error("Itemtype mismatch", name->span, "Item %s is of type %s, expected it to be %s", name->name, ModuleItemType__NAMES[it->type], ModuleItemType__NAMES[kind]);
-    return it;
+    result = it;
+    
+    check_vis: {
+        Module* mod_root = context_module;
+        Module* result_root = result->module;
+        if (result_root == NULL) return result; // skip checking, root modules are always public
+        while (mod_root->parent != NULL) mod_root = mod_root->parent;
+        while (result_root->parent != NULL) result_root = result_root->parent;
+        Visibility required = V_PRIVATE;
+        if (context_module != result->module) required = V_LOCAL;
+        if (mod_root != result_root) required = V_PUBLIC;
+        if (result->vis < required) spanned_error("Lacking visibility", path->elements.elements[0]->span, "Cannot get item %s::%s while in %s as this would require it having a visibility of %s,\nbut %s was only declared as %s",
+                                            to_str_writer(s, fprint_path(s, result->module->path)), result->name->name, to_str_writer(s, fprint_path(s, context_module->path)), Visibility__NAMES[required], result->name->name, Visibility__NAMES[result->vis]);
+        Module* res_tree = result->module;
+        while (res_tree != NULL) {
+            Module* ctx_tree = context_module;
+            while (ctx_tree != NULL) { // wasteful but shush
+                if (ctx_tree == res_tree) goto done_checking_tree;
+                ctx_tree = ctx_tree->parent;
+            }
+            if (res_tree->vis < required) spanned_error("Lacking visibility", path->elements.elements[0]->span, "Cannot get item %s::%s while in %s as this would require the ancestor module %s to have a visibility of %s,\nbut %s was only declared as %s",
+                                            to_str_writer(s, fprint_path(s, result->module->path)), result->name->name, to_str_writer(s, fprint_span(s, &result->module->path->elements.elements[0]->span)), Visibility__NAMES[required], to_str_writer(s, fprint_path(s, context_module->path)), to_str_writer(s, fprint_path(s, res_tree->path)), ctx_tree->name->name, to_str_writer(s, fprint_span(s, &result->name->span)), Visibility__NAMES[res_tree->vis]);
+            res_tree = res_tree->parent;
+        }
+        done_checking_tree: {}
+    }
+    
+    return result;
 }
 
 void register_item(GenericValues* item_values, GenericKeys* gkeys) {
@@ -202,8 +228,9 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
         item_cache_misses += 1;
     }
 #ifdef DEBUG_CACHE
+    {
         FILE* cachelog = NULL;
-        if (hits + misses == 1) {
+        if (item_cache_hits + item_cache_misses == 1) {
             cachelog = fopen("CACHELOG.txt", "w");
         } else {
             cachelog = fopen("CACHELOG.txt", "a");
@@ -564,7 +591,6 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_FUNC_CALL: {
             FuncCall* fc = expr->expr;
-
             FuncDef* fd = resolve_item(program, func->module, fc->name, MIT_FUNCTION, func->generics, type_generics, &fc->generics);
             // preresolve return
             TypeValue* pre_ret = replace_generic(fd->return_type, fc->generics);
@@ -930,6 +956,7 @@ void resolve_typedef(Program* program, TypeDef* ty) {
     }));
 }
 
+// ive missed this typo so often that now its become intentional
 void resovle_imports(Program* program, Module* module, List* mask) {
     if (mask == NULL) {
         mask = malloc(sizeof(List));
@@ -941,96 +968,56 @@ void resovle_imports(Program* program, Module* module, List* mask) {
     list_foreach(&module->imports, lambda(void, Import* import, {
         if (import->wildcard) {
             Module* container = resolve_item_raw(program, import->container, import->path, MIT_MODULE, mask)->item;
-            log("star import container '%s' resolved from %s", container->name->name, to_str_writer(s, fprint_path(s, import->path)));
-            log("   pathed %s", to_str_writer(s, fprint_path(s, container->path)));
-            log("   with this = %s", to_str_writer(s, fprint_path(s, import->container->path)));
             map_foreach(container->items, lambda(void, str key, ModuleItem* item, {
-                log("star import %s", key);
-                Identifier* name = NULL;
-                switch (item->type) {
-                    case MIT_STRUCT:
-                        name = ((TypeDef*)item->item)->name;
-                        break;
-                    case MIT_FUNCTION:
-                        name = ((FuncDef*)item->item)->name;
-                        break;
-                    case MIT_MODULE:
-                        name = ((Module*)item->item)->name;
-                        break;
-                    default:
-                        unreachable();
-                }
+                UNUSED(key);
+                if (item->vis < import->vis) return; // cant re-export with this visibility
+
+                Visibility required = V_PRIVATE;
+                if (item->module != import->container) required = V_LOCAL; // diferent module
+                Module* item_root = item->module;
+                Module* container_root = import->container;
+                while (item_root->parent != NULL) item_root = item_root->parent;
+                while (container_root->parent != NULL) container_root = container_root->parent;
+                if (container_root != item_root) required = V_PUBLIC; // different package
+
+                if (item->vis < required) return; // cant import due to visibility. need to check manually here due to the star import
+
                 ModuleItem* imported = malloc(sizeof(ModuleItem));
-                imported->pub = item->pub;
+                imported->vis = import->vis;
                 imported->type = item->type;
-                imported->module = item->module;
+                imported->module = import->container;
+                imported->origin = item;
                 imported->item = item->item;
-                if (map_contains(module->items, name->name)) {
-                    ModuleItem* orig = map_get(module->items, name->name);
+                imported->name = item->name;
+                
+                if (map_contains(module->items, item->name->name)) {
+                    ModuleItem* orig = map_get(module->items, item->name->name);
                     if (orig->item == imported->item) return;
-                    Identifier* origname = NULL;
-                    switch (orig->type) {
-                        case MIT_STRUCT:
-                            origname = ((TypeDef*)item->item)->name;
-                            break;
-                        case MIT_FUNCTION:
-                            origname = ((FuncDef*)item->item)->name;
-                            break;
-                        case MIT_MODULE:
-                            origname = ((Module*)item->item)->name;
-                            break;
-                        default:
-                            unreachable();
-                    }
-                    spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", name->name, 
-                                                                    TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &origname->span)),
-                                                                    TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &name->span)));
+                    spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", item->name->name, 
+                                                                    TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
+                                                                    TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->name->span)));
                 }
-                map_put(module->items, name->name, imported);
+                map_put(module->items, item->name->name, imported);
             }));
         } else {
             ModuleItem* item = resolve_item_raw(program, import->container, import->path, MIT_ANY, mask);
-            Identifier* name = NULL;
-            switch (item->type) {
-                case MIT_STRUCT:
-                    name = ((TypeDef*)item->item)->name;
-                    break;
-                case MIT_FUNCTION:
-                    name = ((FuncDef*)item->item)->name;
-                    break;
-                case MIT_MODULE:
-                    name = ((Module*)item->item)->name;
-                    break;
-                default:
-                    unreachable();
-            }
+            if (item->vis < import->vis) spanned_error("", import->path->elements.elements[0]->span, "Cannot reexport %s @ %s as %s while it is only declared as %s",
+                    item->name->name, to_str_writer(s, fprint_span(s, &item->name->span)), Visibility__NAMES[import->vis], Visibility__NAMES[item->vis]);
             ModuleItem* imported = malloc(sizeof(ModuleItem));
-            imported->pub = item->pub;
+            imported->vis = import->vis;
             imported->type = item->type;
-            imported->module = item->module;
+            imported->module = import->container;
+            imported->origin = item;
             imported->item = item->item;
-            if (map_contains(module->items, name->name)) {
-                ModuleItem* orig = map_get(module->items, name->name);
+            imported->name = item->name;
+            if (map_contains(module->items, item->name->name)) {
+                ModuleItem* orig = map_get(module->items, item->name->name);
                 if (orig->item == imported->item) return;
-                Identifier* origname = NULL;
-                switch (orig->type) {
-                    case MIT_STRUCT:
-                        origname = ((TypeDef*)item->item)->name;
-                        break;
-                    case MIT_FUNCTION:
-                        origname = ((FuncDef*)item->item)->name;
-                        break;
-                    case MIT_MODULE:
-                        origname = ((Module*)item->item)->name;
-                        break;
-                    default:
-                        unreachable();
-                }
-                spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", name->name, 
-                                                                TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &origname->span)),
-                                                                TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &name->span)));
+                spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", item->name->name, 
+                                                                TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
+                                                                TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->name->span)));
             }
-            map_put(module->items, name->name, imported);
+            map_put(module->items, item->name->name, imported);
         }
     }));
 }

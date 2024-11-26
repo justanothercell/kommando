@@ -1,5 +1,5 @@
-fn getline(out_line: std::ptr<std::c_const_str_ptr>, out_size: std::ptr<std::usize>, stream: std::opaque_ptr) -> std::i32;
-fn input(message: std::c_const_str_ptr) -> std::c_const_str_ptr {
+pub fn getline(out_line: std::ptr<std::c_const_str_ptr>, out_size: std::ptr<std::usize>, stream: std::opaque_ptr) -> std::i32;
+pub fn input(message: std::c_const_str_ptr) -> std::c_const_str_ptr {
     c_api::printf("%s", message);
     c_api::fflush(stdout());
     let out_line: std::c_const_str_ptr = c_api::nullstr();
@@ -11,14 +11,14 @@ fn input(message: std::c_const_str_ptr) -> std::c_const_str_ptr {
 }
 
 
-fn stdin() -> std::opaque_ptr {
+pub fn stdin() -> std::opaque_ptr {
     intrinsics::c_value_of_symbol::<std::symbols::stdin, _>()
 }
 
-fn stdout() -> std::opaque_ptr {
+pub fn stdout() -> std::opaque_ptr {
     intrinsics::c_value_of_symbol::<std::symbols::stdout, _>()
 }
 
-fn stderr() -> std::opaque_ptr {
+pub fn stderr() -> std::opaque_ptr {
     intrinsics::c_value_of_symbol::<std::symbols::stderr, _>()
 }

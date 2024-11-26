@@ -1,6 +1,6 @@
 pub mod arena;
 
-fn malloc<T>() -> std::ptr<T> {
+pub fn malloc<T>() -> std::ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
     if (raw_ptr == c_api::null()) {
@@ -10,18 +10,18 @@ fn malloc<T>() -> std::ptr<T> {
     std::typecast(raw_ptr)
 }
 
-fn new_uninit<T>() -> T {
+pub fn new_uninit<T>() -> T {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
     *std::typecast(raw_ptr)
 }
 
-fn free<T>(ptr: std::ptr<T>) {
+pub fn free<T>(ptr: std::ptr<T>) {
     let raw_ptr = to_raw(ptr);
     c_api::free(raw_ptr);
 }
 
-fn arr_malloc<T>(n: std::usize) -> std::ptr<T> {
+pub fn arr_malloc<T>(n: std::usize) -> std::ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
     if (raw_ptr == c_api::null()) {
@@ -31,7 +31,7 @@ fn arr_malloc<T>(n: std::usize) -> std::ptr<T> {
     std::typecast(raw_ptr)
 }
 
-fn arr_resize<T>(arr: std::ptr<T>, n: std::usize) -> std::ptr<T> {
+pub fn arr_resize<T>(arr: std::ptr<T>, n: std::usize) -> std::ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = to_raw(arr);
     raw_ptr = c_api::realloc(raw_ptr, size * n);
@@ -42,16 +42,16 @@ fn arr_resize<T>(arr: std::ptr<T>, n: std::usize) -> std::ptr<T> {
     std::typecast(raw_ptr)
 }
 
-fn arr_offset<T>(arr: std::ptr<T>, i: std::usize) -> std::ptr<T> {
+pub fn arr_offset<T>(arr: std::ptr<T>, i: std::usize) -> std::ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let usize_ptr = std::typecast::<_, std::usize>(arr);
     std::typecast(usize_ptr + std::typecast(size * i))
 }
 
-fn null<T>() -> std::ptr<T> {
+pub fn null<T>() -> std::ptr<T> {
     std::typecast(0usize)
 }
 
-fn to_raw<T>(ptr: std::ptr<T>) -> std::opaque_ptr {
+pub fn to_raw<T>(ptr: std::ptr<T>) -> std::opaque_ptr {
     std::typecast(ptr)
 }

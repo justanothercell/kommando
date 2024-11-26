@@ -1,10 +1,7 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/list.h"
-#include "lib/str.h"
+LIB;
 #include "module.h"
 #include "token.h"
 #include <stdbool.h>
@@ -73,15 +70,21 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
     module->resolved = false;
     module->in_resolution = false;
     module->filepath = NULL;
+    module->name = path->elements.elements[path->elements.length-1];
     module->subs = list_new(ModDefList);
 
     while (has_next(stream)) {
         Token* t = next_token(stream);
         stream->peek = t;
 
-        bool pub = false;
+        Visibility vis = V_PRIVATE;
         if (token_compare(t, "pub", IDENTIFIER)) {
-            pub = true;
+            vis = V_PUBLIC;
+            t = next_token(stream); // skip peek 
+            t = next_token(stream); // setting new peek
+            stream->peek = t;
+        } else if (token_compare(t, "loc", IDENTIFIER)) {
+            vis = V_LOCAL;
             t = next_token(stream); // skip peek 
             t = next_token(stream); // setting new peek
             stream->peek = t;
@@ -92,25 +95,13 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->item = function;
             mi->type = MIT_FUNCTION;
             mi->module = module;
-            mi->pub = pub;
+            mi->origin = NULL;
+            mi->vis = vis;
+            mi->name = function->name;
             function->module = module;
             ModuleItem* old = map_put(module->items, function->name->name, mi);
             if (old != NULL) {
-                Span span;
-                switch (old->type) {
-                    case MIT_FUNCTION:
-                       span = ((FuncDef*)old->item)->name->span;
-                       break;
-                    case MIT_STRUCT:
-                       span = ((TypeDef*)old->item)->name->span;
-                       break;
-                    case MIT_MODULE:
-                       span = ((Module*)old->item)->name->span;
-                       break;
-                    case MIT_ANY: 
-                        unreachable();
-                }
-                spanned_error("Name conflict", function->name->span, "Name %s is already defined in this scope at %s", function->name->name, to_str_writer(s, fprint_span(s, &span)));
+                spanned_error("Name conflict", function->name->span, "Name %s is already defined in this scope at %s", function->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
             }
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
@@ -118,25 +109,13 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->item = type;
             mi->type = MIT_STRUCT;
             mi->module = module;
-            mi->pub = pub;
+            mi->origin = NULL;
+            mi->vis = vis;
+            mi->name = type->name;
             type->module = module;
             ModuleItem* old = map_put(module->items, type->name->name, mi);
             if (old != NULL) {
-                Span span;
-                switch (old->type) {
-                    case MIT_FUNCTION:
-                       span = ((FuncDef*)old->item)->name->span;
-                       break;
-                    case MIT_STRUCT:
-                       span = ((TypeDef*)old->item)->name->span;
-                       break;
-                    case MIT_MODULE:
-                       span = ((Module*)old->item)->name->span;
-                       break;
-                    case MIT_ANY: 
-                        unreachable();
-                }
-                spanned_error("Name conflict", type->name->span, "Name %s is already defined in this scope at %s", type->name->name, to_str_writer(s, fprint_span(s, &span)));
+                spanned_error("Name conflict", type->name->span, "Name %s is already defined in this scope at %s", type->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
             }
         } else if (token_compare(t, "mod", IDENTIFIER)) {
             t = next_token(stream); // skip mod
@@ -145,7 +124,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
             ModDef* mod = malloc(sizeof(ModDef));
             mod->name = name;
-            mod->pub = pub;
+            mod->vis = vis;
             list_append(&module->subs, mod);
         } else if (token_compare(t, "use", IDENTIFIER)) {
             t = next_token(stream); // skip use
@@ -163,6 +142,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             imp->path = path;
             imp->wildcard = wildcard;
             imp->container = module;
+            imp->vis = vis;
             list_append(&module->imports, imp);
         } else {
             unexpected_token(t);

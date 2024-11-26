@@ -188,14 +188,21 @@ typedef struct FuncDef {
     bool head_resolved;
 } FuncDef;
 
+ENUM(Visibility,
+    V_PRIVATE,
+    V_LOCAL,
+    V_PUBLIC,
+);
+
 typedef struct Import {
     Path* path;
     Module* container;
+    Visibility vis;
     bool wildcard;
 } Import;
 
 typedef struct ModDef {
-    bool pub;
+    Visibility vis;
     Identifier* name;
 } ModDef;
 LIST(ModDefList, ModDef*);

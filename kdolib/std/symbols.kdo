@@ -1,5 +1,5 @@
-struct __global_argc {}
-struct __global_argv {}
-struct stdin {}
-struct stdout {}
-struct stderr {}
+loc struct __global_argc {}
+loc struct __global_argv {}
+loc struct stdin {}
+loc struct stdout {}
+loc struct stderr {}
