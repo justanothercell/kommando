@@ -1,0 +1,28 @@
+use std::*;
+use c_api::printf;
+use intrinsics::typename;
+
+use std::mem::swap as exchange;
+
+struct Foo {
+
+}
+
+use Foo as Bar;
+use Bar as Baz;
+
+fn main() {
+    let a = 4;
+    let b = 5;
+    exchange(&a, &b);
+
+    printf("a = %ld, b = %ld\n", a, b);
+
+    let f: Foo = _ {};
+    let b: Bar = _ {};
+    let b: Baz = _ {};
+
+    printf("Foo is %s\n", typename::<Foo>());
+    printf("Bar is %s\n", typename::<Bar>());
+    printf("Baz is %s\n", typename::<Baz>());
+}

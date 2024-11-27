@@ -197,6 +197,7 @@ ENUM(Visibility,
 typedef struct Import {
     Path* path;
     Module* container;
+    Identifier* alias;
     Visibility vis;
     bool wildcard;
 } Import;

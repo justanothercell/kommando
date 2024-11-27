@@ -130,11 +130,18 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             t = next_token(stream); // skip use
             Path* path = parse_path(stream);
             bool wildcard = false;
+            Identifier* alias = NULL;
             if (path->ends_in_double_colon) {
                 t = next_token(stream);
                 if (token_compare(t, "*", SNOWFLAKE)) wildcard = true;
                 else stream->peek = t;
-
+            } else {
+                t = next_token(stream);
+                if (token_compare(t, "as", IDENTIFIER)) {
+                    alias = parse_identifier(stream);
+                } else {
+                    stream->peek = t;
+                }
             }
             t = next_token(stream);
             if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
@@ -143,6 +150,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             imp->wildcard = wildcard;
             imp->container = module;
             imp->vis = vis;
+            imp->alias = alias;
             list_append(&module->imports, imp);
         } else {
             unexpected_token(t);

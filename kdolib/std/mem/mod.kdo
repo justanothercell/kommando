@@ -1,57 +1,65 @@
 pub mod arena;
 
-pub fn malloc<T>() -> std::ptr<T> {
+use std::*;
+
+pub fn malloc<T>() -> ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
     if (raw_ptr == c_api::null()) {
-        c_api::fprintf(std::io::stderr(), "Program is out of memory");
+        c_api::fprintf(io::stderr(), "Program is out of memory");
         c_api::exit(1);
     };
-    std::typecast(raw_ptr)
+    typecast(raw_ptr)
 }
 
 pub fn new_uninit<T>() -> T {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
-    *std::typecast(raw_ptr)
+    *typecast(raw_ptr)
 }
 
-pub fn free<T>(ptr: std::ptr<T>) {
+pub fn free<T>(ptr: ptr<T>) {
     let raw_ptr = to_raw(ptr);
     c_api::free(raw_ptr);
 }
 
-pub fn arr_malloc<T>(n: std::usize) -> std::ptr<T> {
+pub fn arr_malloc<T>(n: usize) -> ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
     if (raw_ptr == c_api::null()) {
-        c_api::fprintf(std::io::stderr(), "Program is out of memory");
+        c_api::fprintf(io::stderr(), "Program is out of memory");
         c_api::exit(1);
     };
-    std::typecast(raw_ptr)
+    typecast(raw_ptr)
 }
 
-pub fn arr_resize<T>(arr: std::ptr<T>, n: std::usize) -> std::ptr<T> {
+pub fn arr_resize<T>(arr: ptr<T>, n: usize) -> ptr<T> {
     let size = intrinsics::sizeof::<T>();
     let raw_ptr = to_raw(arr);
     raw_ptr = c_api::realloc(raw_ptr, size * n);
     if (raw_ptr == c_api::null()) {
-        c_api::fprintf(std::io::stderr(), "Program is out of memory");
+        c_api::fprintf(io::stderr(), "Program is out of memory");
         c_api::exit(1);
     };
-    std::typecast(raw_ptr)
+    typecast(raw_ptr)
 }
 
-pub fn arr_offset<T>(arr: std::ptr<T>, i: std::usize) -> std::ptr<T> {
+pub fn arr_offset<T>(arr: ptr<T>, i: usize) -> ptr<T> {
     let size = intrinsics::sizeof::<T>();
-    let usize_ptr = std::typecast::<_, std::usize>(arr);
-    std::typecast(usize_ptr + std::typecast(size * i))
+    let usize_ptr = typecast::<_, usize>(arr);
+    typecast(usize_ptr + typecast(size * i))
 }
 
-pub fn null<T>() -> std::ptr<T> {
-    std::typecast(0usize)
+pub fn null<T>() -> ptr<T> {
+    typecast(0usize)
 }
 
-pub fn to_raw<T>(ptr: std::ptr<T>) -> std::opaque_ptr {
-    std::typecast(ptr)
+pub fn to_raw<T>(ptr: ptr<T>) -> opaque_ptr {
+    typecast(ptr)
+}
+
+pub fn swap<T>(p1: ptr<T>, p2: ptr<T>) {
+    let temp = *p1;
+    *p1 = *p2;
+    *p2 = temp;
 }

@@ -4,7 +4,7 @@
 #include <time.h>
 
 #include "lib.h"
-#include "lib/str.h"
+#include "lib/exit.h"
 LIB
 #include "resolver.h"
 #include "ast.h"
@@ -69,6 +69,7 @@ str gvals_to_key(GenericValues* generics) {
 str gvals_to_c_key(GenericValues* generics) {
     return __gvals_to_key(generics, true);
 }
+
 void resovle_imports(Program* program, Module* module, List* mask);
 static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
     Module* context_module = module;
@@ -967,6 +968,7 @@ void resovle_imports(Program* program, Module* module, List* mask) {
 
     list_foreach(&module->imports, lambda(void, Import* import, {
         if (import->wildcard) {
+            if (import->alias != NULL) unreachable("`use path::* as foo;` ... what is that supposed ot mean? Compiler error (probably)!");
             Module* container = resolve_item_raw(program, import->container, import->path, MIT_MODULE, mask)->item;
             map_foreach(container->items, lambda(void, str key, ModuleItem* item, {
                 UNUSED(key);
@@ -1010,14 +1012,16 @@ void resovle_imports(Program* program, Module* module, List* mask) {
             imported->origin = item;
             imported->item = item->item;
             imported->name = item->name;
-            if (map_contains(module->items, item->name->name)) {
-                ModuleItem* orig = map_get(module->items, item->name->name);
+            Identifier* oname = item->name;
+            if (import->alias != NULL) oname = import->alias;
+            if (map_contains(module->items, oname->name)) {
+                ModuleItem* orig = map_get(module->items, oname->name);
                 if (orig->item == imported->item) return;
-                spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", item->name->name, 
-                                                                TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
-                                                                TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->name->span)));
+                spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", oname->name, 
+                                                                ModuleItemType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
+                                                                ModuleItemType__NAMES[item->type], to_str_writer(s, fprint_span(s, &oname->span)));
             }
-            map_put(module->items, item->name->name, imported);
+            map_put(module->items, oname->name, imported);
         }
     }));
 }
@@ -1030,8 +1034,7 @@ void resolve_module_imports(Program* program, Module* module) {
         UNUSED(key);
         switch (item->type) {
             case MIT_MODULE: {
-                Module* mod = item->item;
-                resolve_module_imports(program, mod);
+                if (item->origin == NULL) resolve_module_imports(program, item->item);
             } break;
             default: 
                 break;
