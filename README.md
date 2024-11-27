@@ -29,3 +29,13 @@ make cr file=examples/hello
 Note that this is meant to be compiled with gcc and uses certain gnu compiler extensions. There exists a [./bootstrap/.clangd](./bootstrap/.clangd) file,
 but that is only to fix VSCode errors/hints. Specifically, the defined macro `__INTELLISENSE__` temporarily removes inline functions from
 the `lambda` macro in [./bootstrap/lib/defines.h](./bootstrap/lib/defines.h) and as such cannot be used for compilation.
+
+## Roadmap to Beta 0.1.0
+1. [ ] static global variables
+2. [ ] rustish enums with primitive match expression
+3. [ ] struct methods
+4. [ ] traits with static dispatch (depends on: 3)
+5. [ ] Copy, Clone and Drop (depends on 3, 4)
+6. [ ] operator overloading using traits (depends on 3, 4)
+7. [ ] index[] operator (overloaded) (depends on 3, 4, 6)
+8. [ ] decorators (on structs and functions at least) for compile time directives
