@@ -10,6 +10,7 @@ LIST(ImportList, Import*);
 ENUM(ModuleItemType,
     MIT_FUNCTION,
     MIT_STRUCT,
+    MIT_STATIC,
     MIT_MODULE,
     MIT_ANY
 );
