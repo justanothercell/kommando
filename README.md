@@ -39,3 +39,4 @@ the `lambda` macro in [./bootstrap/lib/defines.h](./bootstrap/lib/defines.h) and
 6. [ ] operator overloading using traits (depends on 3, 4)
 7. [ ] index[] operator (overloaded) (depends on 3, 4, 6)
 8. [ ] decorators (on structs and functions at least) for compile time directives
+9. [ ] mutability
