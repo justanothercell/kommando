@@ -31,7 +31,7 @@ but that is only to fix VSCode errors/hints. Specifically, the defined macro `__
 the `lambda` macro in [./bootstrap/lib/defines.h](./bootstrap/lib/defines.h) and as such cannot be used for compilation.
 
 ## Roadmap to Beta 0.1.0
-1. [ ] static global variables
+1. [x] static global variables
 2. [ ] rustish enums with primitive match expression
 3. [ ] struct methods
 4. [ ] traits with static dispatch (depends on: 3)
