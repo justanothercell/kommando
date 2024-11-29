@@ -4,8 +4,6 @@ pub mod mem;
 pub mod env;
 pub mod coroutine;
 
-loc mod symbols;
-
 pub use intrinsics::types::*;
 
 pub use intrinsics::typecast;

@@ -253,6 +253,10 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
             TypeDef* type = mi->item;
             if (!type->head_resolved) resolve_typedef(program, type);
         } break;
+        case MIT_STATIC: {
+            Static* s = mi->item;
+            if (s->type->def == NULL) resolve_typevalue(program, module, s->type, NULL, NULL);
+        } break;
         default:
             unreachable();
     }
@@ -263,6 +267,8 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
             break;
         case MIT_STRUCT:
             gkeys = ((TypeDef*)mi->item)->generics;
+            break;
+        case MIT_STATIC:
             break;
         default:
             unreachable();
@@ -392,6 +398,7 @@ static void var_find(Program* program, Module* module, VarList* vars, Variable* 
         for (int i = vars->length-1;i >= 0;i--) {
             if (str_eq(vars->elements[i]->name, name->name)) {
                 var->box = vars->elements[i];
+                var->s = NULL;
                 return;
             }
         }
@@ -410,6 +417,13 @@ static void var_find(Program* program, Module* module, VarList* vars, Variable* 
             resolve_typevalue(program, module, tv, NULL, NULL);
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = tv;
+        } break;
+        case MIT_STATIC: {
+            Static* s = item->item;
+            resolve_typevalue(program, module, s->type, NULL, NULL);
+            box->resolved = malloc(sizeof(TVBox));
+            box->resolved->type = s->type;
+            var->s = s;
         } break;
         case MIT_STRUCT:
             spanned_error("Expected variable", name->span, "Expected variable or function ref, got struct");
@@ -1065,6 +1079,10 @@ void resolve_module(Program* program, Module* module) {
             case MIT_MODULE: {
                 Module* mod = item->item;
                 if (!mod->resolved && !mod->in_resolution) resolve_module(program, mod);
+            } break;
+            case MIT_STATIC: {
+                Static* s = item->item;
+                resolve_typevalue(program, module, s->type, NULL, NULL);
             } break;
             case MIT_ANY: 
                 unreachable();

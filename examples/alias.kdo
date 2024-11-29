@@ -16,7 +16,7 @@ fn main() {
     let b = 5;
     exchange(&a, &b);
 
-    printf("a = %ld, b = %ld\n", a, b);
+    printf("a = %d, b = %d\n", a, b);
 
     let f: Foo = _ {};
     let b: Bar = _ {};

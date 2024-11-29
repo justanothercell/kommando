@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/str.h"
 LIB;
 #include "module.h"
 #include "token.h"
@@ -17,6 +18,33 @@ bool double_double_colon(TokenStream* stream) {
     t = next_token(stream);
     if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
     return true;
+}
+
+AnnoList parse_annotations(TokenStream* stream) {
+    AnnoList list = list_new(AnnoList);
+    Token* t = next_token(stream);
+    while (token_compare(t, "#", SNOWFLAKE)) {
+        t = next_token(stream);
+        if (!token_compare(t, "[", SNOWFLAKE)) unexpected_token(t, "expected #[...]");
+        Path* path = parse_path(stream);
+        Annotation annotation;
+        annotation.path = path;
+        annotation.data = NULL;
+        annotation.type = AT_FLAG;
+        t = next_token(stream);
+        if (token_compare(t, "=", SNOWFLAKE)) {
+            t = next_token(stream);
+            if (t->type != IDENTIFIER && t->type != NUMERAL && t->type != STRING) unexpected_token(t, "expected #[%s=?] where ? is IDENTIFIER, NUMERAL or STRING", to_str_writer(s, fprint_path(s, path)));
+            annotation.data = t;
+            annotation.type = AT_DEFINE;
+            t = next_token(stream);
+        }
+        list_append(&list, annotation);
+        if (!token_compare(t, "]", SNOWFLAKE)) unexpected_token(t, "expected #[...]");
+        t = next_token(stream);
+    }
+    stream->peek = t;
+    return list;
 }
 
 TypeDef* parse_struct(TokenStream* stream) {
@@ -74,6 +102,8 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
     module->subs = list_new(ModDefList);
 
     while (has_next(stream)) {
+        AnnoList annos = parse_annotations(stream);
+
         Token* t = next_token(stream);
         stream->peek = t;
 
@@ -91,6 +121,8 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         }
         if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
+            function->annotations = annos;
+            function->module = module;
             ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = function;
             mi->type = MIT_FUNCTION;
@@ -98,13 +130,14 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->origin = NULL;
             mi->vis = vis;
             mi->name = function->name;
-            function->module = module;
             ModuleItem* old = map_put(module->items, function->name->name, mi);
             if (old != NULL) {
                 spanned_error("Name conflict", function->name->span, "Name %s is already defined in this scope at %s", function->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
             }
         } else if (token_compare(t, "struct", IDENTIFIER)) {
             TypeDef* type = parse_struct(stream);
+            type->annotations = annos;
+            type->module = module;
             ModuleItem* mi = malloc(sizeof(ModuleItem));
             mi->item = type;
             mi->type = MIT_STRUCT;
@@ -112,7 +145,6 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             mi->origin = NULL;
             mi->vis = vis;
             mi->name = type->name;
-            type->module = module;
             ModuleItem* old = map_put(module->items, type->name->name, mi);
             if (old != NULL) {
                 spanned_error("Name conflict", type->name->span, "Name %s is already defined in this scope at %s", type->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
@@ -120,6 +152,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         } else if (token_compare(t, "mod", IDENTIFIER)) {
             t = next_token(stream); // skip mod
             Identifier* name = parse_identifier(stream);
+            if (annos.length > 0) spanned_error("Annotated module definition", name->span, "Module definitions dont take annotations yet.");
             t = next_token(stream);
             if (!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t);
             ModDef* mod = malloc(sizeof(ModDef));
@@ -129,6 +162,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         } else if (token_compare(t, "use", IDENTIFIER)) {
             t = next_token(stream); // skip use
             Path* path = parse_path(stream);
+            if (annos.length > 0) spanned_error("Annotated use", path->elements.elements[0]->span, "Item import does not take annotations yet.");
             bool wildcard = false;
             Identifier* alias = NULL;
             if (path->ends_in_double_colon) {
@@ -152,6 +186,28 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             imp->vis = vis;
             imp->alias = alias;
             list_append(&module->imports, imp);
+        } else if(token_compare(t, "static", IDENTIFIER)) {
+            t = next_token(stream); // skip static
+            Static* s = malloc(sizeof(Static));
+            s->name = parse_identifier(stream);
+            t = next_token(stream);
+            if(!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t, "static %s: ...;", s->name->name);
+            s->type = parse_type_value(stream);
+            t = next_token(stream);
+            if(!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t, "static %s: ...;", s->name->name);
+            s->module = module;
+            s->annotations = annos;
+            ModuleItem* mi = malloc(sizeof(ModuleItem));
+            mi->item = s;
+            mi->type = MIT_STATIC;
+            mi->module = module;
+            mi->origin = NULL;
+            mi->vis = vis;
+            mi->name = s->name;
+            ModuleItem* old = map_put(module->items, mi->name->name, mi);
+            if (old != NULL) {
+                spanned_error("Name conflict", mi->name->span, "Name %s is already defined in this scope at %s", mi->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
+            }
         } else {
             unexpected_token(t);
         }

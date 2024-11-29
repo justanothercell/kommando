@@ -5,7 +5,9 @@
 #include <time.h>
 
 #include "lib.h"
+#include "lib/defines.h"
 #include "lib/exit.h"
+#include "lib/list.h"
 #include "lib/str.h"
 LIB
 #include "transpiler_c.h"
@@ -67,6 +69,31 @@ str gen_c_type_name(TypeValue* tv, GenericValues* generics) {
     if (ty->module == NULL) {
         spanned_error("Unsubsituted generic", ty->name->span, "Genric %s. This is probably a compiler error. %s with %s @ %s", ty->name->name, gvals_to_key(tv->generics), gvals_to_key(generics), to_str_writer(s, fprint_span(s, &generics->span)));
     }
+    str name = NULL;
+    int state = 0;
+    list_foreach(&tv->def->annotations, lambda(void, Annotation a, {
+        str p = to_str_writer(s, fprint_path(s, a.path));
+        if (str_eq(p, "symbol")) {
+            if (state == 1) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "Symbol name already defined");
+            if (state == 2) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
+            if (a.type != AT_DEFINE) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected define `#[symbol=\"foo\"]`, found %s", AnnotationType__NAMES[a.type]);
+            if (tv->def->generics != NULL && tv->def->generics->generics.length > 0) spanned_error("Unmangled generic", a.path->elements.elements[0]->span, "a custom symbol cannot be set for a generic type");
+            Token* t = a.data;
+            if (t->type != STRING) unexpected_token(t, "Annotation expects string value");
+            name = t->string;
+            state = 1;
+        }
+        if (str_eq(p, "no_mangle")) {
+            if (state == 1) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
+            if (state == 2) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "no_mangle already set");
+            if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[no_mangle]`, found %s", AnnotationType__NAMES[a.type]);
+            if (tv->def->generics != NULL && tv->def->generics->generics.length > 0) spanned_error("Unmangled generic", a.path->elements.elements[0]->span, "no_mangle cannot be set for a generic type");
+            name = tv->def->name->name;
+            state = 2;
+        }
+    }));
+    if (name != NULL) return to_str_writer(s, fprintf(s, "struct %s", name));
+    
     str key = to_str_writer(stream, {
         fprintf(stream, "%p", ty);
         if (tv->generics != NULL) {
@@ -87,6 +114,30 @@ str gen_c_fn_name(FuncDef* def, GenericValues* generics) {
         if (def->generics != NULL) spanned_error("Generic extern function", def->name->span, "Extern functions may not be generic");
         return def->name->name;
     }
+    str name = NULL;
+    int state = 0;
+    list_foreach(&def->annotations, lambda(void, Annotation a, {
+        str p = to_str_writer(s, fprint_path(s, a.path));
+        if (str_eq(p, "symbol")) {
+            if (state == 1) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "Symbol name already defined");
+            if (state == 2) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
+            if (a.type != AT_DEFINE) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected define `#[symbol=\"foo\"]`, found %s", AnnotationType__NAMES[a.type]);
+            if (def->generics != NULL && def->generics->generics.length > 0) spanned_error("Unmangled generic", a.path->elements.elements[0]->span, "a custom symbol cannot be set for a generic function");
+            Token* t = a.data;
+            if (t->type != STRING) unexpected_token(t, "Annotation expects string value");
+            name = t->string;
+            state = 1;
+        }
+        if (str_eq(p, "no_mangle")) {
+            if (state == 1) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
+            if (state == 2) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "no_mangle already set");
+            if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[no_mangle]`, found %s", AnnotationType__NAMES[a.type]);
+            if (def->generics != NULL && def->generics->generics.length > 0) spanned_error("Unmangled generic", a.path->elements.elements[0]->span, "no_mangle cannot be set for a generic function");
+            name = def->name->name;
+            state = 2;
+        }
+    }));
+    if (name != NULL) return name;
     str data = to_str_writer(stream, {
         fprintf(stream, "%p", def);
         if (generics != NULL) {
@@ -135,9 +186,40 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* context) 
     return expanded;
 }
 
+str gen_c_static_name(Static* s) {
+    str name = NULL;
+    int state = 0;
+    list_foreach(&s->annotations, lambda(void, Annotation a, {
+        str p = to_str_writer(s, fprint_path(s, a.path));
+        if (str_eq(p, "symbol")) {
+            if (state == 1) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "Symbol name already defined");
+            if (state == 2) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
+            if (a.type != AT_DEFINE) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected define `#[symbol=\"foo\"]`, found %s", AnnotationType__NAMES[a.type]);
+            Token* t = a.data;
+            if (t->type != STRING) unexpected_token(t, "Annotation expects string value");
+            name = t->string;
+            state = 1;
+        }
+        if (str_eq(p, "no_mangle")) {
+            if (state == 1) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
+            if (state == 2) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "no_mangle already set");
+            if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[no_mangle]`, found %s", AnnotationType__NAMES[a.type]);
+            name = s->name->name;
+            state = 2;
+        }
+    }));
+    if (name == NULL) {
+        name = to_str_writer(stream, { 
+            fprintf(stream, "%s%llx", s->name->name, (usize)s);
+        });
+    }
+    return name;
+}
+
 str gen_c_var_name(Variable* v) {
-    if (v->box->name == NULL && v->box->mi == NULL) panic("Compiler error: not a var or similar");
-    if (v->box->name != NULL && v->box->mi != NULL) panic("Compiler error: both a var or similar");
+    if (v->s != NULL) {
+        return gen_c_static_name(v->s);
+    }
     if (v->box->name != NULL) {
         return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, (usize)v->box));
     } else {
@@ -560,6 +642,25 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
     ty->transpile_state = 2;
 }
 
+void transpile_static(FILE* header_stream, FILE* code_stream, str modkey, Static* s) {
+    log("transpiling static %s::%s", to_str_writer(stream, fprint_path(stream, s->module->path)), s->name->name);
+    bool is_extern = false;
+    list_foreach(&s->annotations, lambda(void, Annotation a, {
+        str p = to_str_writer(s, fprint_path(s, a.path));
+        if (str_eq(p, "extern")) {            
+            if (is_extern) spanned_error("Duplicate annotation flag", a.path->elements.elements[0]->span, "Flag `#[extern]` already set");
+            if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[extern]`, found %s", AnnotationType__NAMES[a.type]);
+            is_extern = true;
+        }
+    }));
+    str c_type = gen_c_type_name(s->type, NULL);
+    str c_name = gen_c_static_name(s);
+    fprintf(header_stream, "extern %s %s;\n", c_type, c_name);
+    if (!is_extern) {
+        fprintf(code_stream, "%s %s;\n", c_type, c_name);
+    }
+}
+
 void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module* module, ModuleItemType type) {
     log("Transpiling module %s [%s pass]", to_str_writer(s, fprint_path(s, module->path)), ModuleItemType__NAMES[type]);
     map_foreach(module->items, lambda(void, str key, ModuleItem* item, {
@@ -572,8 +673,10 @@ void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module
                 if (type == MIT_FUNCTION) transpile_function(header_stream, code_stream, modkey, item->item);
                 break;
             case MIT_STRUCT:
-            log("s: %s", ((TypeDef*)item->item)->name->name);
                 if (type == MIT_STRUCT) transpile_typedef(header_stream, code_stream, modkey, item->item, true);
+                break;
+            case MIT_STATIC: 
+                if (type == MIT_STATIC) transpile_static(header_stream, code_stream, modkey, item->item);
                 break;
             case MIT_ANY: 
                 unreachable();
@@ -583,32 +686,30 @@ void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module
 
 void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_stream, str header_name, Program* program) {
     fprintf(header_stream, "/* File generated by kommando compiler. Do not modify. */\n");
+    fprintf(code_stream, "/* File generated by kommando compiler. Do not modify. */\n");
+
     if (!options.raw) {
         fprintf(header_stream, "#include <stdint.h>\n");
         fprintf(header_stream, "#include <stdbool.h>\n");
         fprintf(header_stream, "#include <stdalign.h>\n");
         fprintf(header_stream, "#include <assert.h>\n");
         fprintf(header_stream, "\n");
-        fprintf(header_stream, "extern void* stdin;\n");
-        fprintf(header_stream, "extern void* stdout;\n");
-        fprintf(header_stream, "extern void* stderr;\n");
-        fprintf(header_stream, "\n");
-        fprintf(header_stream, "\n");
     }
 
     if (!options.raw) {
-        fprintf(code_stream, "/* File generated by kommando compiler. Do not modify. */\n");
         StrList header_path = rsplitn(header_name, '/', 1);
         fprintf(code_stream, "#include \"%s\"\n", header_path.elements[header_path.length - 1]);
-        fprintf(code_stream, "\n");
-        fprintf(code_stream, "static int __global_argc = 0;\n");
-        fprintf(code_stream, "static char** __global_argv = (void*)0;\n");
         fprintf(code_stream, "\n");
     }
 
     // transpile all types
     map_foreach(program->packages, lambda(void, str modkey, Module* module, {
         transpile_module(header_stream, code_stream, modkey, module, MIT_STRUCT);
+    }));
+
+    // transpile all statics
+    map_foreach(program->packages, lambda(void, str modkey, Module* module, {
+        transpile_module(header_stream, code_stream, modkey, module, MIT_STATIC);
     }));
 
     // transpile all functions

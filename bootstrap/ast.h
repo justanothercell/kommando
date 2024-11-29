@@ -32,6 +32,21 @@ typedef struct Field {
     Identifier* name;
     TypeValue* type;
 } Field;
+
+// Flags and defines should be unique per annotated object, function calls may repeat
+ENUM(AnnotationType,
+    AT_FLAG,   // #[foo]
+    AT_DEFINE, // #[foo="bar"]
+    AT_CALL    // #[foo("bar")]
+);
+
+typedef struct Annotation {
+    Path* path;
+    AnnotationType type;
+    void* data; // LITERAL or IDENTIFIER token, unused for AT_FLAG
+} Annotation;
+LIST(AnnoList, Annotation);
+
 typedef struct TypeDef {
     Identifier* name;
     GenericKeys* generics;
@@ -40,6 +55,7 @@ typedef struct TypeDef {
     Map* fields;
     u32 transpile_state;
     Module* module;
+    AnnoList annotations;
     bool head_resolved;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
@@ -68,9 +84,11 @@ typedef struct TypeValue {
 void fprint_typevalue(FILE* file, TypeValue* tval);
 
 typedef struct VarBox VarBox;
+typedef struct Static Static;
 typedef struct Variable {
     Path* path;
     VarBox* box;
+    Static* s;
 } Variable;
 
 ENUM(ExprType, 
@@ -183,10 +201,18 @@ typedef struct FuncDef {
     ArgumentList args;
     GenericKeys* generics;
     Module* module;
+    AnnoList annotations;
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
 } FuncDef;
+
+typedef struct Static {
+    Identifier* name;
+    TypeValue* type;
+    AnnoList annotations;
+    Module* module;
+} Static;
 
 ENUM(Visibility,
     V_PRIVATE,

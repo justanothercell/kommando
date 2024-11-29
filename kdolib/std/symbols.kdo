@@ -1,5 +1,0 @@
-loc struct __global_argc {}
-loc struct __global_argv {}
-loc struct stdin {}
-loc struct stdout {}
-loc struct stderr {}

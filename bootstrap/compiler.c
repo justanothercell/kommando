@@ -209,7 +209,7 @@ void compile(CompilerOptions options) {
 
     if (options.compile) {
         info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compilign generated c code... ");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wswitch-enum -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wswitch-enum -Wno-unused -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
         info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Done!");

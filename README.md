@@ -23,7 +23,7 @@ make cr file=examples/hello
 # ./kdolib/link is a bash file which inserts the kommando library paths
 ./kommando $(./kdolib/link) examples/hello.kdo examples/hello -cr
 
-# run witnout any arguments to see a list of options
+# run witout any arguments to see a list of options
 ./kommando
 ```
 Note that this is meant to be compiled with gcc and uses certain gnu compiler extensions. There exists a [./bootstrap/.clangd](./bootstrap/.clangd) file,
@@ -38,5 +38,4 @@ the `lambda` macro in [./bootstrap/lib/defines.h](./bootstrap/lib/defines.h) and
 5. [ ] Copy, Clone and Drop (depends on 3, 4)
 6. [ ] operator overloading using traits (depends on 3, 4)
 7. [ ] index[] operator (overloaded) (depends on 3, 4, 6)
-8. [ ] decorators (on structs and functions at least) for compile time directives
-9. [ ] mutability
+8. [x] decorators (on structs and functions at least) for compile time directives

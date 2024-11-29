@@ -3,18 +3,22 @@
 
 /// Initalizes the structure pointed to by ucp.
 /// returns -1 on error and 0 on success,
+#[extern]
 pub fn getcontext(ucp: std::ptr<ucontext_t>) -> std::i32;
 
 /// Restore the context to the structure pointed to by ucp.
 /// returns -1 on error, does not return on success.
+#[extern]
 pub fn setcontext(ucp: std::ptr<ucontext_t>) -> std::i32;
 
 /// Fill the context with this execution info.
 /// Note: the va_args of length count need to be of type i32.
+#[extern]
 pub fn makecontext(ucp: std::ptr<ucontext_t>, function: std::function_ptr, count: std::i32, *);
 
 /// save the current instruction context in uocp and continue with ucp.
 /// returns -1 on error and 0 on success (when returning back from a different context)
+#[extern]
 pub fn swapcontext(uocp: std::ptr<ucontext_t>, ucp: std::ptr<ucontext_t>) -> std::i32;
 
 pub struct ucontext_t {
