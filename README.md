@@ -17,7 +17,7 @@ make build
 make run file=examples/hello
 
 # or both in one step:
-make cr file=examples/hello
+make br file=examples/hello
 
 # you can also run the compiler manually (once it is compiled itself).
 # ./kdolib/link is a bash file which inserts the kommando library paths

@@ -1,0 +1,24 @@
+use std::*;
+use c_api::printf;
+
+static counter: i32;
+
+fn reset() {
+    counter = 0;
+}
+
+fn next() -> i32 {
+    counter = counter + 1;
+    counter - 1
+}
+
+fn main() {
+    reset();
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+    reset();
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+}
