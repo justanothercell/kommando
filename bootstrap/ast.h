@@ -89,6 +89,7 @@ typedef struct Variable {
     Path* path;
     VarBox* box;
     Static* s;
+    GenericValues* values;
 } Variable;
 
 ENUM(ExprType, 
@@ -108,6 +109,7 @@ ENUM(ExprType,
     EXPR_CONTINUE, // no data
     EXPR_FIELD_ACCESS,
     EXPR_STRUCT_LITERAL,
+    EXPR_DYN_RAW_CALL,
     EXPR_C_INTRINSIC
 );
 
@@ -139,6 +141,10 @@ typedef struct StructLiteral {
     TypeValue* type;
     Map* fields;
 } StructLiteral;
+typedef struct DynRawCall {
+    Expression* callee;
+    ExpressionList args;
+} DynRawCall;
 
 typedef struct BinOp {
     Expression* lhs;

@@ -1,20 +1,28 @@
-use std::io::stderr;
+use std::*;
+use io::stderr;
 
 pub struct CoroContext<A, T> {
     main_ctx: c_api::ucontext::ucontext_t,
     runner_ctx: c_api::ucontext::ucontext_t,
     stack: std::opaque_ptr,
     state: std::u8,
+    function: function_ptr<T>,
     arg: A,
     ret: T,
 }
 
 pub struct Coroutine<A, T> {
     // needs to be heaped so it doesnt move
-    ctx: std::ptr<CoroContext<A, T>>
+    ctx: ptr<CoroContext<A, T>>,
+    state: i32
 }
 
-pub fn coro_new<A, T>(function: std::function_ptr, arg: A) -> Coroutine<A, T> {
+fn coro_start<A, T>(ctx: ptr<CoroContext<A, T>>) {
+    (*ctx).ret = ((*ctx).function)(ctx, (*ctx).arg);
+    (*ctx).state = 1;
+}
+
+pub fn coro_new<A, T>(function: function_ptr<T>) -> Coroutine<A, T> {
     let stack_size: std::usize = 256 * 64;
     let stack = c_api::malloc(stack_size);
 
@@ -23,10 +31,10 @@ pub fn coro_new<A, T>(function: std::function_ptr, arg: A) -> Coroutine<A, T> {
     (*ctx).runner_ctx = std::mem::new_uninit();
     (*ctx).stack = stack;
     (*ctx).state = 0;
-    (*ctx).arg = arg;
+    (*ctx).function = function;
 
     if c_api::ucontext::getcontext(&(*ctx).runner_ctx) == 0-1 {
-        c_api::fprintf(stderr, "Error: getcontext\n");
+        c_api::fprintf(io::stderr, "Error: getcontext\n");
         c_api::exit(1);
     };
 
@@ -34,37 +42,40 @@ pub fn coro_new<A, T>(function: std::function_ptr, arg: A) -> Coroutine<A, T> {
     (*ctx).runner_ctx.uc_stack.ss_size = stack_size;
     (*ctx).runner_ctx.uc_link = (&(*ctx).main_ctx);
 
-    c_api::ucontext::makecontext(&(*ctx).runner_ctx, function, 2, ctx);
+    c_api::ucontext::makecontext(&(*ctx).runner_ctx, coro_start::<A, T>, 2, ctx);
 
     Coroutine {
-        ctx: ctx
+        ctx: ctx,
+        state: 0
     }
 }
 
-pub fn coro_step<A, T>(coro: std::ptr<Coroutine<A, T>>) -> T {
+pub fn coro_step<A, T>(coro: std::ptr<Coroutine<A, T>>, arg: A) -> T {
+    if (*coro).state != 0 {
+        c_api::fprintf(io::stderr, "Error: coroutine cannot be stepped, is already done\n");
+        c_api::exit(1);
+    };
     let ctx = (*coro).ctx;
-    if (*ctx).state != 0 {
-        c_api::fprintf(stderr, "Error: coroutine cannot be stepped, is already done\n");
-        c_api::exit(1);
-    };
-    (*ctx).state = 1;
+    (*ctx).arg = arg;
     if c_api::ucontext::swapcontext(&(*ctx).main_ctx, &(*ctx).runner_ctx) == 0-1 {
-        c_api::fprintf(stderr, "Error: swapcontext\n");
+        c_api::fprintf(io::stderr, "Error: swapcontext\n");
         c_api::exit(1);
     };
+    let r = (*ctx).ret;
     if (*ctx).state == 1 {
         coro_free(coro);
+        (*coro).state = 1;
     };
-    (*ctx).ret
+    r
 }
 
-pub fn coro_yield<A, T>(ctx: std::ptr<CoroContext<A, T>>, ret: T) {
-    (*ctx).state = 0;
+pub fn coro_yield<A, T>(ctx: std::ptr<CoroContext<A, T>>, ret: T) -> A {
     (*ctx).ret = ret;
     if c_api::ucontext::swapcontext(&(*ctx).runner_ctx, &(*ctx).main_ctx) == 0-1 {
-        c_api::fprintf(stderr, "Error: swapcontext\n");
+        c_api::fprintf(io::stderr, "Error: swapcontext\n");
         c_api::exit(1);
     };
+    (*ctx).arg
 }
 
 pub fn coro_free<A, T>(coro: std::ptr<Coroutine<A, T>>) {
@@ -73,4 +84,5 @@ pub fn coro_free<A, T>(coro: std::ptr<Coroutine<A, T>>) {
     (*ctx).stack = c_api::null();
     std::mem::free(ctx);
     (*coro).ctx = std::mem::null();
+    (*coro).state = 1;
 }

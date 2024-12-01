@@ -2,27 +2,27 @@ use std::*;
 use std::coroutine::*;
 use c_api::printf;
 
-fn foo(ctx: ptr<CoroContext<i32, c_const_str_ptr>>) {
-    printf("foo: started with arg=%d\n", (*ctx).arg);
+fn foo(ctx: ptr<CoroContext<i32, c_const_str_ptr>>, arg: i32) -> c_const_str_ptr {
+    printf("foo: started with arg=%d\n", arg);
     coro_yield(ctx, "hello");
     coro_yield(ctx, "world");
     coro_yield(ctx, "from");
     coro_yield(ctx, "foo");
-    coro_yield(ctx, "xD");
     printf("foo: done\n");
+    "xD"
 }
 
 fn main() {
-    let c = coro_new::<_, c_const_str_ptr>(foo, 42);
+    let c = coro_new::<i32, c_const_str_ptr>(foo);
 
     printf("main: running foo as coro\n");
     while 1 == 1 {
-        let r = coro_step(&c);
-        if (*(c.ctx)).state != 0 {
+        let r = coro_step(&c, 42);
+        printf("main: foo says '%s'\n", r);
+        if c.state != 0 {
             printf("main: foo done\n");
             break;
         };
-        printf("main: foo says '%s'\n", r);
     };
     printf("main: end\n");
 }

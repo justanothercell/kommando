@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
 #include "lib/str.h"
 LIB;
 #include "module.h"
@@ -225,6 +226,28 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         expression = parse_expression(stream, true);
         t = next_token(stream);
         if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
+        t = next_token(stream);
+        if (token_compare(t, "(", SNOWFLAKE)) {
+            DynRawCall* call = malloc(sizeof(DynRawCall));
+            call->callee = expression;
+            call->args = list_new(ExpressionList);
+            if (!token_compare(t, ")", SNOWFLAKE)) {
+                while (true) {
+                    Expression* argument = parse_expression(stream, true);
+                    list_append(&call->args, argument);
+                    t = next_token(stream);
+                    if (token_compare(t, ")", SNOWFLAKE)) {
+                        end = t->span.right;
+                        break;
+                    } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+                }
+            }
+            expression = malloc(sizeof(Expression));
+            expression->expr = call;
+            expression->type = EXPR_DYN_RAW_CALL;
+        } else {
+            stream->peek = t;
+        }
     } else if (token_compare(t, "let", IDENTIFIER)) {
         Identifier* name = parse_identifier(stream);
         end = name->span.right;
@@ -299,7 +322,6 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         if (path->elements.length > 0) end = path->elements.elements[path->elements.length - 1]->span.right;
         GenericValues* generics = NULL;
         t = next_token(stream);
-        Token* gen_start = t;
         stream->peek = t;
         if (path->ends_in_double_colon && token_compare(t, "<", SNOWFLAKE)) {
             generics = parse_generic_values(stream);
@@ -358,12 +380,12 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             expression->expr = slit;
             expression->type = EXPR_STRUCT_LITERAL;
         } else {
-            if (generics != NULL) unexpected_token(gen_start);
             // other items are now allowed, disabling this check
             // if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s @ %s", to_str_writer(stream, fprint_path(stream, path)), to_str_writer(stream, fprint_span(stream, &path->elements.elements[0]->span)));
             stream->peek = t;
             Variable* var = malloc(sizeof(Variable));
             var->path = path;
+            var->values = generics;
             expression->expr = var;
             expression->type = EXPR_VARIABLE;
         }

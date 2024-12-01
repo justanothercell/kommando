@@ -4,7 +4,9 @@
 #include <time.h>
 
 #include "lib.h"
+#include "lib/defines.h"
 #include "lib/exit.h"
+#include "lib/list.h"
 LIB
 #include "resolver.h"
 #include "ast.h"
@@ -390,8 +392,9 @@ void assert_types_equal(Program* program, Module* module, TypeValue* tv1, TypeVa
         }
     }
 }
-
-static void var_find(Program* program, Module* module, VarList* vars, Variable* var) {
+void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, GenericValues* generics);
+TypeValue* replace_generic(TypeValue* tv, GenericValues* ctx);
+static void var_find(Program* program, Module* module, VarList* vars, Variable* var, GenericKeys* func_generics, GenericKeys* type_generics) {
     Path* path = var->path;
     Identifier* name = path->elements.elements[path->elements.length-1];
     if (!path->absolute && path->elements.length == 1) {
@@ -399,26 +402,37 @@ static void var_find(Program* program, Module* module, VarList* vars, Variable* 
             if (str_eq(vars->elements[i]->name, name->name)) {
                 var->box = vars->elements[i];
                 var->s = NULL;
+                if (var->values != NULL) spanned_error("Generic variable?", var->path->elements.elements[0]->span, "Variable values are not supposed to be generic");
                 return;
             }
         }
     }
-    GenericValues* values = NULL;
-    ModuleItem* item = resolve_item(program, module, path, MIT_ANY, NULL, NULL, &values);
+    ModuleItem* item = resolve_item(program, module, path, MIT_ANY, func_generics, type_generics, &var->values);
     VarBox* box = malloc(sizeof(VarBox));
     box->id = ~0;
     box->name = NULL;
     box->mi = item;
-    box->values = values;
+    box->values = var->values;
     var->box = box;
     switch (item->type) {
         case MIT_FUNCTION: {
-            TypeValue* tv = gen_typevalue("std::function_ptr", &name->span);
+            FuncDef* func = item->item;
+            //if (func->generics != NULL && func->generics->generics.length > 0) spanned_error("Generic function literal", var->path->elements.elements[0]->span, "Title says it all. Only use ungeneric functions here.");
+            if (func->generics != NULL) {
+                if (var->values == NULL) spanned_error("Generic function", var->path->elements.elements[0]->span, "this function is generic. please provide generic args.");
+                if (func->generics->generics.length != var->values->generics.length) spanned_error("Mismatch generic count", var->path->elements.elements[0]->span, "title says it all, todo better errors in this entire area...");
+            } else if (var->values != NULL) spanned_error("Ungeneric function", var->path->elements.elements[0]->span, "this function is not generic");
+            TypeValue* tv = gen_typevalue("std::function_ptr<T>", &name->span);
+            resolve_typevalue(program, module, func->return_type, NULL, NULL);
+            TypeValue* ret = replace_generic(func->return_type, var->values);
+            tv->generics->generics.elements[0] = ret;
             resolve_typevalue(program, module, tv, NULL, NULL);
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = tv;
+            register_item(var->values, func->generics);
         } break;
         case MIT_STATIC: {
+            if (var->values != NULL) spanned_error("Generic static?", var->path->elements.elements[0]->span, "Static values are not supposed to be generic (yet?!)");
             Static* s = item->item;
             resolve_typevalue(program, module, s->type, NULL, NULL);
             box->resolved = malloc(sizeof(TVBox));
@@ -533,7 +547,10 @@ void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, Gen
     if (!template->name->absolute && template->name->elements.length == 1 && str_eq(template->name->elements.elements[0]->name, "_")) {
         if (!match->name->absolute && match->name->elements.length == 1) {
             str generic = match->name->elements.elements[0]->name;
-
+            if (generics == NULL) spanned_error("No generics supplied", value->name->elements.elements[0]->span, "Expected generics, got none. %s @ %s, %s @ %s and %s @ %s", 
+                to_str_writer(s, fprint_typevalue(s, template)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)),
+                to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_span(s, &match->name->elements.elements[0]->span)),
+                to_str_writer(s, fprint_typevalue(s, value)), to_str_writer(s, fprint_span(s, &value->name->elements.elements[0]->span)));
             if (!map_contains(generics->resolved, generic)) {
                 spanned_error("No such generic", match->name->elements.elements[0]->span, "%s is not a valid generic for %s @ %s", to_str_writer(s, fprint_typevalue(s, match)), 
                     to_str_writer(s, fprint_span_contents(s, &generics->span)), to_str_writer(s, fprint_span(s, &generics->span))
@@ -639,6 +656,23 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
 
             register_item(fc->generics, fd->generics);        
         } break;
+        case EXPR_DYN_RAW_CALL: {
+            DynRawCall* call = expr->expr;
+
+            TVBox* dyncall = new_tvbox();
+            dyncall->type = gen_typevalue("::std::function_ptr<_>", &expr->span);
+            log("%p", t_return->type);
+            dyncall->type->generics->generics.elements[0] = t_return->type;
+            resolve_typevalue(program, func->module, dyncall->type, func->generics, type_generics);
+            resolve_expr(program, func, type_generics, call->callee, vars, dyncall);
+            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, dyncall->type->generics->generics.elements[0]);
+            // resolving args, no typehints here, unsafe yada yada
+            list_foreach(&call->args, lambda(void, Expression* arg, {
+                TVBox* argbox = new_tvbox();
+                resolve_expr(program, func, type_generics, arg, vars, argbox);
+                finish_tvbox(argbox);
+            }));
+        } break;
         case EXPR_LITERAL: {
             Token* lit = expr->expr;
             switch (lit->type) {
@@ -669,7 +703,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_VARIABLE: {
             Variable* var = expr->expr;
-            var_find(program, func->module, vars, var);
+            var_find(program, func->module, vars, var, func->generics, type_generics);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, var->box->resolved->type);
         } break;
         case EXPR_LET: {
@@ -818,7 +852,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             CIntrinsic* ci = expr->expr;
             map_foreach(ci->var_bindings, lambda(void, str key, Variable* var, {
                 UNUSED(key);
-                var_find(program, func->module, vars, var);
+                var_find(program, func->module, vars, var, func->generics, type_generics);
             }));
             map_foreach(ci->type_bindings, lambda(void, str key, TypeValue* tv, {
                 UNUSED(key);

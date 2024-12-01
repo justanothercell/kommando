@@ -216,7 +216,7 @@ str gen_c_static_name(Static* s) {
     return name;
 }
 
-str gen_c_var_name(Variable* v) {
+str gen_c_var_name(Variable* v, GenericValues* context) {
     if (v->s != NULL) {
         return gen_c_static_name(v->s);
     }
@@ -226,7 +226,11 @@ str gen_c_var_name(Variable* v) {
         switch (v->box->mi->type) {
             case MIT_FUNCTION: {
                 FuncDef* func = v->box->mi->item;
-                return gen_c_fn_name(func, NULL);
+                GenericValues* func_gens = v->values;
+                if (func_gens != NULL) {
+                    func_gens = expand_generics(func_gens, context);
+                }
+                return gen_c_fn_name(func, func_gens);
             } break;
             default:
                 unreachable();
@@ -271,6 +275,20 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
             }));
             fprintf(code_stream, ")");
         } break;
+        case EXPR_DYN_RAW_CALL: {
+            DynRawCall* fc = expr->expr;
+            fprintf(code_stream, "(");
+            str c_ret = gen_c_type_name(expr->resolved->type, generics);
+            fprintf(code_stream, "(%s(*)())", c_ret);
+            transpile_expression(code_stream, modkey, func, generics, fc->callee, indent + 1);
+            fprintf(code_stream, ")");
+            fprintf(code_stream, "(");
+            list_foreach_i(&fc->args, lambda(void, usize i, Expression* arg, {
+                if (i > 0) fprintf(code_stream, ", ");
+                transpile_expression(code_stream, modkey, func, generics, arg, indent + 1);
+            }));
+            fprintf(code_stream, ")");
+        } break;
         case EXPR_LITERAL: {
             Token* lit = expr->expr;
             switch (lit->type) {
@@ -296,12 +314,12 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
         } break;
         case EXPR_VARIABLE: {
             Variable* v = expr->expr;
-            fprintf(code_stream, "%s", gen_c_var_name(v));
+            fprintf(code_stream, "%s", gen_c_var_name(v, generics));
         } break;
         case EXPR_LET: {
             LetExpr* let = expr->expr;
             str c_ty = gen_c_type_name(let->type, generics);
-            fprintf(code_stream, "%s %s = ", c_ty, gen_c_var_name(let->var));
+            fprintf(code_stream, "%s %s = ", c_ty, gen_c_var_name(let->var, generics));
             transpile_expression(code_stream, modkey, func, generics, let->value, indent + 1);
         } break;
         case EXPR_CONDITIONAL: {
@@ -424,7 +442,7 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
                             str name = v->box->name;
                             fprintf(code_stream, "%s", name);
                         } else if (mode == '!') {
-                            str c_var = gen_c_var_name(v);
+                            str c_var = gen_c_var_name(v, generics);
                             fprintf(code_stream, "%s", c_var);
                         } else spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
                     } else spanned_error("Invalid c intrinsic op", expr->span, "No such intrinsic operator `%c`", op);
@@ -525,7 +543,7 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
     fprintf(header_stream, "%s %s(", c_ret_ty, c_fn_name);
     list_foreach_i(&func->args, lambda(void, usize i, Argument* arg, {
         str c_ty = gen_c_type_name(arg->type, generics);
-        str c_val = gen_c_var_name(arg->var);
+        str c_val = gen_c_var_name(arg->var, generics);
         if (i > 0) fprintf(header_stream, ", ");
         fprintf(header_stream, "%s %s", c_ty, c_val);
     }));
@@ -541,7 +559,7 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
         fprintf(code_stream, "%s %s(", c_ret_ty, c_fn_name);
         list_foreach_i(&func->args, lambda(void, usize i, Argument* arg, {
             str c_ty = gen_c_type_name(arg->type, generics);
-            str c_val = gen_c_var_name(arg->var);
+            str c_val = gen_c_var_name(arg->var, generics);
             if (i > 0) fprintf(code_stream, ", ");
             fprintf(code_stream, "%s %s", c_ty, c_val);
         }));

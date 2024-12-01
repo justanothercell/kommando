@@ -141,7 +141,6 @@ Module* gen_intrinsics_types() {
 
     register_extern_type(module, "bool", "bool");
     register_extern_type(module, "opaque_ptr", "void*");
-    register_extern_type(module, "function_ptr", "void*");
     register_extern_type(module, "c_void", "void");
     register_extern_type(module, "c_const_str_ptr", "const char*");
 
@@ -189,6 +188,22 @@ Module* gen_intrinsics_types() {
         ty_ptr_mi->name = ty_ptr->name;
         ty_ptr->module = module;
         map_put(module->items, "ptr", ty_ptr_mi);
+    }
+
+    {   
+        TypeDef* ty_ptr = gen_simple_type("function_ptr");
+        TokenStream* ty_ptr_gs = tokenstream_new("<generated>", "<T> ");
+        ty_ptr->generics = parse_generic_keys(ty_ptr_gs);
+        ty_ptr->extern_ref = "void*";
+        ModuleItem* ty_ptr_mi = malloc(sizeof(ModuleItem));
+        ty_ptr_mi->item = ty_ptr;
+        ty_ptr_mi->type = MIT_STRUCT;
+        ty_ptr_mi->module = module;
+        ty_ptr_mi->origin = NULL;
+        ty_ptr_mi->vis = V_PUBLIC;
+        ty_ptr_mi->name = ty_ptr->name;
+        ty_ptr->module = module;
+        map_put(module->items, "function_ptr", ty_ptr_mi);
     }
 
     return module;
