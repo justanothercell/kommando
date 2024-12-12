@@ -20,22 +20,20 @@ impl Car {
     } 
 }
 
-struct Foo<T> { }
-struct Bar<T> { }
+struct X<T> {
 
-impl<T> Bar<T> {
-    pub fn frobnicate(self: ptr<Bar<T>>) {
+}
 
+impl X<u8> {
+    fn foo() {
+        printf("hello u8\n");
     }
 }
 
-fn blob<K>() -> ptr<Bar<K>> {
-    std::mem::malloc()
-}
-
-impl<T> Foo<T> {
-    fn blob_t(t: T) -> ptr<Bar<T>> { std::mem::malloc() }
-    fn blob_u<U>(t: U) -> ptr<Bar<U>> { std::mem::malloc() }
+impl X<bool> {
+    fn foo() {
+        printf("hello bool\n");
+    }
 }
 
 fn main() {
@@ -45,12 +43,9 @@ fn main() {
     car.beep();
     car.beep();
 
-    Foo::<i32>::blob_t(1);
-    Foo::<_>::blob_t("");
-    Foo::<c_str>::blob_u::<u8>(1);
-    Foo::<c_str>::blob_u(1);
-    Foo::<c_str>::blob_u("");
+    printf("\n");
 
-    blob::<i16>().frobnicate();
+    X::<u8>::foo();
+    X::<bool>::foo();
 }
 
