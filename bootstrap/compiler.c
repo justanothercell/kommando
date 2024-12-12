@@ -137,7 +137,7 @@ void compile(CompilerOptions options) {
     insert_module(program, intrinsics, V_PUBLIC);
     insert_module(program, intrinsics_types, V_PUBLIC);
 
-    list_foreach(&options.module_names, lambda(void, str modname, {
+    list_foreach(&options.module_names, i, str modname, {
         str fp = map_get(options.modules, modname);
         str file = to_str_writer(s, fprintf(s, "%s/lib.kdo", fp));
         if (access(file, F_OK) != 0) panic("Could not load package %s: no such file %s", file, modname);
@@ -149,7 +149,7 @@ void compile(CompilerOptions options) {
         Module* mod = parse_module_contents(s, modpath);
         mod->filepath = file;
         insert_module(program, mod, V_PUBLIC);
-    }));
+    });
 
     typedef struct Submodule {
         Path* current;
@@ -159,16 +159,16 @@ void compile(CompilerOptions options) {
     } Submodule;
     LIST(SubList, Submodule);
     SubList sublist = list_new(SubList);
-    map_foreach(program->packages, lambda(void, str key, Module* item, {
+    map_foreach(program->packages, str key, Module* item, {
         UNUSED(key);
-        list_foreach(&item->subs, lambda(void, ModDef* m, {({
+        list_foreach(&item->subs, i, ModDef* m, ({
             if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, item->path)));
             if (item->filepath == NULL) spanned_error("Synthetic", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
                     to_str_writer(s, fprint_path(s, item->path)), m->name->name);
             Submodule sm = (Submodule){ .current = item->path, .parentfile=item->filepath, .mod = m->name, .vis = m->vis};
             list_append(&sublist, sm);
-        });}));
-    }));
+        }));
+    });
 
     for (usize i = 0;i < sublist.length;i++) {
         Submodule sm = sublist.elements[i];

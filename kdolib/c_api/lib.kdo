@@ -3,47 +3,47 @@ pub mod str;
 pub mod ucontext;
 
 #[extern]
-pub fn printf(fmt: std::c_const_str_ptr, *) -> std::i32;
+pub fn printf(fmt: std::c_str, *) -> std::i32;
 #[extern]
-pub fn fprintf(stream: std::opaque_ptr, fmt: std::c_const_str_ptr, *) -> std::i32;
+pub fn fprintf(stream: std::raw_ptr, fmt: std::c_str, *) -> std::i32;
 
 #[extern]
-pub fn fopen(path: std::c_const_str_ptr, mode: std::c_const_str_ptr) -> std::opaque_ptr;
+pub fn fopen(path: std::c_str, mode: std::c_str) -> std::raw_ptr;
 #[extern]
-pub fn fclose(stream: std::opaque_ptr) -> std::i32;
+pub fn fclose(stream: std::raw_ptr) -> std::i32;
 #[extern]
-pub fn fflush(stream: std::opaque_ptr) -> std::i32;
+pub fn fflush(stream: std::raw_ptr) -> std::i32;
 
 #[extern]
 pub fn exit(code: std::i32) -> std::c_void;
 
 #[extern]
-pub fn malloc(size: std::usize) -> std::opaque_ptr;
+pub fn malloc(size: std::usize) -> std::raw_ptr;
 #[extern]
-pub fn alloca(size: std::usize) -> std::opaque_ptr;
+pub fn alloca(size: std::usize) -> std::raw_ptr;
 #[extern]
-pub fn realloc(ptr: std::opaque_ptr, size: std::usize) -> std::opaque_ptr;
+pub fn realloc(ptr: std::raw_ptr, size: std::usize) -> std::raw_ptr;
 #[extern]
-pub fn free(ptr: std::opaque_ptr) -> std::c_void;
+pub fn free(ptr: std::raw_ptr) -> std::c_void;
 
 #[extern]
-pub fn alligned_alloc(alignment: std::usize, size: std::usize) -> std::opaque_ptr;
+pub fn alligned_alloc(alignment: std::usize, size: std::usize) -> std::raw_ptr;
 #[extern]
 pub fn getpagesize() -> std::usize;
 
 // we do not have constants yet
-pub fn null() -> std::opaque_ptr {
+pub fn null() -> std::raw_ptr {
     intrinsics::typecast(0usize)
 }
 
 // we do not have constants yet
-pub fn nullstr() -> std::c_const_str_ptr {
+pub fn nullstr() -> std::c_str {
     intrinsics::typecast(0usize)
 }
 
 // gnu-c
 #[extern]
-pub fn getline(out_line: std::ptr<std::c_const_str_ptr>, out_size: std::ptr<std::usize>, stream: std::opaque_ptr) -> std::i32;
+pub fn getline(out_line: std::ptr<std::c_str>, out_size: std::ptr<std::usize>, stream: std::raw_ptr) -> std::i32;
 
 #[extern]
 pub fn raise(signal: std::i32) -> std::i32;
@@ -53,7 +53,7 @@ pub fn kill(pid: std::i32, signal: std::i32) -> std::i32;
 pub fn signal(signal: std::i32, handler: std::function_ptr) -> std::function_ptr;
 
 #[extern]
-pub fn system(cmd: std::c_const_str_ptr) -> std::i32;
+pub fn system(cmd: std::c_str) -> std::i32;
 pub fn shell_exists() -> std::bool {
     system(nullstr()) != 0
 }

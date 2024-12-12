@@ -1,7 +1,7 @@
 use std::*;
 
 struct Hello {
-    name: c_const_str_ptr
+    name: c_str
 }
 
 fn greet(hello: Hello) {

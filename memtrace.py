@@ -1,5 +1,9 @@
+import sys
+
 with open('MEMTRACE.txt', 'r') as tracefile:
     traces = tracefile.readlines()
+
+input_ptrs = sys.argv[1:]
 
 memory = {}
 total_memory = {}
@@ -11,6 +15,8 @@ for trace in traces:
         data, loc = rest.split('@')
         if kind == 'MALLOC':
             ptr, size = data.strip().split(' ')
+            if ptr in input_ptrs:
+                print(f'found {ptr}:', trace.strip())
             if ptr == '(nil)':
                 raise Exception(f'invalid alloc (null): {ptr} of size {size} @ {loc}')
             elif ptr in memory:
@@ -20,6 +26,8 @@ for trace in traces:
             total += 1
         elif kind == 'FREE':
             ptr = data.strip()
+            if ptr in input_ptrs:
+                print(f'found {ptr}:', trace.strip())
             if ptr != '(nil)':
                 if ptr not in memory:
                     if ptr in total_memory:
@@ -29,6 +37,10 @@ for trace in traces:
                 del memory[ptr]
         elif kind == 'REALLOC':
             ptr, new_ptr, size = data.strip().split(' ')
+            if ptr in input_ptrs:
+                print(f'found {ptr}:', trace.strip())
+            if new_ptr in input_ptrs:
+                print(f'found {new_ptr}:', trace.strip())
             if ptr != '(nil)':
                 if ptr not in memory:
                     if ptr in total_memory:

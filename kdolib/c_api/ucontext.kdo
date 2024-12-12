@@ -35,14 +35,14 @@ pub struct ucontext_t {
 }
 
 struct stack_t {
-    ss_sp: std::opaque_ptr,
+    ss_sp: std::raw_ptr,
     ss_flags: std::i32,
     ss_size: std::usize
 }
 
 struct mcontext_t {
     gregs: gregset_t,
-    fpregs: std::opaque_ptr,
+    fpregs: std::raw_ptr,
     __reserved0: std::u64,
     __reserved1: std::u64,
     __reserved2: std::u64,

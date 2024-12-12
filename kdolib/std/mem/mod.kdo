@@ -55,7 +55,7 @@ pub fn null<T>() -> ptr<T> {
     typecast(0usize)
 }
 
-pub fn to_raw<T>(ptr: ptr<T>) -> opaque_ptr {
+pub fn to_raw<T>(ptr: ptr<T>) -> raw_ptr {
     typecast(ptr)
 }
 

@@ -1,18 +1,23 @@
+use std::*;
+use std::vec::Vec;
+
+// example 3 4 + 2 *
+
 fn main() {
     while 1 == 1 {
-        let stack: _<std::f64> = std::vec::vec_new();
+        let stack: _<f64> = Vec::<_>::new();
 
-        let input: std::c_const_str_ptr = std::io::input(">>> ");
+        let input: c_str = io::input(">>> ");
         let i = 0usize;
         let len = c_api::str::strlen(input);
-        let text: std::ptr<std::u8> = std::typecast(input);
+        let text: ptr<u8> = typecast(input);
         let numstate = 0;
-        let num: std::f64 = 0.0;
+        let num: f64 = 0.0;
         let fdigits = 0;
 
         while i <= len {
             let c = if i < len {
-                *std::mem::arr_offset(text, i)
+                *mem::arr_offset(text, i)
             } else {
                 32 // ' ' append a single whitespace
             };
@@ -23,7 +28,7 @@ fn main() {
                     fdigits = 0;
                     num = 0;
                 };
-                num = num * 10 + std::numcast(c - 48);
+                num = num * 10 + numcast(c - 48);
                 if numstate == 2 {
                     fdigits = fdigits += 1; 
                 };
@@ -36,56 +41,56 @@ fn main() {
             // not continued: end of number!
             if numstate != 0 {
                 numstate = 0;
-                num = num / c_api::math::pow(10.0, std::numcast(fdigits));
-                std::vec::vec_push(&stack, num);
+                num = num / c_api::math::pow(10.0, numcast(fdigits));
+                stack.push(num);
             };
             if c == 32 { // ' '
                 continue;
             };
             if c == 43 { // +
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = std::vec::vec_get(&stack, stack.length - 2);
-                let b = std::vec::vec_get(&stack, stack.length - 1);
+                let a = stack.get(stack.length - 2);
+                let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *std::vec::vec_get_ref(&stack, stack.length - 1) = a + b;
+                *stack.get_ref(stack.length - 1) = a + b;
                 continue;
             };
             if c == 45 { // -
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = std::vec::vec_get(&stack, stack.length - 2);
-                let b = std::vec::vec_get(&stack, stack.length - 1);
+                let a = stack.get(stack.length - 2);
+                let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *std::vec::vec_get_ref(&stack, stack.length - 1) = a - b;
+                *stack.get_ref(stack.length - 1) = a - b;
                 continue;
             };
             if c == 42 { // *
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = std::vec::vec_get(&stack, stack.length - 2);
-                let b = std::vec::vec_get(&stack, stack.length - 1);
+                let a = stack.get(stack.length - 2);
+                let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *std::vec::vec_get_ref(&stack, stack.length - 1) = a * b;
+                *stack.get_ref(stack.length - 1) = a * b;
                 continue;
             };
             if c == 47 { // /
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = std::vec::vec_get(&stack, stack.length - 2);
-                let b = std::vec::vec_get(&stack, stack.length - 1);
+                let a = stack.get(stack.length - 2);
+                let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *std::vec::vec_get_ref(&stack, stack.length - 1) = a / b;
+                *stack.get_ref(stack.length - 1) = a / b;
                 continue;
             };
             if c == 35 { // # swap
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = std::vec::vec_get(&stack, stack.length - 1);
-                let b = std::vec::vec_get(&stack, stack.length - 2);
-                *std::vec::vec_get_ref(&stack, stack.length - 1) = b;
-                *std::vec::vec_get_ref(&stack, stack.length - 2) = a;
+                let a = stack.get(stack.length - 1);
+                let b = stack.get(stack.length - 2);
+                *stack.get_ref(stack.length - 1) = b;
+                *stack.get_ref(stack.length - 2) = a;
                 continue;
             };
             if c == 58 { // : dup
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
-                let v = std::vec::vec_get(&stack, stack.length - 1);
-                std::vec::vec_push(&stack, v);
+                let v = stack.get(stack.length - 1);
+                stack.push(v);
                 continue;
             };
             if c == 95 { // _ drop
@@ -104,6 +109,6 @@ fn main() {
             c_api::printf("Stack has more than 1 element\n");
             continue;
         };
-        c_api::printf(" = %f\n", std::vec::vec_get(&stack, 0));
+        c_api::printf(" = %f\n", stack.get(0));
     };
 }

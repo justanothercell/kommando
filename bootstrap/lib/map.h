@@ -24,11 +24,13 @@ void* map_remove(Map* map, str key);
 void* map_put(Map* map, str key, void* value);
 usize map_size(Map* map);
 
-#define map_foreach(map_ptr, function) ({ \
+#define map_foreach(map_ptr, key_name, value_name, map_block) ({ \
     for (usize i1234567890 = 0;i1234567890 < (map_ptr)->buckets.length;i1234567890++) { \
         Bucket* bucket1234567890 = &(map_ptr)->buckets.elements[i1234567890]; \
         for (usize j1234567890 = 0;j1234567890 < bucket1234567890->length;j1234567890++) { \
-            function(bucket1234567890->elements[j1234567890].key, bucket1234567890->elements[j1234567890].value); \
+            key_name = bucket1234567890->elements[j1234567890].key; \
+            value_name = bucket1234567890->elements[j1234567890].value; \
+            map_block; \
         } \
     } \
 })

@@ -59,7 +59,7 @@ pub fn page_new(size: std::usize) -> std::ptr<Page> {
         c_api::exit(1);
     };
     // the first entry in our page is the page itself
-    let page = std::typecast::<std::opaque_ptr, std::ptr<Page>>(buffer);
+    let page = std::typecast::<std::raw_ptr, std::ptr<Page>>(buffer);
     (*page).filled = intrinsics::sizeof::<Page>();
     (*page).prev = std::null();
     page

@@ -1,0 +1,56 @@
+use std::*;
+use c_api::printf;
+
+struct Car {
+    beeps: u8
+}
+
+impl Car {
+    fn new() -> Car {
+        _ { beeps: 3 }
+    }
+
+    fn beep(car: ptr<Car>) {
+        if car.beeps > 0 {
+            car.beeps = car.beeps - 1;
+            printf("beep beep!\n");
+        } else {
+            printf("error: out of blinker fluid\n");
+        }
+    } 
+}
+
+struct Foo<T> { }
+struct Bar<T> { }
+
+impl<T> Bar<T> {
+    pub fn frobnicate(self: ptr<Bar<T>>) {
+
+    }
+}
+
+fn blob<K>() -> ptr<Bar<K>> {
+    std::mem::malloc()
+}
+
+impl<T> Foo<T> {
+    fn blob_t(t: T) -> ptr<Bar<T>> { std::mem::malloc() }
+    fn blob_u<U>(t: U) -> ptr<Bar<U>> { std::mem::malloc() }
+}
+
+fn main() {
+    let car = Car::<>::new();
+    Car::<>::beep(&car);
+    car.beep();
+    car.beep();
+    car.beep();
+
+    Foo::<i32>::blob_t(1);
+    Foo::<_>::blob_t("");
+    Foo::<c_str>::blob_u::<u8>(1);
+    Foo::<c_str>::blob_u(1);
+    Foo::<c_str>::blob_u("");
+
+    blob::<i16>().frobnicate();
+}
+

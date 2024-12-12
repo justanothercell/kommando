@@ -75,6 +75,11 @@ typedef struct GenericValues {
     Map* resolved;
 } GenericValues;
 
+typedef struct GenericUse {
+    GenericValues* type_context;
+    GenericValues* func_context;
+} GenericUse;
+
 typedef struct TypeValue {
     Path* name;
     GenericValues* generics;
@@ -88,13 +93,18 @@ typedef struct Static Static;
 typedef struct Variable {
     Path* path;
     VarBox* box;
-    Static* s;
+    Static* static_ref;
     GenericValues* values;
+    Identifier* method_name;
+    GenericValues* method_values;
 } Variable;
 
 ENUM(ExprType, 
     EXPR_BIN_OP,
     EXPR_FUNC_CALL,
+    EXPR_METHOD_CALL,
+    EXPR_STATIC_METHOD_CALL,
+    EXPR_DYN_RAW_CALL,
     EXPR_LITERAL,  // typeof(expr) = Token*
     EXPR_BLOCK,
     EXPR_VARIABLE,
@@ -109,7 +119,6 @@ ENUM(ExprType,
     EXPR_CONTINUE, // no data
     EXPR_FIELD_ACCESS,
     EXPR_STRUCT_LITERAL,
-    EXPR_DYN_RAW_CALL,
     EXPR_C_INTRINSIC
 );
 
@@ -141,10 +150,6 @@ typedef struct StructLiteral {
     TypeValue* type;
     Map* fields;
 } StructLiteral;
-typedef struct DynRawCall {
-    Expression* callee;
-    ExpressionList args;
-} DynRawCall;
 
 typedef struct BinOp {
     Expression* lhs;
@@ -160,7 +165,27 @@ typedef struct FuncCall {
     GenericValues* generics;
     FuncDef* def;
 } FuncCall;
-
+typedef struct DynRawCall {
+    Expression* callee;
+    ExpressionList args;
+} DynRawCall;
+typedef struct MethodImpl MethodImpl;
+typedef struct MethodCall {
+    Expression* object;
+    Identifier* name;
+    ExpressionList arguments;
+    GenericValues* generics;
+    GenericValues* impl_vals;
+    MethodImpl* def;
+} MethodCall;
+typedef struct StaticMethodCall {
+    TypeValue* tv;
+    Identifier* name;
+    ExpressionList arguments;
+    GenericValues* generics;
+    GenericValues* impl_vals;
+    MethodImpl* def;
+} StaticMethodCall;
 typedef struct Block {
     ExpressionList expressions;
     bool yield_last;
@@ -211,6 +236,7 @@ typedef struct FuncDef {
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
+    TypeValue* mt;
 } FuncDef;
 
 typedef struct Static {
@@ -225,6 +251,13 @@ ENUM(Visibility,
     V_LOCAL,
     V_PUBLIC,
 );
+
+typedef struct ImplBlock {
+    TypeValue* type;
+    Map* methods;
+    GenericKeys* generics;
+} ImplBlock;
+LIST(ImplList, ImplBlock*);
 
 typedef struct Import {
     Path* path;

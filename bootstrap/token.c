@@ -154,6 +154,10 @@ Span from_points(CodePoint* left, CodePoint* right) {
 }
 
 void fprint_span(FILE* file, Span* span) {
+    if (span == NULL) {
+        fprintf(file, "(null):0:0-0");
+        return;
+    }
     if (span->left.index + 1 == span->right.index) fprintf(file, "%s:%lld:%lld-%lld", span->left.file, span->left.line + 1, span->left.column+1, span->left.column+2);
     else if (span->left.line == span->right.line) fprintf(file, "%s:%lld:%lld-%lld", span->left.file, span->left.line + 1, span->left.column + 1, span->right.column);
     else fprintf(file, "%s:%lld:%lld", span->left.file, span->left.line + 1, span->left.column);

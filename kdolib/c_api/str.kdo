@@ -1,8 +1,8 @@
 #[extern]
-pub fn strcmp(str1: std::c_const_str_ptr, str2: std::c_const_str_ptr) -> std::i32;
+pub fn strcmp(str1: std::c_str, str2: std::c_str) -> std::i32;
 #[extern]
-pub fn strlen(str: std::c_const_str_ptr) -> std::usize;
+pub fn strlen(str: std::c_str) -> std::usize;
 
-pub fn streq(str1: std::c_const_str_ptr, str2: std::c_const_str_ptr) -> std::bool {
+pub fn streq(str1: std::c_str, str2: std::c_str) -> std::bool {
     strcmp(str1, str2) == 0
 }

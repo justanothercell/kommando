@@ -9,7 +9,7 @@ fn identity_not_indirectly_called<T>(input: T) -> T {
 fn indirect<A, B>(a: A, b: B) {
     identity::<A>(a);
     identity::<B>(b);
-    identity_not_indirectly_called::<std::c_const_str_ptr>("no indirection here!");
+    identity_not_indirectly_called::<std::c_str>("no indirection here!");
 }
 
 fn indirect_indirect<A, B>(a: A, b: B) {
@@ -36,8 +36,8 @@ fn main() {
     dosomething::<std::u8>();
 
     identity::<std::i64>(1i64);
-    identity::<std::c_const_str_ptr>("");
-    indirect::<std::u8, std::c_const_str_ptr>(0u8, "");
+    identity::<std::c_str>("");
+    indirect::<std::u8, std::c_str>(0u8, "");
     indirect::<std::u8, std::i8>(0u8, 0i8);
     indirect_indirect::<std::u8, std::i8>(0u8, 0i8);
     indirect_indirect::<std::u16, std::i16>(0u16, 0i16);
@@ -46,7 +46,7 @@ fn main() {
     print_typeinfo::<std::bool>();
     print_typeinfo::<std::u32>();
     print_typeinfo::<std::usize>();
-    print_typeinfo::<std::c_const_str_ptr>();
+    print_typeinfo::<std::c_str>();
     print_typeinfo::<std::unit>();
     
     let box = Box::<std::i8> { item: 0i8 };

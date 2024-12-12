@@ -33,7 +33,7 @@ the `lambda` macro in [./bootstrap/lib/defines.h](./bootstrap/lib/defines.h) and
 ## Roadmap to Beta 0.1.0
 1. [x] static global variables
 2. [ ] rustish enums with primitive match expression
-3. [ ] struct methods
+3. [x] struct methods
 4. [ ] traits with static dispatch (depends on: 3)
 5. [ ] Copy, Clone and Drop (depends on 3, 4)
 6. [ ] operator overloading using traits (depends on 3, 4)

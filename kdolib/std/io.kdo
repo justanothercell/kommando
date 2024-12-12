@@ -1,7 +1,7 @@
-pub fn input(message: std::c_const_str_ptr) -> std::c_const_str_ptr {
+pub fn input(message: std::c_str) -> std::c_str {
     c_api::printf("%s", message);
     c_api::fflush(stdout);
-    let out_line: std::c_const_str_ptr = c_api::nullstr();
+    let out_line: std::c_str = c_api::nullstr();
     let out_len = 0usize;
     c_api::getline(&out_line, &out_len, stdin);
     let out_line_as_u8_ptr: ::std::ptr<::std::u8> = std::typecast(out_line);
@@ -11,12 +11,12 @@ pub fn input(message: std::c_const_str_ptr) -> std::c_const_str_ptr {
 
 #[extern]
 #[no_mangle]
-pub static stdin: std::opaque_ptr;
+pub static stdin: std::raw_ptr;
 
 #[extern]
 #[no_mangle]
-pub static stdout: std::opaque_ptr;
+pub static stdout: std::raw_ptr;
 
 #[extern]
 #[no_mangle]
-pub static stderr: std::opaque_ptr;
+pub static stderr: std::raw_ptr;
