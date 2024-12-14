@@ -5,6 +5,7 @@
 #include "module.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
 #include "lib/map.h"
 LIB;
 #include "parser.h"
@@ -136,7 +137,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
 
 Module* gen_intrinsics_types() {
     Module* module = malloc(sizeof(Module));
-    module->path = gen_path("::intrinsics::types");
+    module->path = gen_path("::core::types");
     module->imports = list_new(ImportList);
     module->impls = list_new(ImplList);
     module->items = map_new();
@@ -219,7 +220,7 @@ Module* gen_intrinsics_types() {
 
 Module* gen_intrinsics() {
     Module* module = malloc(sizeof(Module));
-    module->path = gen_path("::intrinsics");
+    module->path = gen_path("::core::intrinsics");
     module->imports = list_new(ImportList);
     module->impls = list_new(ImplList);
     module->items = map_new();
@@ -256,35 +257,35 @@ Module* gen_intrinsics() {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn sizeof<T>() -> ::std::usize {} ", "sizeof(@!T)", var_bindings, type_bindings);
+        register_intrinsic(module, "fn sizeof<T>() -> ::core::types::usize {} ", "sizeof(@!T)", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn alignof<T>() -> ::std::usize {} ", "alignof(@!T)", var_bindings, type_bindings);
+        register_intrinsic(module, "fn alignof<T>() -> ::core::types::usize {} ", "alignof(@!T)", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn c_typename<T>() -> ::std::c_str {} ", "\"@!T\"", var_bindings, type_bindings);
+        register_intrinsic(module, "fn c_typename<T>() -> ::core::types::c_str {} ", "\"@!T\"", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn typename<T>() -> ::std::c_str {} ", "\"@:T\"", var_bindings, type_bindings);
+        register_intrinsic(module, "fn typename<T>() -> ::core::types::c_str {} ", "\"@:T\"", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn short_typename<T>() -> ::std::c_str {} ", "\"@.T\"", var_bindings, type_bindings);
+        register_intrinsic(module, "fn short_typename<T>() -> ::core::types::c_str {} ", "\"@.T\"", var_bindings, type_bindings);
     }
 
     {

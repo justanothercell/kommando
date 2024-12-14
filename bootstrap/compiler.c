@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "lib.h"
+#include "lib/list.h"
 LIB;
 #include "compiler.h"
 #include "ast.h"
@@ -134,8 +135,6 @@ void compile(CompilerOptions options) {
     program->main_module = main;
 
     insert_module(program, main, V_PUBLIC);
-    insert_module(program, intrinsics, V_PUBLIC);
-    insert_module(program, intrinsics_types, V_PUBLIC);
 
     list_foreach(&options.module_names, i, str modname, {
         str fp = map_get(options.modules, modname);
@@ -151,6 +150,9 @@ void compile(CompilerOptions options) {
         insert_module(program, mod, V_PUBLIC);
     });
 
+    insert_module(program, intrinsics, V_PUBLIC);
+    insert_module(program, intrinsics_types, V_PUBLIC);
+
     typedef struct Submodule {
         Path* current;
         str parentfile;
@@ -163,7 +165,7 @@ void compile(CompilerOptions options) {
         UNUSED(key);
         list_foreach(&item->subs, i, ModDef* m, ({
             if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, item->path)));
-            if (item->filepath == NULL) spanned_error("Synthetic", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
+            if (item->filepath == NULL) spanned_error("Synthetic module error", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
                     to_str_writer(s, fprint_path(s, item->path)), m->name->name);
             Submodule sm = (Submodule){ .current = item->path, .parentfile=item->filepath, .mod = m->name, .vis = m->vis};
             list_append(&sublist, sm);

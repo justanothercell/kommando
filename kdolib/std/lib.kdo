@@ -4,7 +4,7 @@ pub mod mem;
 pub mod env;
 pub mod coroutine;
 
-pub use intrinsics::types::*;
+pub use core::types::*;
 
-pub use intrinsics::typecast;
-pub use intrinsics::numcast;
+pub use core::intrinsics::typecast;
+pub use core::intrinsics::numcast;

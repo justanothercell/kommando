@@ -771,7 +771,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             TVBox* op_arg_box;
             if (str_eq(op->op, ">") || str_eq(op->op, "<") || str_eq(op->op, ">=") || str_eq(op->op, "<=") || str_eq(op->op, "!=") || str_eq(op->op, "==")) {
                 op_arg_box = new_tvbox();
-                TypeValue* bool_ty = gen_typevalue("::intrinsics::types::bool", &op->op_span);
+                TypeValue* bool_ty = gen_typevalue("::core::types::bool", &op->op_span);
                 resolve_typevalue(program, func->module, bool_ty, func->generics, type_generics);
                 fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, bool_ty);
             } else {
@@ -820,7 +820,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             TVBox* objectbox = new_tvbox();
             resolve_expr(program, func, type_generics, call->object, vars, objectbox);
 
-            TypeValue* ptr = gen_typevalue("::intrinsics::types::ptr<_>", &expr->span);
+            TypeValue* ptr = gen_typevalue("::core::types::ptr<_>", &expr->span);
             resolve_typevalue(program, func->module, ptr, NULL, NULL);
             TypeValue* method_type = call->object->resolved->type;
             bool deref_to_call = false;
@@ -977,7 +977,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             DynRawCall* call = expr->expr;
 
             TVBox* dyncall = new_tvbox();
-            dyncall->type = gen_typevalue("::intrinsics::types::function_ptr<_>", &expr->span);
+            dyncall->type = gen_typevalue("::core::types::function_ptr<_>", &expr->span);
             dyncall->type->generics->generics.elements[0] = t_return->type;
             resolve_typevalue(program, func->module, dyncall->type, func->generics, type_generics);
             resolve_expr(program, func, type_generics, call->callee, vars, dyncall);
@@ -993,7 +993,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             Token* lit = expr->expr;
             switch (lit->type) {
                 case STRING: {
-                    t_return->type = gen_typevalue("::intrinsics::types::c_str", &expr->span);
+                    t_return->type = gen_typevalue("::core::types::c_str", &expr->span);
                     resolve_typevalue(program, func->module, t_return->type, func->generics, type_generics);
                 } break;
                 case NUMERAL: {
@@ -1005,7 +1005,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
                     }
                     TypeValue* tv = t_return->type;
                     if (tv == NULL || tv->def == NULL || !default_ty) {
-                        tv = gen_typevalue(to_str_writer(stream, fprintf(stream, "::intrinsics::types::%s", ty)), &expr->span);
+                        tv = gen_typevalue(to_str_writer(stream, fprintf(stream, "::core::types::%s", ty)), &expr->span);
                     }
                     fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, tv);
                 } break; 
@@ -1033,7 +1033,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             resolve_expr(program, func, type_generics, let->value, vars, let->var->box->resolved);
             patch_tvs(&let->type, &let->var->box->resolved->type);
 
-            TypeValue* tv = gen_typevalue("::intrinsics::types::unit", &expr->span);
+            TypeValue* tv = gen_typevalue("::core::types::unit", &expr->span);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, tv);
         } break;
         case EXPR_ASSIGN: {
@@ -1042,20 +1042,20 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             resolve_expr(program, func, type_generics, assign->asignee, vars, assign_t);
             resolve_expr(program, func, type_generics, assign->value, vars, assign_t);
 
-            TypeValue* tv = gen_typevalue("::intrinsics::types::unit", &expr->span);
+            TypeValue* tv = gen_typevalue("::core::types::unit", &expr->span);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, tv);
         } break;
         case EXPR_CONDITIONAL: {
             Conditional* cond = expr->expr;
 
-            TypeValue* bool_ty = gen_typevalue("::intrinsics::types::bool", &cond->cond->span);
+            TypeValue* bool_ty = gen_typevalue("::core::types::bool", &cond->cond->span);
             resolve_typevalue(program, func->module, bool_ty, func->generics, type_generics);
             TVBox* cond_ty = new_tvbox();
             cond_ty->type = bool_ty;
             resolve_expr(program, func, type_generics, cond->cond, vars, cond_ty);
 
             if (cond->otherwise == NULL) {
-                TypeValue* unit_ty = gen_typevalue("::intrinsics::types::unit", &cond->cond->span);
+                TypeValue* unit_ty = gen_typevalue("::core::types::unit", &cond->cond->span);
                 resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
                 fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);
             }
@@ -1066,12 +1066,12 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_WHILE_LOOP: {
             WhileLoop* wl = expr->expr;
-            TypeValue* bool_ty = gen_typevalue("::intrinsics::types::bool", &wl->cond->span);
+            TypeValue* bool_ty = gen_typevalue("::core::types::bool", &wl->cond->span);
             resolve_typevalue(program, func->module, bool_ty, func->generics, type_generics);
             TVBox* condbox = new_tvbox();
             condbox->type = bool_ty;
             resolve_expr(program, func, type_generics, wl->cond, vars, condbox);
-            TypeValue* unit_ty = gen_typevalue("::intrinsics::types::unit", &wl->body->span);
+            TypeValue* unit_ty = gen_typevalue("::core::types::unit", &wl->body->span);
             resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
             TVBox* bodybox = new_tvbox();
             bodybox->type = unit_ty;
@@ -1080,7 +1080,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
         } break;
         case EXPR_RETURN: {
             Expression* ret = expr->expr;
-            TypeValue* unit_ty = gen_typevalue("::intrinsics::types::unit", &expr->span);
+            TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
             resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
             if (ret == NULL) {
                 // we return unit
@@ -1098,12 +1098,12 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
                 resolve_expr(program, func, type_generics, expr->expr, vars, t_return);
                 todo("XPR_BREAK with expr");
             }
-            TypeValue* unit_ty = gen_typevalue("::intrinsics::types::unit", &expr->span);
+            TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
             resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);    
         } break;
         case EXPR_CONTINUE: {
-            TypeValue* unit_ty = gen_typevalue("::intrinsics::types::unit", &expr->span);
+            TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
             resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);            
         } break;
@@ -1111,7 +1111,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             FieldAccess* fa = expr->expr;
             TVBox* object_type = new_tvbox();
             resolve_expr(program, func, type_generics, fa->object, vars, object_type);
-            TypeValue* reference = gen_typevalue("::intrinsics::types::ptr<_>", &expr->span);
+            TypeValue* reference = gen_typevalue("::core::types::ptr<_>", &expr->span);
             resolve_typevalue(program, func->module, reference, NULL, NULL);
             if (reference->def == fa->object->resolved->type->def) { // is a reference;
                 Expression* inner = fa->object;
@@ -1136,7 +1136,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
                     fprint_path(stream, td->module->path);
                     fprintf(stream, "::%s", td->name->name);
                 });
-                if (str_eq(path, "::intrinsics::types::ptr")) {
+                if (str_eq(path, "::core::types::ptr")) {
                     spanned_error("Invalid struct field", fa->field->span, "%s @ %s has no such field '%s'. Try dereferencing the ptr to get the field of the inner type: `(*ptr).%s`.", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &td->name->span)), fa->field->name, fa->field->name);
                 } else {
                     spanned_error("Invalid struct field", fa->field->span, "%s @ %s has no such field '%s'", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &td->name->span)), fa->field->name);
@@ -1192,14 +1192,14 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             Expression* inner = expr->expr;
             TVBox* inner_tv = new_tvbox();
             if (t_return->type != NULL) {
-                TypeValue* reference = gen_typevalue("::intrinsics::types::ptr<_>", &expr->span);
+                TypeValue* reference = gen_typevalue("::core::types::ptr<_>", &expr->span);
                 resolve_typevalue(program, func->module, reference, NULL, NULL);
                 if (reference->def != t_return->type->def) spanned_error("Expected resulting type to be a reference", expr->span, "Type %s, is not a reference, expected %s as a result", to_str_writer(s, fprint_typevalue(s, t_return->type)),to_str_writer(s, fprint_typevalue(s, reference)));
                 inner_tv->type = t_return->type->generics->generics.elements[0];
             }
             resolve_expr(program, func, type_generics, inner, vars, inner_tv);
             finish_tvbox(inner_tv, NULL);
-            TypeValue* reference = gen_typevalue("::intrinsics::types::ptr::<_>", &expr->span);
+            TypeValue* reference = gen_typevalue("::core::types::ptr::<_>", &expr->span);
             reference->generics->generics.elements[0] = inner->resolved->type;
             resolve_typevalue(program, func->module, reference, NULL, NULL);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, reference);
@@ -1208,12 +1208,12 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             Expression* inner = expr->expr;
             TVBox* inner_tv = new_tvbox();
             if (t_return->type != NULL) {
-                inner_tv->type = gen_typevalue("::intrinsics::types::ptr::<_>", &expr->span);
+                inner_tv->type = gen_typevalue("::core::types::ptr::<_>", &expr->span);
                 inner_tv->type->generics->generics.elements[0] = t_return->type;
             }
             resolve_expr(program, func, type_generics, inner, vars, inner_tv);
             finish_tvbox(inner_tv, NULL);
-            if (!str_eq(to_str_writer(s, fprint_td_path(s, inner_tv->type->def)), "::intrinsics::types::ptr")) spanned_error("Expected ptr to dereference", expr->span, "Cannot dereference type %s, expected ::intrinsics::types::ptr<_>", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
+            if (!str_eq(to_str_writer(s, fprint_td_path(s, inner_tv->type->def)), "::core::types::ptr")) spanned_error("Expected ptr to dereference", expr->span, "Cannot dereference type %s, expected ::core::types::ptr<_>", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             if (inner->resolved->type->generics == NULL || inner->resolved->type->generics->generics.length != 1) spanned_error("Expected ptr to have a pointee", expr->span, "Pointer %s should have one generic argument as its pointee", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, inner->resolved->type->generics->generics.elements[0]);
         } break;
@@ -1240,7 +1240,7 @@ void resolve_block(Program* program, FuncDef* func, GenericKeys* type_generics, 
         yield_ty = block->expressions.elements[block->expressions.length-1]->resolved;
     } else {
         yield_ty = malloc(sizeof(TVBox));
-        yield_ty->type = gen_typevalue("::intrinsics::types::unit", &block->span);
+        yield_ty->type = gen_typevalue("::core::types::unit", &block->span);
         resolve_typevalue(program, func->module, yield_ty->type, func->generics, type_generics);
     }
     block->res = yield_ty->type;
@@ -1261,7 +1261,7 @@ void resolve_funcdef(Program* program, FuncDef* func, GenericKeys* type_generics
 
     if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
     if (func->return_type == NULL) {
-        func->return_type = gen_typevalue("::intrinsics::types::unit", &func->name->span);
+        func->return_type = gen_typevalue("::core::types::unit", &func->name->span);
     }
     if (func->generics != NULL) {
         list_foreach(&func->generics->generics, i, Identifier* key, {

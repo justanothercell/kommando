@@ -1,4 +1,6 @@
+use core::types::*;
+
 #[extern]
-pub fn pow(a: std::f64, b: std::f64) -> std::f64;
+pub fn pow(a: f64, b: f64) -> f64;
 #[extern]
-pub fn powf(a: std::f32, b: std::f32) -> std::f32;
+pub fn powf(a: f32, b: f32) -> f32;

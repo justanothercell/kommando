@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "lib.h"
+LIB;
 #include "compiler.h"
 
 void cleanup_quit(str file, usize line, int code) {

@@ -18,6 +18,7 @@ fn main() {
     printf("counting %d\n", next());
     printf("counting %d\n", next());
     printf("counting %d\n", next());
+    printf("--- resetting ---\n");
     reset();
     printf("counting %d\n", next());
     printf("counting %d\n", next());
