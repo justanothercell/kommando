@@ -6,6 +6,7 @@
 
 #include "lib.h"
 #include "lib/exit.h"
+#include "lib/map.h"
 #include "lib/str.h"
 LIB
 #include "transpiler_c.h"
@@ -18,7 +19,6 @@ LIB
 void fprint_resolved_typevalue(FILE* stream, TypeValue* tv, GenericValues* type_generics, GenericValues* func_generics, bool long_names) {
     TypeDef* ty = tv->def;
     if (ty == NULL) panic("Unresolved type");
-    if (tv->ctx != NULL) spanned_error("Indirect generic type", ty->name->span, "Type is not concrete");
     if (ty->module == NULL) { // is generic
         TypeValue* type_candidate = NULL;
         if (type_generics != NULL) type_candidate = map_get(type_generics->resolved, ty->name->name);
@@ -272,6 +272,15 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
             transpile_expression(code_stream, modkey, func, type_generics, func_generics, op->rhs, indent + 1);
             fprintf(code_stream, ")");
         } break;
+        case EXPR_BIN_OP_ASSIGN: {
+            BinOp* op = expr->expr;
+            str temp = gen_temp_c_name();
+            str ty = gen_c_type_name(op->lhs->resolved->type, type_generics, func_generics);
+            fprintf(code_stream, "%s* %s = &(", ty, temp);
+            transpile_expression(code_stream, modkey, func, type_generics, func_generics, op->lhs, indent + 1);
+            fprintf(code_stream, "); *%s = *%s %s ", temp, temp, op->op);
+            transpile_expression(code_stream, modkey, func, type_generics, func_generics, op->rhs, indent + 1);
+        } break;
         case EXPR_FUNC_CALL: {
             FuncCall* fc = expr->expr;
             FuncDef* fd = fc->def;
@@ -471,6 +480,9 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
                         } else if (mode == '!') {
                             str c_ty = gen_c_type_name(tv, type_generics, func_generics);
                             fprintf(code_stream, "%s", c_ty);
+                        } else if (mode == '#') {
+                            str tyname = to_str_writer(s, fprint_resolved_typevalue(s, tv, type_generics, func_generics, true));
+                            fprintf(code_stream, "%lu", str_hash(tyname));
                         } else spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
                     } else if (op == '$') {
                         str key = malloc(2);
@@ -560,10 +572,11 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
     if (type_instance != NULL) {
         TypeValue* type_contexted = find_contexted(type_instance);
         if (type_contexted == NULL) {
-            if (!is_fully_defined(type_instance)) spanned_error("Not fully defined", type_instance->span, "This is probably a compiler error. For now just supply more generic hints.");
+            if (!is_fully_defined(type_instance)) spanned_error("Not fully defined", type_instance->span, "This is probably a compiler error. For now just supply more generic hints. Defined @ %s", to_str_writer(s, fprint_span(s, &instance_host->span)));
             goto type_done;
         }
         map_foreach(type_contexted->ctx->generic_uses, str key, GenericUse* use, {
+            log(" -> %s ", key);
             UNUSED(key);
             GenericValues* expanded = expand_generics(type_instance, use->type_context, use->func_context);
             str expanded_key = tfvals_to_key(expanded, func_instance);
@@ -590,9 +603,7 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
             UNUSED(key);
             GenericValues* expanded = expand_generics(func_instance, use->type_context, use->func_context);
             str expanded_key = tfvals_to_key(type_instance, expanded);
-            log(" > monomorphized to %s (func)", expanded_key);
             if (!map_contains(instance_host->generic_uses, expanded_key)) {
-                log(" > the thing was actually new");
                 GenericUse* use = malloc(sizeof(GenericUse));
                 use->type_context = type_instance;
                 use->func_context = expanded;
@@ -611,8 +622,8 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
 void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func, GenericValues* type_generics, GenericValues* func_generics) {
     str c_fn_name = gen_c_fn_name(func, type_generics, func_generics);
     str c_ret_ty = gen_c_type_name(func->return_type, type_generics, func_generics);
-
-    fprintf(header_stream, "// %s::%s%s%s\n", modkey, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics));
+    if (func->impl_type == NULL) fprintf(header_stream, "// %s::%s%s%s\n", modkey, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics));
+    else fprintf(header_stream, "// %s%s::%s%s\n", to_str_writer(s, fprint_td_path(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
     fprintf(header_stream, "%s %s(", c_ret_ty, c_fn_name);
     list_foreach(&func->args, i, Argument* arg, {
         str c_ty = gen_c_type_name(arg->type, type_generics, func_generics);
@@ -628,7 +639,8 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
     fprintf(header_stream, "\n");
 
     if (func->body != NULL) {
-        fprintf(code_stream, "// %s::%s%s%s\n", modkey, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics));
+        if (func->impl_type == NULL) fprintf(code_stream, "// %s::%s%s%s\n", modkey, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics));
+        else fprintf(code_stream, "// %s%s::%s%s\n", to_str_writer(s, fprint_td_path(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
         fprintf(code_stream, "%s %s(", c_ret_ty, c_fn_name);
         list_foreach(&func->args, i, Argument* arg, {
             str c_ty = gen_c_type_name(arg->type, type_generics, func_generics);
@@ -650,8 +662,8 @@ void transpile_function_generic_variant(FILE* header_stream, FILE* code_stream, 
 }
 
 void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, FuncDef* func) {
-    if (func->mt == NULL) log("Transpiling function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
-    else log("Transpiling method  %s::%s", to_str_writer(s, fprint_typevalue(s, func->mt)), func->name->name);
+    if (func->impl_type == NULL) log("Transpiling function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
+    else log("Transpiling method %s::%s", to_str_writer(s, fprint_typevalue(s, func->impl_type)), func->name->name);
     if (func->generics != NULL) {
         Map* dupls = map_new();
         // we can safely append to that list, even if it reallocates it should be fine as long as its the last thing we do with the item sbefore refetching
@@ -659,6 +671,7 @@ void transpile_function(FILE* header_stream, FILE* code_stream, str modkey, Func
             GenericUse* use = map_get(func->generics->generic_uses, key);
             GenericValues* type_generics = use->type_context;
             GenericValues* func_generics = use->func_context;
+            log("variant %s %lld", key, func->generics->generic_use_keys.length);
             if (monomorphize(type_generics, func_generics, func->generics)) {
                 str fn_c_name = gen_c_fn_name(func, type_generics, func_generics);
                 if (!map_contains(dupls, fn_c_name)) {
@@ -715,7 +728,6 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
             GenericValues* func_generics = use->func_context;
             if (func_generics != NULL) unreachable("%p %p %s %s", type_generics, func_generics, ty->name->name, to_str_writer(s, fprint_span(s, &func_generics->span)));
             if (monomorphize(type_generics, func_generics, ty->generics)) { 
-                log(" > actually doing the thing!");
                 map_foreach(ty->fields, str key, Field* f, {
                     UNUSED(key);
                     TypeValue* tv = f->type;
@@ -824,6 +836,8 @@ void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_str
     map_foreach(program->packages, str modkey, Module* module, {
         transpile_module(header_stream, code_stream, modkey, module, MIT_STATIC);
     });
+
+    fprintf(code_stream, "\n");
 
     // transpile all functions
     map_foreach(program->packages, str modkey, Module* module, {

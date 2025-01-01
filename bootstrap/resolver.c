@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 
 #include "lib.h"
 #include "lib/defines.h"
@@ -166,6 +167,7 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
 //             Foo  <i32>              <T> (of Foo)            
 //    register_item(tv->generics, NULL, tv->def->generics);
 void register_item(GenericValues* type_values, GenericValues* func_values, GenericKeys* gkeys) {
+    if (gkeys == NULL) return;
     // no need to register if we are not generic - we just complie the one default nongeneric variant in that case
     if (type_values != NULL || func_values != NULL) {
         if (type_values == NULL && func_values != NULL) {
@@ -197,40 +199,32 @@ void register_item(GenericValues* type_values, GenericValues* func_values, Gener
 void resolve_funcdef(Program* program, FuncDef* func, GenericKeys* type_generics);
 void resolve_typedef(Program* program, TypeDef* ty);
 void resolve_typevalue(Program* program, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
-static int item_cache_hits = 0;
-static int item_cache_misses = 0;
+static usize ITEM_CACHE_HOT_HITS = 0;
+static usize ITEM_CACHE_COLD_HITS = 0;
+static usize ITEM_CACHE_MISSES = 0;
+#define HOT_CACHE_SIZE 16
+#define COLD_CACHE_SIZE 8
+// HOT:COLD
+//  16: 1 - Item cache hot hits: 396 cold hits: 27 misses: 207
+//  16: 8 - Item cache hot hits: 398 cold hits: 73 misses: 159
+//   8: 8 - Item cache hot hits: 360 cold hits: 93 misses: 177
+//   8:16 - Item cache hot hits: 366 cold hits: 123 misses: 141
+//   1:16 - Item cache hot hits: 197 cold hits: 271 misses: 162
+static_assert(HOT_CACHE_SIZE > 0, "HOT_CACHE_SIZE has to be greater than zero");
+static_assert(COLD_CACHE_SIZE > 0, "COLD_CACHE_SIZE has to be greater than zero");
 void report_item_cache_stats() {
-    log("Item cache hits: %d misses: %d", item_cache_hits, item_cache_misses);
+    log("Item cache hot hits: %llu cold hits: %llu misses: %llu", ITEM_CACHE_HOT_HITS, ITEM_CACHE_COLD_HITS, ITEM_CACHE_MISSES);
 }
 void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
     typedef struct {
         str key;
         ModuleItem* item;
     } MICacheItem;
-    LIST(MICList, MICacheItem);
-    static MICList LOOKUP_CACHE = list_new(MICList);
-    const usize CACHE_SIZE = 16;
-    /*
-        // examples/generics.kdo
-        // note that this is still a rather small example so it only is partially representative.
-        size: hits/misses
-            1:   40/295
-            2:   71/264
-            3:   90/245
-            4:   95/240
-            6:  109/226
-            8:  112/223
-           12:  145/190
-           16:  161/174
-           24:  193/142
-           32:  197/138
-           48:  214/121
-           64:  217/118
-           96:  246/ 89
-          128:  246/ 89
-          192:  246/ 89
-          256:  246/ 89
-    */
+    static MICacheItem HOT_LOOKUP_CACHE[HOT_CACHE_SIZE];
+    static MICacheItem COLD_LOOKUP_CACHE[COLD_CACHE_SIZE];
+    static usize HOT_CACHE_LENGTH = 0;
+    static usize COLD_CACHE_LENGTH = 0;
+    static usize COLD_CACHE_INDEX = 0;
     str key = to_str_writer(s, {
         fprint_path(s, path);
         if (!path->absolute) {
@@ -240,25 +234,50 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
     });
 
     ModuleItem* mi = NULL;
-    for (usize i = 0;i < CACHE_SIZE && i < LOOKUP_CACHE.length;i++) {
-        if (str_eq(LOOKUP_CACHE.elements[i].key, key)) {
-            mi = LOOKUP_CACHE.elements[i].item;
+    for (usize i = 0;i < HOT_CACHE_LENGTH;i++) {
+        if (str_eq(HOT_LOOKUP_CACHE[i].key, key)) {
+            MICacheItem mic = HOT_LOOKUP_CACHE[i];
+            mi = mic.item;
             if (i > 0) { // improve location in cache
-                MICacheItem t = LOOKUP_CACHE.elements[i];
-                LOOKUP_CACHE.elements[i] = LOOKUP_CACHE.elements[i - 1];
-                LOOKUP_CACHE.elements[i - 1] = t;
+                HOT_LOOKUP_CACHE[i] = HOT_LOOKUP_CACHE[i - 1];
+                HOT_LOOKUP_CACHE[i - 1] = mic;
             }
-            item_cache_hits += 1;
+            ITEM_CACHE_HOT_HITS += 1;
             break;
+        }
+    }
+    if (mi == NULL) {
+        for (usize i = 0;i < COLD_CACHE_LENGTH;i++) {
+            usize idx = (COLD_CACHE_LENGTH - 1 - i + COLD_CACHE_INDEX) % COLD_CACHE_LENGTH;
+            if (str_eq(COLD_LOOKUP_CACHE[idx].key, key)) {
+                MICacheItem mic = COLD_LOOKUP_CACHE[idx];
+                mi = mic.item;
+                // now swap this with the last item in the hot cache
+                if (HOT_CACHE_LENGTH < HOT_CACHE_SIZE) {
+                    HOT_LOOKUP_CACHE[HOT_CACHE_LENGTH++] = mic;
+                } else {
+                    COLD_LOOKUP_CACHE[idx] = HOT_LOOKUP_CACHE[HOT_CACHE_LENGTH-1];
+                    HOT_LOOKUP_CACHE[HOT_CACHE_LENGTH-1] = mic;
+                }
+                ITEM_CACHE_COLD_HITS += 1;
+                break;
+            }
         }
     }
 
     if (mi == NULL) {
         mi = resolve_item_raw(program, module, path, kind, NULL);
         MICacheItem mic = (MICacheItem) { .key=key, .item = mi };
-        if (LOOKUP_CACHE.length < CACHE_SIZE) list_append(&LOOKUP_CACHE, mic);
-        else LOOKUP_CACHE.elements[CACHE_SIZE - 1] = mic;
-        item_cache_misses += 1;
+        ITEM_CACHE_MISSES += 1;
+        // now place into cache
+        if (HOT_CACHE_LENGTH < HOT_CACHE_SIZE) {
+            HOT_LOOKUP_CACHE[HOT_CACHE_LENGTH++] = mic;
+        } else if (COLD_CACHE_LENGTH < COLD_CACHE_SIZE) {
+            COLD_LOOKUP_CACHE[COLD_CACHE_LENGTH++] = mic;
+        } else {
+            COLD_LOOKUP_CACHE[COLD_CACHE_INDEX] = mic;
+            COLD_CACHE_INDEX = (COLD_CACHE_INDEX + 1) % COLD_CACHE_LENGTH;
+        }
     }
 #ifdef DEBUG_CACHE
     {
@@ -340,12 +359,12 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
             generic_value->ctx = func_generics;
         }
         if (type_generics != NULL && map_contains(type_generics->resolved, generic_value->def->name->name)) {
-            if (generic_value->ctx != NULL && generic_value->ctx != func_generics) spanned_error("Multiple contexts found", generic_value->name->elements.elements[0]->span, "%s has potential contexts in %s @ %s and %s @ %s",
+            if (generic_value->ctx != NULL && generic_value->ctx != type_generics) spanned_error("Multiple contexts found", generic_value->name->elements.elements[0]->span, "%s has potential contexts in %s @ %s and %s @ %s",
                                                 generic_value->def->name->name,
                                                 to_str_writer(s, fprint_span_contents(s, &generic_value->ctx->span)), to_str_writer(s, fprint_span(s, &generic_value->ctx->span)),
                                                 to_str_writer(s, fprint_span_contents(s, &type_generics->span)), to_str_writer(s, fprint_span(s, &type_generics->span))
                                             );
-            generic_value->ctx = func_generics; // don't question it... we are still dependant on the calling function even if the generic comes from the implementing type on a method
+            generic_value->ctx = type_generics; // don't question it... we are still dependant on the calling function even if the generic comes from the implementing type on a method
         }
     }
     generic_end: {}
@@ -376,10 +395,12 @@ void resolve_typevalue(Program* program, Module* module, TypeValue* tval, Generi
         if ((func_gen_t != NULL || type_gen_t != NULL) && tval->generics != NULL) spanned_error("Generic generic", tval->generics->span, "Generic parameter should not have generic arguments @ %s", to_str_writer(s, fprint_span(s, &tval->def->name->span)));
         if (func_gen_t != NULL) {
             tval->def = func_gen_t;
+            tval->ctx = func_generics;
             return;
         }
         if (type_gen_t != NULL) {
             tval->def = type_gen_t;
+            tval->ctx = type_generics;
             return;
         }
     }
@@ -653,7 +674,7 @@ void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, Gen
                 to_str_writer(s, fprint_typevalue(s, value)), to_str_writer(s, fprint_span(s, &value->name->elements.elements[0]->span)));
             TypeValue* type_candidate = NULL;
             if (type_generics != NULL) type_candidate = map_get(type_generics->resolved, generic);
-            TypeValue* func_candidate = NULL;;
+            TypeValue* func_candidate = NULL;
             if (func_generics != NULL) func_candidate = map_get(func_generics->resolved, generic);
             if (type_candidate == NULL && func_candidate == NULL) {
                 spanned_error("No such generic", match->name->elements.elements[0]->span, "%s is not a valid generic for %s @ %s or %s @ %s", to_str_writer(s, fprint_typevalue(s, match)), 
@@ -779,6 +800,16 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             }
             resolve_expr(program, func, type_generics, op->lhs, vars, op_arg_box);
             resolve_expr(program, func, type_generics, op->rhs, vars, op_arg_box);
+            
+        } break;
+        case EXPR_BIN_OP_ASSIGN: {
+            BinOp* op = expr->expr;
+            TVBox* op_arg_box = new_tvbox();
+            resolve_expr(program, func, type_generics, op->lhs, vars, op_arg_box);
+            resolve_expr(program, func, type_generics, op->rhs, vars, op_arg_box);
+            TypeValue* unit_ty = gen_typevalue("::core::types::unit", &op->op_span);
+            resolve_typevalue(program, func->module, unit_ty, func->generics, type_generics);
+            fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);
         } break;
         case EXPR_FUNC_CALL: {
             FuncCall* fc = expr->expr;
@@ -812,7 +843,9 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
 
             TypeValue* ret = replace_generic(fd->return_type, NULL, fc->generics);
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, ret);
-
+            if (str_eq(fc->def->name->name, "arr_offset")) {
+                log("arr_offset with %s in %s", gvals_to_key(fc->generics), func->name->name);
+            }
             register_item(NULL, fc->generics, fd->generics);        
         } break;
         case EXPR_METHOD_CALL: {
@@ -822,6 +855,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
 
             TypeValue* ptr = gen_typevalue("::core::types::ptr<_>", &expr->span);
             resolve_typevalue(program, func->module, ptr, NULL, NULL);
+
             TypeValue* method_type = call->object->resolved->type;
             bool deref_to_call = false;
             if (method_type->def == ptr->def) {
@@ -915,6 +949,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, ret);
 
             register_item(type_call_vals, call->generics, call->def->func->generics);    
+            register_item(type_call_vals, call->generics, call->def->keys);    
         } break;
         case EXPR_STATIC_METHOD_CALL: {
             StaticMethodCall* call = expr->expr;
@@ -972,6 +1007,7 @@ void resolve_expr(Program* program, FuncDef* func, GenericKeys* type_generics, E
             fill_tvbox(program, func->module, expr->span, func->generics, type_generics, t_return, ret);
 
             register_item(type_call_vals, call->generics, call->def->func->generics);  
+            register_item(type_call_vals, call->generics, call->def->keys);  
         } break;
         case EXPR_DYN_RAW_CALL: {
             DynRawCall* call = expr->expr;
@@ -1253,11 +1289,12 @@ void resolve_block(Program* program, FuncDef* func, GenericKeys* type_generics, 
 
 void resolve_module(Program* program, Module* module);
 void resolve_funcdef(Program* program, FuncDef* func, GenericKeys* type_generics) {
+    if (func->head_resolved) return;
     if (!func->module->resolved && !func->module->in_resolution) {
         resolve_module(program, func->module);
     }
-    if (func->mt == NULL) log("Resolving function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
-    else log("Resolving method %s::%s", to_str_writer(s, fprint_typevalue(s, func->mt)), func->name->name);
+    if (func->impl_type == NULL) log("Resolving function %s::%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name);
+    else log("Resolving method %s::%s", to_str_writer(s, fprint_typevalue(s, func->impl_type)), func->name->name);
 
     if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
     if (func->return_type == NULL) {
@@ -1425,8 +1462,8 @@ void resovle_imports(Program* program, Module* module, List* mask) {
                     ModuleItem* orig = map_get(module->items, item->name->name);
                     if (orig->item == imported->item) continue;
                     spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", item->name->name, 
-                                                                    TokenType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
-                                                                    TokenType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->name->span)));
+                                                                    ModuleItemType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
+                                                                    ModuleItemType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->name->span)));
                 }
                 map_put(module->items, item->name->name, imported);
             });

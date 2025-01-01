@@ -4,6 +4,7 @@
 #include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
+#include <string.h>
 LIB;
 #include "module.h"
 #include "token.h"
@@ -128,7 +129,7 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         FuncDef* func = parse_function_definition(stream);
         func->module = module;
         func->annotations = annos;
-        func->mt = impl->type;
+        func->impl_type = impl->type;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
             func->generics->generic_use_keys = list_new(StrList);
@@ -516,6 +517,16 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         Token* t = next_token(stream);
         if (token_compare(t, ".", SNOWFLAKE)) {
             Identifier* field = parse_identifier(stream);
+            bool will_call = false;
+            GenericValues* generics = NULL;
+            if (double_double_colon(stream)) {
+                will_call = true;
+                t = next_token(stream);
+                stream->peek = t;
+                if (token_compare(t, "<", SNOWFLAKE)) {
+                    generics = parse_generic_values(stream);
+                }
+            }
             t = next_token(stream);
             if (token_compare(t, "(", SNOWFLAKE)) {
                 ExpressionList arguments = list_new(ExpressionList);
@@ -536,13 +547,14 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 call->object = expression;
                 call->name = field;
                 call->arguments = arguments;
-                call->generics = NULL;
+                call->generics = generics;
                 call->def = NULL;
                 expression = malloc(sizeof(Expression));
                 expression->span = from_points(&call->object->span.left, &call->name->span.right);
                 expression->expr = call;
                 expression->type = EXPR_METHOD_CALL;
             } else {
+                if (will_call) spanned_error("Expected method call", t->span, "Expected method call parenthesis after `::`");
                 stream->peek = t;
                 FieldAccess* fa = malloc(sizeof(FieldAccess));
                 fa->object = expression;
@@ -560,7 +572,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
     return expression;
 }
 
-int bin_op_precedence(str op) {
+int bin_op_precedence(str op, Span span) {
     if (str_eq("||", op)) return 0;
     if (str_eq("&&", op)) return 1;
     if (str_eq("==", op) || str_eq("!=", op)
@@ -572,7 +584,7 @@ int bin_op_precedence(str op) {
     if (str_eq(">>", op) || str_eq("<<", op)) return 6;
     if (str_eq("+", op) || str_eq("-", op)) return 7;
     if (str_eq("*", op) || str_eq("/", op) || str_eq("%", op)) return 8;
-    unreachable("Invalid binop %s", op);
+    spanned_error("Invalid operator", span, "Invalid binop %s", op);
 }
 
 Expression* parse_expression(TokenStream* stream, bool allow_lit) {
@@ -630,38 +642,56 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                 }
             }
             Expression* rhs = parse_expression(stream, allow_lit);
-            if (rhs->type == EXPR_BIN_OP) {
-                BinOp* rhs_inner = rhs->expr;
-                if (bin_op_precedence(t->string) >= bin_op_precedence(rhs_inner->op)) {
-                    Expression* a = expr;
-                    Expression* b = rhs_inner->lhs;
-                    Expression* c = rhs_inner->rhs;
-                    BinOp* op = malloc(sizeof(BinOp));
-                    op->lhs = a;
-                    op->rhs = b;
-                    op->op = t->string;
-                    op->op_span = t->span;
-                    t->string = rhs_inner->op;
-                    t->span = rhs_inner->op_span;
-                    Expression* op_expr = malloc(sizeof(Expression));
-                    op_expr->expr = op;
-                    op_expr->type = EXPR_BIN_OP;
-                    op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
-                    expr = op_expr;
-                    rhs = c;
+            if (str_endswith(t->string, "=") && t->string[0] != '=' && t->string[0] != '>' && t->string[0] != '<' && t->string[0] != '!') { // sth like `+=`
+                usize l = strlen(t->string);
+                t->string[l-1] = '\0';
+                bin_op_precedence(t->string, t->span); // make sure op is valid
+                BinOp* op = malloc(sizeof(BinOp));
+                op->lhs = expr;
+                op->rhs = rhs;
+                op->op = t->string;
+                op->op_span = t->span;
+                Expression* parent = malloc(sizeof(Expression));
+                parent->expr = op;
+                parent->type = EXPR_BIN_OP_ASSIGN;
+                parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                expr = parent;
+                return expr;
+            } else {
+                bin_op_precedence(t->string, t->span); // make sure op is valid
+                if (rhs->type == EXPR_BIN_OP) {
+                    BinOp* rhs_inner = rhs->expr;
+                    if (bin_op_precedence(t->string, t->span) >= bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
+                        Expression* a = expr;
+                        Expression* b = rhs_inner->lhs;
+                        Expression* c = rhs_inner->rhs;
+                        BinOp* op = malloc(sizeof(BinOp));
+                        op->lhs = a;
+                        op->rhs = b;
+                        op->op = t->string;
+                        op->op_span = t->span;
+                        t->string = rhs_inner->op;
+                        t->span = rhs_inner->op_span;
+                        Expression* op_expr = malloc(sizeof(Expression));
+                        op_expr->expr = op;
+                        op_expr->type = EXPR_BIN_OP;
+                        op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                        expr = op_expr;
+                        rhs = c;
+                    }
                 }
+                BinOp* op = malloc(sizeof(BinOp));
+                op->lhs = expr;
+                op->rhs = rhs;
+                op->op = t->string;
+                op->op_span = t->span;
+                Expression* parent = malloc(sizeof(Expression));
+                parent->expr = op;
+                parent->type = EXPR_BIN_OP;
+                parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                expr = parent;
+                return expr;
             }
-            BinOp* op = malloc(sizeof(BinOp));
-            op->lhs = expr;
-            op->rhs = rhs;
-            op->op = t->string;
-            op->op_span = t->span;
-            Expression* parent = malloc(sizeof(Expression));
-            parent->expr = op;
-            parent->type = EXPR_BIN_OP;
-            parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
-            expr = parent;
-            return expr;
         } else {
             stream->peek = t;
             return expr;
@@ -871,6 +901,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->is_variadic = variadic;
     func->generics = keys;
     func->head_resolved = false;
-    func->mt = NULL;
+    func->impl_type = NULL;
+    func->annotations = list_new(AnnoList);
     return func;
 }

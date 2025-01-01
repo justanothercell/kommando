@@ -10,13 +10,14 @@ impl<T> Vec<T> {
     pub fn new() -> Vec<T> {
         _ {
             length: 0,
-            capacity: 1,
-            buffer: std::mem::arr_malloc(1)
+            capacity: 0,
+            buffer: std::mem::null()
         }
     }
 
     fn reserve_armortized(v: ptr<Vec<T>>, size: usize) {
         if v.capacity >= size { return; };
+        if v.capacity == 0 { v.capacity = 8; };
         while v.capacity < size {
             v.capacity *= 2;
         };

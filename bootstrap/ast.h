@@ -101,6 +101,7 @@ typedef struct Variable {
 
 ENUM(ExprType, 
     EXPR_BIN_OP,
+    EXPR_BIN_OP_ASSIGN,  // typeof(expr) = BinOp*
     EXPR_FUNC_CALL,
     EXPR_METHOD_CALL,
     EXPR_STATIC_METHOD_CALL,
@@ -236,7 +237,7 @@ typedef struct FuncDef {
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
-    TypeValue* mt;
+    TypeValue* impl_type;
 } FuncDef;
 
 typedef struct Static {

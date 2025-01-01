@@ -113,7 +113,6 @@ void register_extern_type(Module* module, str name, str extern_ref) {
 void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_bindings, Map* type_bindings) {
     TokenStream* s = tokenstream_new("<generated>", prototype);
     FuncDef* fd = parse_function_definition(s);
-    fd->body->yield_last = true;
     fd->module = module;
     Expression* expr = malloc(sizeof(Expression));
     CIntrinsic* ci = malloc(sizeof(CIntrinsic));
@@ -125,6 +124,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     expr->expr = ci;
     expr->span = fd->name->span;
     list_append(&fd->body->expressions, expr);
+    fd->body->yield_last = true;
     ModuleItem* mi = malloc(sizeof(ModuleItem));
     mi->item = fd;
     mi->type = MIT_FUNCTION;
@@ -147,9 +147,7 @@ Module* gen_intrinsics_types() {
     module->subs = list_new(ModDefList);
     module->name = module->path->elements.elements[module->path->elements.length-1];
 
-    register_extern_type(module, "bool", "bool");
     register_extern_type(module, "c_void", "void");
-
     register_extern_type(module, "raw_ptr", "void*");
     register_extern_type(module, "c_str", "char*");
 
@@ -169,6 +167,9 @@ Module* gen_intrinsics_types() {
 
     register_extern_type(module, "f32", "float");
     register_extern_type(module, "f64", "double");
+
+    register_extern_type(module, "bool", "bool");
+    register_extern_type(module, "TypeId", "uint32_t");
 
     {
         TypeDef* ty_unit = gen_simple_type("unit");
@@ -291,9 +292,8 @@ Module* gen_intrinsics() {
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
-        map_put(type_bindings, "D", gen_typevalue("D", NULL));
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn c_value_of_symbol<D, T>() -> T {} ", "@.D", var_bindings, type_bindings);
+        register_intrinsic(module, "fn typeid<T>() -> ::core::types::TypeId { } ", "@#Tu", var_bindings, type_bindings);
     }
 
     return module;

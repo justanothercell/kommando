@@ -8,9 +8,13 @@ fn main() {
         let stack: _<f64> = Vec::<_>::new();
 
         let input: c_str = io::input(">>> ");
-        let i = 0usize;
+        if input == c_api::nullstr() { // EOF
+            c_api::printf("\n");
+            break;
+        };
         let len = c_api::str::strlen(input);
         let text: ptr<u8> = typecast(input);
+        let i = 0usize;
         let numstate = 0;
         let num: f64 = 0.0;
         let fdigits = 0;
@@ -30,7 +34,7 @@ fn main() {
                 };
                 num = num * 10 + numcast(c - 48);
                 if numstate == 2 {
-                    fdigits = fdigits += 1; 
+                    fdigits += 1; 
                 };
                 continue;
             };
@@ -110,5 +114,6 @@ fn main() {
             continue;
         };
         c_api::printf(" = %f\n", stack.get(0));
+        c_api::freestr(input);
     };
 }

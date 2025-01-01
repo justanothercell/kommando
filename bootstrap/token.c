@@ -164,6 +164,10 @@ void fprint_span(FILE* file, Span* span) {
 }
 
 void fprint_span_contents(FILE* file, Span* span) {
+    if (span == NULL) {
+        fprintf(file, "(null)");
+        return;
+    }
     fprintf(file, "%.*s", (int)(span->right.index - span->left.index), span->left.source + span->left.index);
 }
 

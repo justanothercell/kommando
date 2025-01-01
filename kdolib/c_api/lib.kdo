@@ -15,6 +15,8 @@ pub fn fopen(path: c_str, mode: c_str) -> raw_ptr;
 pub fn fclose(stream: raw_ptr) -> i32;
 #[extern]
 pub fn fflush(stream: raw_ptr) -> i32;
+#[extern]
+pub fn feof(stream: raw_ptr) -> i32;
 
 #[extern]
 pub fn exit(code: i32) -> c_void;
@@ -27,6 +29,13 @@ pub fn alloca(size: usize) -> raw_ptr;
 pub fn realloc(ptr: raw_ptr, size: usize) -> raw_ptr;
 #[extern]
 pub fn free(ptr: raw_ptr) -> c_void;
+#[extern]
+pub fn calloc(count: usize, size: usize) -> raw_ptr;
+#[extern]
+pub fn reallocarray(ptr: raw_ptr, count: usize, size: usize) -> raw_ptr;
+
+#[extern]
+pub fn memset(ptr: raw_ptr, char_value: i32, count: usize) -> raw_ptr;
 
 #[extern]
 pub fn alligned_alloc(alignment: usize, size: usize) -> raw_ptr;
@@ -42,6 +51,9 @@ pub fn null() -> raw_ptr {
 pub fn nullstr() -> c_str {
     core::intrinsics::typecast(0usize)
 }
+pub fn freestr(str: c_str) -> c_void {
+    free(core::intrinsics::typecast(str))
+}
 
 // gnu-c
 #[extern]
@@ -56,7 +68,8 @@ pub fn signal(signal: i32, handler: function_ptr) -> function_ptr;
 
 #[extern]
 pub fn system(cmd: c_str) -> i32;
-pub fn shell_exists() -> bool {
+
+pub fn is_shell() -> bool {
     system(nullstr()) != 0
 }
 
