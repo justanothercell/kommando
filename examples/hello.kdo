@@ -14,7 +14,7 @@ fn main() {
 
     c_api::printf("10th fib: %u\n", fib(10u32));
     let stream = c_api::fopen("out.txt", "w");
-    if stream == c_api::null() {
+    if stream == c_api::null {
         c_api::printf("Could not open file.\n");
         c_api::exit(0);
     };
