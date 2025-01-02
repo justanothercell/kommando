@@ -4,7 +4,7 @@ use std::vec::Vec;
 // example 3 4 + 2 *
 
 fn main() {
-    while 1 == 1 {
+    while true {
         let stack: _<f64> = Vec::<_>::new();
 
         let input: c_str = io::input(">>> ");
