@@ -28,6 +28,8 @@ use std::vec::Vec;
 // Calculate sum of 0 to n (remplace n with number)
 // n :: [ 1 - #;+#: ] _
 
+const PRECISION: f64 = 10000000;
+
 fn main() {
     while true {
         let stack: _<f64> = Vec::<_>::new();
@@ -113,7 +115,7 @@ fn main() {
                 let a = stack.get(stack.length - 2);
                 let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = numcast(a > b);
+                *stack.get_ref(stack.length - 1) = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 60 { // <
@@ -121,22 +123,22 @@ fn main() {
                 let a = stack.get(stack.length - 2);
                 let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = numcast(a < b);
+                *stack.get_ref(stack.length - 1) = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
                 continue;
             };
-            if c == 60 { // =
+            if c == 61 { // =
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
                 let a = stack.get(stack.length - 2);
                 let b = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = numcast(a < b);
+                *stack.get_ref(stack.length - 1) = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 91 { // [
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
                 let x = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                if x == 0 {
+                if numcast::<_, i64>(x * PRECISION) == 0 {
                     while i < len {
                         let c = *mem::arr_offset(text, i);
                         i += 1; // we end up AFTER the ]
@@ -149,7 +151,7 @@ fn main() {
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
                 let x = stack.get(stack.length - 1);
                 stack.length = stack.length - 1;
-                if x != 0 {
+                if numcast::<_, i64>(x * PRECISION) != 0 {
                     while i > 0 {
                         let c = *mem::arr_offset(text, i-1);
                         if c == 91 { break; }; // [
