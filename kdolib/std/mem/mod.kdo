@@ -4,7 +4,7 @@ use std::io::stderr;
 pub fn malloc<T>() -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
-    if raw_ptr == c_api::null() {
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };
@@ -14,7 +14,7 @@ pub fn malloc<T>() -> ptr<T> {
 pub fn malloc_zeroed<T>() -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::calloc(1, size); // calloc is faster than memset(raw_ptr, 0, size)
-    if raw_ptr == c_api::null() {
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };
@@ -42,7 +42,7 @@ pub fn free<T>(ptr: ptr<T>) {
 pub fn arr_malloc<T>(n: usize) -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::calloc(n, size);
-    if raw_ptr == c_api::null() {
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };
@@ -53,7 +53,7 @@ pub fn arr_resize<T>(arr: ptr<T>, n: usize) -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = to_raw(arr);
     raw_ptr = c_api::reallocarray(raw_ptr, n, size);
-    if raw_ptr == c_api::null() {
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };

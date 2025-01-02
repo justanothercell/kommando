@@ -42,15 +42,9 @@ pub fn alligned_alloc(alignment: usize, size: usize) -> raw_ptr;
 #[extern]
 pub fn getpagesize() -> usize;
 
-// we do not have constants yet
-pub fn null() -> raw_ptr {
-    core::intrinsics::typecast(0usize)
-}
+pub const null: raw_ptr = 0;
+pub const nullstr: c_str = 0;
 
-// we do not have constants yet
-pub fn nullstr() -> c_str {
-    core::intrinsics::typecast(0usize)
-}
 pub fn freestr(str: c_str) -> c_void {
     free(core::intrinsics::typecast(str))
 }
@@ -70,7 +64,7 @@ pub fn signal(signal: i32, handler: function_ptr) -> function_ptr;
 pub fn system(cmd: c_str) -> i32;
 
 pub fn is_shell() -> bool {
-    system(nullstr()) != 0
+    system(nullstr) != 0
 }
 
 #[extern]

@@ -79,7 +79,7 @@ impl<A, T> Coroutine<A, T> {
     pub fn free(coro: ptr<Coroutine<A, T>>) {
         let ctx = coro.ctx;
         c_api::free(ctx.stack);
-        ctx.stack = c_api::null();
+        ctx.stack = c_api::null;
         std::mem::free(ctx);
         coro.ctx = std::mem::null();
         coro.state = 1;
