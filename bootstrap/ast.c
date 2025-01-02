@@ -11,9 +11,9 @@ Path* path_new(bool absolute, IdentList elements) {
     Path* path = malloc(sizeof(Path));
     path->absolute = absolute;
     path->elements = list_new(IdentList);
-    list_foreach(&elements, lambda(void, Identifier* i, {
-        list_append(&path->elements, i);
-    }));
+    list_foreach(&elements, i, Identifier* ident, {
+        list_append(&path->elements, ident);
+    });
     return path;
 }
 
@@ -41,10 +41,10 @@ Path* path_join(Path* parent, Path* child) {
 
 void fprint_path(FILE* file, Path* path) {
     if (path->absolute && path->elements.length > 0) fprintf(file, "::");
-    list_foreach_i(&path->elements, lambda(void, usize i, Identifier* element, {
+    list_foreach(&path->elements, i, Identifier* element, {
         if (i > 0) fprintf(file, "::");
         fprintf(file, "%s", element->name);
-    }));
+    });
 }
 
 void fprint_td_path(FILE* file, TypeDef* td) {
@@ -75,10 +75,10 @@ void fprint_typevalue(FILE* file, TypeValue* tval) {
     }
     if (tval->generics != NULL && tval->generics->generics.length > 0) {
         fputc('<', file);
-        list_foreach_i(&tval->generics->generics, lambda(void, int i, TypeValue* generic, {
+        list_foreach(&tval->generics->generics, i, TypeValue* generic, {
             if (i > 0) fprintf(file, ", ");
             fprint_typevalue(file, generic);
-        }));
+        });
         fputc('>', file);   
     }
 }

@@ -1,12 +1,20 @@
-pub mod arena;
-
 use std::*;
 use std::io::stderr;
 
 pub fn malloc<T>() -> ptr<T> {
-    let size = intrinsics::sizeof::<T>();
+    let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::malloc(size);
-    if (raw_ptr == c_api::null()) {
+    if raw_ptr == c_api::null {
+        c_api::fprintf(stderr, "Program is out of memory");
+        c_api::exit(1);
+    };
+    typecast(raw_ptr)
+}
+
+pub fn malloc_zeroed<T>() -> ptr<T> {
+    let size = core::intrinsics::sizeof::<T>();
+    let raw_ptr = c_api::calloc(1, size); // calloc is faster than memset(raw_ptr, 0, size)
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };
@@ -14,10 +22,17 @@ pub fn malloc<T>() -> ptr<T> {
 }
 
 pub fn new_uninit<T>() -> T {
-    let size = intrinsics::sizeof::<T>();
+    let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
     *typecast(raw_ptr)
 }
+
+pub fn new_zeroed<T>() -> T {
+    let size = core::intrinsics::sizeof::<T>();
+    let raw_ptr = c_api::alloca(size);
+    *typecast(c_api::memset(raw_ptr, 0, size))
+}
+
 
 pub fn free<T>(ptr: ptr<T>) {
     let raw_ptr = to_raw(ptr);
@@ -25,9 +40,9 @@ pub fn free<T>(ptr: ptr<T>) {
 }
 
 pub fn arr_malloc<T>(n: usize) -> ptr<T> {
-    let size = intrinsics::sizeof::<T>();
-    let raw_ptr = c_api::malloc(size);
-    if (raw_ptr == c_api::null()) {
+    let size = core::intrinsics::sizeof::<T>();
+    let raw_ptr = c_api::calloc(n, size);
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };
@@ -35,10 +50,10 @@ pub fn arr_malloc<T>(n: usize) -> ptr<T> {
 }
 
 pub fn arr_resize<T>(arr: ptr<T>, n: usize) -> ptr<T> {
-    let size = intrinsics::sizeof::<T>();
+    let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = to_raw(arr);
-    raw_ptr = c_api::realloc(raw_ptr, size * n);
-    if (raw_ptr == c_api::null()) {
+    raw_ptr = c_api::reallocarray(raw_ptr, n, size);
+    if raw_ptr == c_api::null {
         c_api::fprintf(stderr, "Program is out of memory");
         c_api::exit(1);
     };
@@ -46,7 +61,7 @@ pub fn arr_resize<T>(arr: ptr<T>, n: usize) -> ptr<T> {
 }
 
 pub fn arr_offset<T>(arr: ptr<T>, i: usize) -> ptr<T> {
-    let size = intrinsics::sizeof::<T>();
+    let size = core::intrinsics::sizeof::<T>();
     let usize_ptr = typecast::<_, usize>(arr);
     typecast(usize_ptr + typecast(size * i))
 }
@@ -55,7 +70,7 @@ pub fn null<T>() -> ptr<T> {
     typecast(0usize)
 }
 
-pub fn to_raw<T>(ptr: ptr<T>) -> opaque_ptr {
+pub fn to_raw<T>(ptr: ptr<T>) -> raw_ptr {
     typecast(ptr)
 }
 

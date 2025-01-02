@@ -4,7 +4,7 @@ build: clean
 clean:
 	rm -f kommando
 
-cr: build run
+br: build run
 
 run:
 	name=$(basename $(file) .kdo); \

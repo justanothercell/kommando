@@ -28,17 +28,8 @@
 
 #define list_swap_retain(list_ptr, iter_var, predicate) do { \
     for (usize i = 0;i < (list_ptr)->length;i++) { \
-        typeof(*((list_ptr)->elements)) item_var = (list_ptr)->elements[i]; \
+        iter_var = (list_ptr)->elements[i]; \
         if (!(predicate)) { \
-            list_swap_remove(list_ptr, i); \
-            i--; \
-        } \
-    } \
-} while(0)
-
-#define list_map_retain(list_ptr, lambda_func) do { \
-    for (usize i = 0;i < (list_ptr)->length;i++) { \
-        if (!((lambda_func)(&(list_ptr)->elements[i]))) { \
             list_swap_remove(list_ptr, i); \
             i--; \
         } \
@@ -49,7 +40,7 @@
     typeof(*((list_ptr)->elements)) element1234567890; \
     memset(&element1234567890, 0, sizeof(element1234567890)); \
     for (usize i = 0;i < (list_ptr)->length;i++) { \
-        typeof(((list_ptr)->elements)) item_var = &(list_ptr)->elements[i]; \
+        item_var = &(list_ptr)->elements[i]; \
         if (predicate) { \
             element1234567890 = list_swap_remove(list_ptr, i); \
             break; \
@@ -58,27 +49,28 @@
     element1234567890; \
 })
 
-#define list_map(list_ptr, lambda_func) do { \
+#define list_map(list_ptr, item_ref_var, mapper) do { \
     for (usize i = 0;i < (list_ptr)->length;i++) { \
-        (lambda_func)(&((list_ptr)->elements[i])); \
+        item_ref_var = &((list_ptr)->elements[i]); \
+        mapper; \
     } \
 } while(0)
 
-#define list_filter_map(list_ptr, item_var, predicate, lambda_func) do { \
-    for (usize i = 0;i < (list_ptr)->length;i++) { \
-        typeof(((list_ptr)->elements)) item_var = &(list_ptr)->elements[i]; \
+#define list_filter_map(list_ptr, counter, item_var, predicate, mapper) do { \
+    for (usize counter = 0;counter < (list_ptr)->length;counter++) { \
+        item_var = &(list_ptr)->elements[counter]; \
         if (predicate) { \
-            (lambda_func)(item_var); \
+            mapper; \
         } \
     } \
 } while(0)
 
-#define list_find_map(list_ptr, item_var, predicate, lambda_func) ({ \
+#define list_find_map(list_ptr, counter, item_var, predicate, mapper) ({ \
     bool found1234567890 = false; \
-    for (usize i = 0;i < (list_ptr)->length;i++) { \
-        typeof(((list_ptr)->elements)) item_var = &(list_ptr)->elements[i]; \
+    for (usize counter = 0;counter < (list_ptr)->length;counter++) { \
+        item_var = &(list_ptr)->elements[counter]; \
         if (predicate) { \
-            (lambda_func)(item_var); \
+            mapper; \
             found1234567890 = true; \
             break; \
         } \
@@ -86,10 +78,10 @@
     found1234567890; \
 })
 
-#define list_contains(list_ptr, item_var, predicate) ({ \
+#define list_contains(list_ptr, counter, item_var, predicate) ({ \
     bool found1234567890 = false; \
-    for (usize i1234567890 = 0;i1234567890 < (list_ptr)->length;i1234567890++) { \
-        typeof(((list_ptr)->elements)) item_var = &(list_ptr)->elements[i1234567890]; \
+    for (usize counter = 0;counter < (list_ptr)->length;counter++) { \
+        item_var = &(list_ptr)->elements[counter]; \
         if (predicate) { \
             found1234567890 = true; \
             break; \
@@ -103,18 +95,12 @@
     (list_ptr)->elements[(list_ptr)->length]; \
 })
 
-#define list_foreach(list_ptr, function) ({ \
-    for (usize i = 0;i < (list_ptr)->length;i++) { \
-        function((list_ptr)->elements[i]); \
+#define list_foreach(list_ptr, counter, item_def, body) ({ \
+    for (usize counter = 0;counter < (list_ptr)->length;counter++) { \
+        item_def = (list_ptr)->elements[counter]; \
+        body; \
     } \
 })
-
-#define list_foreach_i(list_ptr, function) ({ \
-    for (usize i = 0;i < (list_ptr)->length;i++) { \
-        function(i, (list_ptr)->elements[i]); \
-    } \
-})
-
 
 #define list_extend(list_ptr, joinee_ptr) ({ \
     typeof(joinee_ptr) j1234567890 = joinee_ptr; \

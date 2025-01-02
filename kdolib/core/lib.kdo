@@ -1,0 +1,6 @@
+pub mod env;
+// pub mod intrinsics - synthetically generated
+// pub mod types - synthetically generated
+
+pub const true: types::bool = 0 == 0;
+pub const false: types::bool = 0 == 1;

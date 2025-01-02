@@ -1,4 +1,5 @@
 #!/bin/sh
 
-echo ::c_api=kdolib/c_api \
-     ::std=kdolib/std \
+echo $($(dirname "$0")/link_core) \
+     ::c_api=kdolib/c_api \
+     ::std=kdolib/std

@@ -1,7 +1,10 @@
 #include "parser.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
+#include "lib/map.h"
 #include "lib/str.h"
+#include <string.h>
 LIB;
 #include "module.h"
 #include "token.h"
@@ -90,9 +93,69 @@ TypeDef* parse_struct(TokenStream* stream) {
     return type;
 }
 
+
+ImplBlock* parse_impl(TokenStream* stream, Module* module) {
+    ImplBlock* impl = malloc(sizeof(ImplBlock));
+    impl->methods = map_new();
+    Token* t = next_token(stream);
+    if (!token_compare(t, "impl", IDENTIFIER)) unexpected_token(t);
+    t = next_token(stream);
+    stream->peek = t;
+    impl->generics = NULL;
+    if (token_compare(t, "<", SNOWFLAKE)) {
+        impl->generics = parse_generic_keys(stream);
+    }
+    impl->type = parse_type_value(stream);
+    t = next_token(stream);
+    if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
+    while (true) {
+        t = next_token(stream);
+        if (token_compare(t, "}", SNOWFLAKE)) break;
+        stream->peek = t;
+        AnnoList annos = parse_annotations(stream);
+
+        Visibility vis = V_PRIVATE;
+        if (token_compare(t, "pub", IDENTIFIER)) {
+            vis = V_PUBLIC;
+            t = next_token(stream); // skip peek 
+            t = next_token(stream); // setting new peek
+            stream->peek = t;
+        } else if (token_compare(t, "loc", IDENTIFIER)) {
+            vis = V_LOCAL;
+            t = next_token(stream); // skip peek 
+            t = next_token(stream); // setting new peek
+            stream->peek = t;
+        }
+        FuncDef* func = parse_function_definition(stream);
+        func->module = module;
+        func->annotations = annos;
+        func->impl_type = impl->type;
+        if (func->generics == NULL) {
+            func->generics = malloc(sizeof(GenericKeys));
+            func->generics->generic_use_keys = list_new(StrList);
+            func->generics->generic_uses = map_new();
+            func->generics->resolved = map_new();
+            func->generics->generics = list_new(IdentList);
+            func->generics->span = func->name->span;
+        }
+        ModuleItem* mi = malloc(sizeof(ModuleItem));
+        mi->item = func;
+        mi->type = MIT_FUNCTION;
+        mi->module = module;
+        mi->origin = NULL;
+        mi->vis = vis;
+        mi->name = func->name;
+        ModuleItem* old = map_put(impl->methods, func->name->name, mi);
+        if (old != NULL) spanned_error("Methiod already exists", mi->name->span, "Method `%s` already defined in this impl block @ %s", old->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
+    }
+    return impl;
+}
+
+
 Module* parse_module_contents(TokenStream* stream, Path* path) {
     Module* module = malloc(sizeof(Module));
     module->imports = list_new(ImportList);
+    module->impls = list_new(ImplList);
     module->items = map_new();
     module->path = path;
     module->resolved = false;
@@ -186,24 +249,37 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             imp->vis = vis;
             imp->alias = alias;
             list_append(&module->imports, imp);
-        } else if(token_compare(t, "static", IDENTIFIER)) {
+        } else if (token_compare(t, "impl", IDENTIFIER)) {
+            ImplBlock* impl = parse_impl(stream, module);
+            list_append(&module->impls, impl);
+        } else if(token_compare(t, "static", IDENTIFIER) || token_compare(t, "const", IDENTIFIER)) {
+            bool constant = token_compare(t, "const", IDENTIFIER);
             t = next_token(stream); // skip static
-            Static* s = malloc(sizeof(Static));
-            s->name = parse_identifier(stream);
+            Global* g = malloc(sizeof(Global));
+            g->name = parse_identifier(stream);
             t = next_token(stream);
-            if(!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t, "static %s: ...;", s->name->name);
-            s->type = parse_type_value(stream);
+            if(!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t, "static|const %s: ...;", g->name->name);
+            g->type = parse_type_value(stream);
             t = next_token(stream);
-            if(!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t, "static %s: ...;", s->name->name);
-            s->module = module;
-            s->annotations = annos;
+            g->module = module;
+            g->annotations = annos;
+            g->constant = constant;
+            g->computed_value = NULL;
+            g->value = NULL;
+            if(!token_compare(t, ";", SNOWFLAKE)) {
+                if(!token_compare(t, "=", SNOWFLAKE)) unexpected_token(t, "static|const %s: ... = ...;", g->name->name);
+                g->value = parse_expression(stream, true);
+                t = next_token(stream);
+                if(!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t, "static|const %s: ... = ...;", g->name->name);
+            }
             ModuleItem* mi = malloc(sizeof(ModuleItem));
-            mi->item = s;
-            mi->type = MIT_STATIC;
+            mi->item = g;
+            if (constant) mi->type = MIT_CONSTANT;
+            else mi->type = MIT_STATIC;
             mi->module = module;
             mi->origin = NULL;
             mi->vis = vis;
-            mi->name = s->name;
+            mi->name = g->name;
             ModuleItem* old = map_put(module->items, mi->name->name, mi);
             if (old != NULL) {
                 spanned_error("Name conflict", mi->name->span, "Name %s is already defined in this scope at %s", mi->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
@@ -225,11 +301,34 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         expression = parse_expression(stream, true);
         t = next_token(stream);
         if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
+        t = next_token(stream);
+        if (token_compare(t, "(", SNOWFLAKE)) {
+            DynRawCall* call = malloc(sizeof(DynRawCall));
+            call->callee = expression;
+            call->args = list_new(ExpressionList);
+            if (!token_compare(t, ")", SNOWFLAKE)) {
+                while (true) {
+                    Expression* argument = parse_expression(stream, true);
+                    list_append(&call->args, argument);
+                    t = next_token(stream);
+                    if (token_compare(t, ")", SNOWFLAKE)) {
+                        end = t->span.right;
+                        break;
+                    } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+                }
+            }
+            expression = malloc(sizeof(Expression));
+            expression->expr = call;
+            expression->type = EXPR_DYN_RAW_CALL;
+        } else {
+            stream->peek = t;
+        }
     } else if (token_compare(t, "let", IDENTIFIER)) {
         Identifier* name = parse_identifier(stream);
         end = name->span.right;
         LetExpr* let = malloc(sizeof(LetExpr));
         Variable* var = malloc(sizeof(Variable));
+        var->global_ref = NULL;
         var->path = path_simple(name);
         let->var = var;
         t = next_token(stream);
@@ -299,13 +398,60 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         if (path->elements.length > 0) end = path->elements.elements[path->elements.length - 1]->span.right;
         GenericValues* generics = NULL;
         t = next_token(stream);
-        Token* gen_start = t;
         stream->peek = t;
         if (path->ends_in_double_colon && token_compare(t, "<", SNOWFLAKE)) {
             generics = parse_generic_values(stream);
         }
         t = next_token(stream);
-        if (token_compare(t, "(", SNOWFLAKE)) {
+        stream->peek = t;
+        if (double_double_colon(stream)) {
+            if (generics == NULL) unexpected_token(t);
+            Identifier* method = parse_identifier(stream);
+            GenericValues* method_generics = NULL;
+            if (double_double_colon(stream)) {
+                method_generics = parse_generic_values(stream);
+            }
+            t = next_token(stream);
+            stream->peek = t;
+            if (token_compare(t, "(", SNOWFLAKE)) {
+                t = next_token(stream);
+                ExpressionList arguments = list_new(ExpressionList); 
+                t = next_token(stream);
+                if (!token_compare(t, ")", SNOWFLAKE)) {
+                    stream->peek = t;
+                    while (true) {
+                        Expression* argument = parse_expression(stream, true);
+                        list_append(&arguments, argument);
+                        t = next_token(stream);
+                        if (token_compare(t, ")", SNOWFLAKE)) {
+                            end = t->span.right;
+                            break;
+                        } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+                    }
+                }
+                StaticMethodCall* call = malloc(sizeof(StaticMethodCall));
+                call->arguments = arguments;
+                call->name = method;
+                call->generics = method_generics;
+                call->tv = malloc(sizeof(TypeValue));
+                call->tv->generics = generics;
+                call->tv->name = path;
+                call->tv->def = NULL;
+                call->tv->ctx = NULL;
+                expression->expr = call;
+                expression->type = EXPR_STATIC_METHOD_CALL;
+            } else {
+                Variable* var = malloc(sizeof(Variable));
+                var->path = path;
+                var->values = generics;
+                var->method_name = method;
+                var->method_values = method_generics;
+                var->global_ref = NULL;
+                expression->expr = var;
+                expression->type = EXPR_VARIABLE;
+            }
+        } else if (token_compare(t, "(", SNOWFLAKE)) {
+            t = next_token(stream);
             ExpressionList arguments = list_new(ExpressionList); 
             t = next_token(stream);
             if (!token_compare(t, ")", SNOWFLAKE)) {
@@ -327,6 +473,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             expression->expr = call;
             expression->type = EXPR_FUNC_CALL;       
         } else if (token_compare(t, "{", SNOWFLAKE) && allow_lit) {
+            t = next_token(stream);
             Map* fields = map_new();
             t = next_token(stream);
             if (!token_compare(t, "}", SNOWFLAKE)) {
@@ -350,20 +497,23 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             StructLiteral* slit = malloc(sizeof(StructLiteral));
             TypeValue* tv =malloc(sizeof(TypeValue));
             tv->name = path;
-            tv->def = NULL;
             tv->generics = generics;
+            tv->def = NULL;
             tv->ctx = NULL;
             slit->type = tv;
             slit->fields = fields;
             expression->expr = slit;
             expression->type = EXPR_STRUCT_LITERAL;
         } else {
-            if (generics != NULL) unexpected_token(gen_start);
             // other items are now allowed, disabling this check
             // if (path->absolute || path->elements.length != 1) panic("This path is not a single variable: %s @ %s", to_str_writer(stream, fprint_path(stream, path)), to_str_writer(stream, fprint_span(stream, &path->elements.elements[0]->span)));
             stream->peek = t;
             Variable* var = malloc(sizeof(Variable));
             var->path = path;
+            var->values = generics;
+            var->method_name = NULL;
+            var->method_values = NULL;
+            var->global_ref = NULL;
             expression->expr = var;
             expression->type = EXPR_VARIABLE;
         }
@@ -377,13 +527,53 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         Token* t = next_token(stream);
         if (token_compare(t, ".", SNOWFLAKE)) {
             Identifier* field = parse_identifier(stream);
-            FieldAccess* fa = malloc(sizeof(FieldAccess));
-            fa->object = expression;
-            fa->field = field;
-            expression = malloc(sizeof(Expression));
-            expression->span = from_points(&fa->object->span.left, &fa->field->span.right);
-            expression->expr = fa;
-            expression->type = EXPR_FIELD_ACCESS;
+            bool will_call = false;
+            GenericValues* generics = NULL;
+            if (double_double_colon(stream)) {
+                will_call = true;
+                t = next_token(stream);
+                stream->peek = t;
+                if (token_compare(t, "<", SNOWFLAKE)) {
+                    generics = parse_generic_values(stream);
+                }
+            }
+            t = next_token(stream);
+            if (token_compare(t, "(", SNOWFLAKE)) {
+                ExpressionList arguments = list_new(ExpressionList);
+                t = next_token(stream);
+                if (!token_compare(t, ")", SNOWFLAKE)) {
+                    stream->peek = t;
+                    while (true) {
+                        Expression* argument = parse_expression(stream, true);
+                        list_append(&arguments, argument);
+                        t = next_token(stream);
+                        if (token_compare(t, ")", SNOWFLAKE)) {
+                            end = t->span.right;
+                            break;
+                        } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+                    }
+                }
+                MethodCall* call = malloc(sizeof(MethodCall));
+                call->object = expression;
+                call->name = field;
+                call->arguments = arguments;
+                call->generics = generics;
+                call->def = NULL;
+                expression = malloc(sizeof(Expression));
+                expression->span = from_points(&call->object->span.left, &call->name->span.right);
+                expression->expr = call;
+                expression->type = EXPR_METHOD_CALL;
+            } else {
+                if (will_call) spanned_error("Expected method call", t->span, "Expected method call parenthesis after `::`");
+                stream->peek = t;
+                FieldAccess* fa = malloc(sizeof(FieldAccess));
+                fa->object = expression;
+                fa->field = field;
+                expression = malloc(sizeof(Expression));
+                expression->span = from_points(&fa->object->span.left, &fa->field->span.right);
+                expression->expr = fa;
+                expression->type = EXPR_FIELD_ACCESS;
+            }
         } else {
             stream->peek = t;
             break;
@@ -392,18 +582,19 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
     return expression;
 }
 
-int bin_op_precedence(str op) {
+int bin_op_precedence(str op, Span span) {
     if (str_eq("||", op)) return 0;
     if (str_eq("&&", op)) return 1;
-    if (str_eq("==", op) || str_eq("!=", op) || str_eq(">", op) 
-    || str_eq("<", op) || str_eq(">=", op) || str_eq("<=", op)) return 2;
+    if (str_eq("==", op) || str_eq("!=", op)
+      || str_eq(">", op) || str_eq("<", op)
+     || str_eq(">=", op) || str_eq("<=", op)) return 2;
     if (str_eq("|", op)) return 3;
     if (str_eq("^", op)) return 4;
     if (str_eq("&", op)) return 5;
     if (str_eq(">>", op) || str_eq("<<", op)) return 6;
     if (str_eq("+", op) || str_eq("-", op)) return 7;
     if (str_eq("*", op) || str_eq("/", op) || str_eq("%", op)) return 8;
-    unreachable("Invalid binop %s", op);
+    spanned_error("Invalid operator", span, "Invalid binop %s", op);
 }
 
 Expression* parse_expression(TokenStream* stream, bool allow_lit) {
@@ -461,38 +652,56 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                 }
             }
             Expression* rhs = parse_expression(stream, allow_lit);
-            if (rhs->type == EXPR_BIN_OP) {
-                BinOp* rhs_inner = rhs->expr;
-                if (bin_op_precedence(t->string) >= bin_op_precedence(rhs_inner->op)) {
-                    Expression* a = expr;
-                    Expression* b = rhs_inner->lhs;
-                    Expression* c = rhs_inner->rhs;
-                    BinOp* op = malloc(sizeof(BinOp));
-                    op->lhs = a;
-                    op->rhs = b;
-                    op->op = t->string;
-                    op->op_span = t->span;
-                    t->string = rhs_inner->op;
-                    t->span = rhs_inner->op_span;
-                    Expression* op_expr = malloc(sizeof(Expression));
-                    op_expr->expr = op;
-                    op_expr->type = EXPR_BIN_OP;
-                    op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
-                    expr = op_expr;
-                    rhs = c;
+            if (str_endswith(t->string, "=") && t->string[0] != '=' && t->string[0] != '>' && t->string[0] != '<' && t->string[0] != '!') { // sth like `+=`
+                usize l = strlen(t->string);
+                t->string[l-1] = '\0';
+                bin_op_precedence(t->string, t->span); // make sure op is valid
+                BinOp* op = malloc(sizeof(BinOp));
+                op->lhs = expr;
+                op->rhs = rhs;
+                op->op = t->string;
+                op->op_span = t->span;
+                Expression* parent = malloc(sizeof(Expression));
+                parent->expr = op;
+                parent->type = EXPR_BIN_OP_ASSIGN;
+                parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                expr = parent;
+                return expr;
+            } else {
+                bin_op_precedence(t->string, t->span); // make sure op is valid
+                if (rhs->type == EXPR_BIN_OP) {
+                    BinOp* rhs_inner = rhs->expr;
+                    if (bin_op_precedence(t->string, t->span) >= bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
+                        Expression* a = expr;
+                        Expression* b = rhs_inner->lhs;
+                        Expression* c = rhs_inner->rhs;
+                        BinOp* op = malloc(sizeof(BinOp));
+                        op->lhs = a;
+                        op->rhs = b;
+                        op->op = t->string;
+                        op->op_span = t->span;
+                        t->string = rhs_inner->op;
+                        t->span = rhs_inner->op_span;
+                        Expression* op_expr = malloc(sizeof(Expression));
+                        op_expr->expr = op;
+                        op_expr->type = EXPR_BIN_OP;
+                        op_expr->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                        expr = op_expr;
+                        rhs = c;
+                    }
                 }
+                BinOp* op = malloc(sizeof(BinOp));
+                op->lhs = expr;
+                op->rhs = rhs;
+                op->op = t->string;
+                op->op_span = t->span;
+                Expression* parent = malloc(sizeof(Expression));
+                parent->expr = op;
+                parent->type = EXPR_BIN_OP;
+                parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
+                expr = parent;
+                return expr;
             }
-            BinOp* op = malloc(sizeof(BinOp));
-            op->lhs = expr;
-            op->rhs = rhs;
-            op->op = t->string;
-            op->op_span = t->span;
-            Expression* parent = malloc(sizeof(Expression));
-            parent->expr = op;
-            parent->type = EXPR_BIN_OP;
-            parent->span = from_points(&op->lhs->span.left, &op->rhs->span.right);
-            expr = parent;
-            return expr;
         } else {
             stream->peek = t;
             return expr;
@@ -664,6 +873,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
             }
             Argument* argument = malloc(sizeof(Argument));
             Variable* var = malloc(sizeof(Variable));
+            var->global_ref = NULL;
             var->path = path_simple(parse_identifier(stream));
             argument->var = var;
             t = next_token(stream);
@@ -701,5 +911,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->is_variadic = variadic;
     func->generics = keys;
     func->head_resolved = false;
+    func->impl_type = NULL;
+    func->annotations = list_new(AnnoList);
     return func;
 }

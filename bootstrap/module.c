@@ -5,6 +5,8 @@
 #include "module.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
+#include "lib/map.h"
 LIB;
 #include "parser.h"
 #include "token.h"
@@ -15,6 +17,7 @@ void insert_module(Program* program, Module* module, Visibility vis) {
     Path* path = module->path;
     if (path->elements.length == 1) {
         Identifier* name = path->elements.elements[0];
+        module->package_method_map = map_new();
         if (vis != V_PUBLIC) spanned_error("Package must be public", name->span, "Cannot register package %s as %s, this is probably a compiler error.", to_str_writer(s, fprint_path(s, path)), Visibility__NAMES[vis]);
         if (map_put(program->packages, name->name, module) != NULL) spanned_error("Package already exists", name->span, "Cannot register package %s, it already exists.", to_str_writer(s, fprint_path(s, path)));
         return;
@@ -44,6 +47,10 @@ void insert_module(Program* program, Module* module, Visibility vis) {
     Identifier* name = path->elements.elements[i];
     
     module->parent = current;
+    Module* pkg = current;
+    while (pkg->parent != NULL) pkg = pkg->parent;
+    module->package_method_map = pkg->package_method_map;
+
     ModuleItem* old = map_put(current->items, name->name, item);
     if (old != NULL) {
         spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
@@ -67,9 +74,9 @@ Path* gen_path(str path) {
 TypeValue* gen_typevalue(str typevalue, Span* span) {
     TokenStream* stream = tokenstream_new("<generated>", typevalue);
     TypeValue* tv = parse_type_value(stream);
-    if (span != NULL) list_foreach(&tv->name->elements, lambda(void, Identifier* ident, {
+    if (span != NULL) list_foreach(&tv->name->elements, i, Identifier* ident, {
         ident->span = *span;
-    }));
+    });
     if(try_next_token(stream) != NULL) panic("`%s` is not a valid type value", typevalue);
     return tv;
 }
@@ -106,7 +113,6 @@ void register_extern_type(Module* module, str name, str extern_ref) {
 void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_bindings, Map* type_bindings) {
     TokenStream* s = tokenstream_new("<generated>", prototype);
     FuncDef* fd = parse_function_definition(s);
-    fd->body->yield_last = true;
     fd->module = module;
     Expression* expr = malloc(sizeof(Expression));
     CIntrinsic* ci = malloc(sizeof(CIntrinsic));
@@ -118,6 +124,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     expr->expr = ci;
     expr->span = fd->name->span;
     list_append(&fd->body->expressions, expr);
+    fd->body->yield_last = true;
     ModuleItem* mi = malloc(sizeof(ModuleItem));
     mi->item = fd;
     mi->type = MIT_FUNCTION;
@@ -130,8 +137,9 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
 
 Module* gen_intrinsics_types() {
     Module* module = malloc(sizeof(Module));
-    module->path = gen_path("::intrinsics::types");
+    module->path = gen_path("::core::types");
     module->imports = list_new(ImportList);
+    module->impls = list_new(ImplList);
     module->items = map_new();
     module->resolved = false;
     module->in_resolution = false;
@@ -139,11 +147,9 @@ Module* gen_intrinsics_types() {
     module->subs = list_new(ModDefList);
     module->name = module->path->elements.elements[module->path->elements.length-1];
 
-    register_extern_type(module, "bool", "bool");
-    register_extern_type(module, "opaque_ptr", "void*");
-    register_extern_type(module, "function_ptr", "void*");
     register_extern_type(module, "c_void", "void");
-    register_extern_type(module, "c_const_str_ptr", "const char*");
+    register_extern_type(module, "raw_ptr", "void*");
+    register_extern_type(module, "c_str", "char*");
 
     register_extern_type(module, "i8", "int8_t");
     register_extern_type(module, "i16", "int16_t");
@@ -161,6 +167,9 @@ Module* gen_intrinsics_types() {
 
     register_extern_type(module, "f32", "float");
     register_extern_type(module, "f64", "double");
+
+    register_extern_type(module, "bool", "bool");
+    register_extern_type(module, "TypeId", "uint32_t");
 
     {
         TypeDef* ty_unit = gen_simple_type("unit");
@@ -191,13 +200,30 @@ Module* gen_intrinsics_types() {
         map_put(module->items, "ptr", ty_ptr_mi);
     }
 
+    {   
+        TypeDef* ty_ptr = gen_simple_type("function_ptr");
+        TokenStream* ty_ptr_gs = tokenstream_new("<generated>", "<T> ");
+        ty_ptr->generics = parse_generic_keys(ty_ptr_gs);
+        ty_ptr->extern_ref = "void*";
+        ModuleItem* ty_ptr_mi = malloc(sizeof(ModuleItem));
+        ty_ptr_mi->item = ty_ptr;
+        ty_ptr_mi->type = MIT_STRUCT;
+        ty_ptr_mi->module = module;
+        ty_ptr_mi->origin = NULL;
+        ty_ptr_mi->vis = V_PUBLIC;
+        ty_ptr_mi->name = ty_ptr->name;
+        ty_ptr->module = module;
+        map_put(module->items, "function_ptr", ty_ptr_mi);
+    }
+
     return module;
 }
 
 Module* gen_intrinsics() {
     Module* module = malloc(sizeof(Module));
-    module->path = gen_path("::intrinsics");
+    module->path = gen_path("::core::intrinsics");
     module->imports = list_new(ImportList);
+    module->impls = list_new(ImplList);
     module->items = map_new();
     module->resolved = false;
     module->in_resolution = false;
@@ -232,43 +258,42 @@ Module* gen_intrinsics() {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn sizeof<T>() -> ::std::usize {} ", "sizeof(@!T)", var_bindings, type_bindings);
+        register_intrinsic(module, "fn sizeof<T>() -> ::core::types::usize {} ", "sizeof(@!T)", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn alignof<T>() -> ::std::usize {} ", "alignof(@!T)", var_bindings, type_bindings);
+        register_intrinsic(module, "fn alignof<T>() -> ::core::types::usize {} ", "alignof(@!T)", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn c_typename<T>() -> ::std::c_const_str_ptr {} ", "\"@!T\"", var_bindings, type_bindings);
+        register_intrinsic(module, "fn c_typename<T>() -> ::core::types::c_str {} ", "\"@!T\"", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn typename<T>() -> ::std::c_const_str_ptr {} ", "\"@:T\"", var_bindings, type_bindings);
+        register_intrinsic(module, "fn typename<T>() -> ::core::types::c_str {} ", "\"@:T\"", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn short_typename<T>() -> ::std::c_const_str_ptr {} ", "\"@.T\"", var_bindings, type_bindings);
+        register_intrinsic(module, "fn short_typename<T>() -> ::core::types::c_str {} ", "\"@.T\"", var_bindings, type_bindings);
     }
 
     {
         Map* var_bindings = map_new();
         Map* type_bindings = map_new();
-        map_put(type_bindings, "D", gen_typevalue("D", NULL));
         map_put(type_bindings, "T", gen_typevalue("T", NULL));
-        register_intrinsic(module, "fn c_value_of_symbol<D, T>() -> T {} ", "@.D", var_bindings, type_bindings);
+        register_intrinsic(module, "fn typeid<T>() -> ::core::types::TypeId { } ", "@#Tu", var_bindings, type_bindings);
     }
 
     return module;

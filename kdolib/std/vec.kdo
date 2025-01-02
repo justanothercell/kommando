@@ -1,45 +1,53 @@
+use std::*;
+
 pub struct Vec<T> {
-    length: std::usize,
-    capacity: std::usize,
-    buffer: std::ptr<T>
+    length: usize,
+    capacity: usize,
+    buffer: ptr<T>
 }
 
-pub fn vec_new<T>() -> Vec<T> {
-    _ {
-        length: 0,
-        capacity: 1,
-        buffer: std::mem::arr_malloc(1)
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        _ {
+            length: 0,
+            capacity: 0,
+            buffer: std::mem::null()
+        }
     }
-}
 
-fn vec_reserve_armortized<T>(v: std::ptr<Vec<T>>, size: std::usize) {
-    if (*v).capacity >= size { return; };
-    while (*v).capacity < size {
-        (*v).capacity *= 2;
-    };
-    (*v).buffer = std::mem::arr_resize((*v).buffer, (*v).capacity);
-}
+    fn reserve_armortized(v: ptr<Vec<T>>, size: usize) {
+        if v.capacity >= size { return; };
+        if v.capacity == 0 { v.capacity = 8; };
+        while v.capacity < size {
+            v.capacity *= 2;
+        };
+        v.buffer = std::mem::arr_resize(v.buffer, v.capacity);
+    }
 
-pub fn vec_push<T>(v: std::ptr<Vec<T>>, item: T) {
-    vec_reserve_armortized(v, (*v).length + 1);
-    *std::mem::arr_offset((*v).buffer, (*v).length) = item;
-    (*v).length = (*v).length + 1;
-}
+    pub fn push(v: ptr<Vec<T>>, item: T) {
+        v.reserve_armortized(v.length + 1);
+        *std::mem::arr_offset(v.buffer, v.length) = item;
+        v.length = v.length + 1;
+    }
 
-pub fn vec_get<T>(v: std::ptr<Vec<T>>, i: std::usize) -> T {
-    //*std::mem::arr_offset((*v).buffer, i)
-    *vec_get_ref(v, i)
-}
+    pub fn get(v: ptr<Vec<T>>, i: usize) -> T {
+        *v.get_ref(i)
+    }
 
-pub fn vec_get_ref<T>(v: std::ptr<Vec<T>>, i: std::usize) -> std::ptr<T> {
-    std::mem::arr_offset((*v).buffer, i)
-}
+    pub fn get_ref(v: ptr<Vec<T>>, i: usize) -> ptr<T> {
+        std::mem::arr_offset(v.buffer, i)
+    }
 
-pub fn vec_pop<T>(v: std::ptr<Vec<T>>) -> T {
-    if (*v).length > 0 {
-        (*v).length = (*v).length - 1;
-        *std::mem::arr_offset((*v).buffer, (*v).length)
-    } else {
-        std::mem::new_uninit()
+    pub fn pop(v: ptr<Vec<T>>) -> T {
+        if v.length > 0 {
+            v.length = v.length - 1;
+            *std::mem::arr_offset(v.buffer, v.length)
+        } else {
+            std::mem::new_uninit()
+        }
+    }
+
+    pub fn free(v: ptr<Vec<T>>) {
+        std::mem::free(v.buffer)
     }
 }

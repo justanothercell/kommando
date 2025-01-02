@@ -3,7 +3,6 @@
 
 #include "lib.h"
 #include "ast.h"
-#include "lib/list.h"
 
 LIST(ImportList, Import*);
 
@@ -11,6 +10,7 @@ ENUM(ModuleItemType,
     MIT_FUNCTION,
     MIT_STRUCT,
     MIT_STATIC,
+    MIT_CONSTANT,
     MIT_MODULE,
     MIT_ANY
 );
@@ -37,7 +37,15 @@ typedef struct Module {
     str filepath;
     Module* parent;
     Visibility vis;
+    ImplList impls;
+    Map* package_method_map;
 } Module;
+typedef struct MethodImpl {
+    TypeValue* tv;
+    GenericKeys* keys;
+    FuncDef* func;
+} MethodImpl;
+LIST(MethodImplList, MethodImpl);
 
 typedef struct Program {
     Map* packages;

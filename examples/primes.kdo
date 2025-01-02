@@ -1,6 +1,6 @@
 use std::*;
 
-fn printf(fmt: c_const_str_ptr, *) -> i32;
+fn printf(fmt: c_str, *) -> i32;
 
 fn main() {
     let number = 42u32;

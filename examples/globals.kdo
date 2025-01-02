@@ -1,0 +1,27 @@
+use std::*;
+use c_api::printf;
+
+static COUNTER: i32 = 1 << 3 | 1;
+const START_MESSAGE: c_str = "--- starting ---\n";
+const RESET_MESSAGE: c_str = "--- resetting ---\n";
+
+fn reset() {
+    COUNTER = 0;
+}
+
+fn next() -> i32 {
+    COUNTER = COUNTER + 1;
+    COUNTER - 1
+}
+
+fn main() {
+    printf(START_MESSAGE);
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+    printf(RESET_MESSAGE);
+    reset();
+    printf("counting %d\n", next());
+    printf("counting %d\n", next());
+}

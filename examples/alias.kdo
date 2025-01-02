@@ -1,6 +1,6 @@
 use std::*;
 use c_api::printf;
-use intrinsics::typename;
+use core::intrinsics::typename;
 
 use std::mem::swap as exchange;
 

@@ -3,8 +3,19 @@ pub mod vec;
 pub mod mem;
 pub mod env;
 pub mod coroutine;
+pub mod any;
 
-pub use intrinsics::types::*;
+pub use core::types::*;
+pub use u8 as char;
+pub use core::true;
+pub use core::false;
 
-pub use intrinsics::typecast;
-pub use intrinsics::numcast;
+pub use core::intrinsics::typecast;
+pub use core::intrinsics::numcast;
+
+pub fn unreachable<T>() -> T {
+    c_api::printf("ERROR: Unreachable state reached");
+    c_api::exit(1);
+    // dummy: control flow will never reach this
+    std::mem::new_uninit()
+}
