@@ -10,6 +10,7 @@ ENUM(ModuleItemType,
     MIT_FUNCTION,
     MIT_STRUCT,
     MIT_STATIC,
+    MIT_CONSTANT,
     MIT_MODULE,
     MIT_ANY
 );

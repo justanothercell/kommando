@@ -198,7 +198,8 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* type_cont
     return expanded;
 }
 
-str gen_c_static_name(Static* s) {
+str gen_c_static_name(Global* s) {
+    if (s->constant) panic("Expected static, got constant. This is a compiler error");
     str name = NULL;
     int state = 0;
     list_foreach(&s->annotations, i, Annotation a, {
@@ -229,8 +230,15 @@ str gen_c_static_name(Static* s) {
 }
 
 str gen_c_var_name(Variable* v, GenericValues* type_generics, GenericValues* func_generics) {
-    if (v->static_ref != NULL) {
-        return gen_c_static_name(v->static_ref);
+    if (v->global_ref != NULL) {
+        if (v->global_ref->constant) {
+            if (v->global_ref->computed_value->type == STRING) {
+                return to_str_writer(s, fprintf(s, "\"%s\"", v->global_ref->computed_value->string));
+            } else {
+                return v->global_ref->computed_value->string;
+            }
+        } 
+        return gen_c_static_name(v->global_ref);
     }
     if (v->box->name != NULL) {
         return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, (usize)v->box));
@@ -752,8 +760,9 @@ void transpile_typedef(FILE* header_stream, FILE* code_stream, str modkey, TypeD
     ty->transpile_state = 2;
 }
 
-void transpile_static(FILE* header_stream, FILE* code_stream, str modkey, Static* s) {
+void transpile_static(FILE* header_stream, FILE* code_stream, str modkey, Global* s) {
     UNUSED(modkey);
+    if (s->constant) panic("Expected static, got constant. This is a compiler error");
     log("transpiling static %s::%s", to_str_writer(stream, fprint_path(stream, s->module->path)), s->name->name);
     bool is_extern = false;
     list_foreach(&s->annotations, i, Annotation a, {
@@ -768,7 +777,15 @@ void transpile_static(FILE* header_stream, FILE* code_stream, str modkey, Static
     str c_name = gen_c_static_name(s);
     fprintf(header_stream, "extern %s %s;\n", c_type, c_name);
     if (!is_extern) {
-        fprintf(code_stream, "%s %s;\n", c_type, c_name);
+        if (s->computed_value != NULL) {
+            if (s->computed_value->type == STRING) {
+                fprintf(code_stream, "%s %s = \"%s\";\n", c_type, c_name, s->computed_value->string);
+            } else {
+                fprintf(code_stream, "%s %s = %s;\n", c_type, c_name, s->computed_value->string);
+            }
+        } else {
+            fprintf(code_stream, "%s %s;\n", c_type, c_name);
+        }
     }
 }
 
@@ -800,9 +817,11 @@ void transpile_module(FILE* header_stream, FILE* code_stream, str modkey, Module
             case MIT_STRUCT:
                 if (type == MIT_STRUCT) transpile_typedef(header_stream, code_stream, modkey, item->item, true);
                 break;
-            case MIT_STATIC: 
+            case MIT_STATIC:
                 if (type == MIT_STATIC) transpile_static(header_stream, code_stream, modkey, item->item);
                 break;
+            case MIT_CONSTANT:
+                break; // constants dont get transpiled, they get inlined
             case MIT_ANY: 
                 unreachable();
         }

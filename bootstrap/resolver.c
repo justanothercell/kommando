@@ -1,15 +1,11 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <assert.h>
 
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 LIB
 #include "resolver.h"
 #include "ast.h"
@@ -305,9 +301,10 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
             TypeDef* type = mi->item;
             if (!type->head_resolved) resolve_typedef(program, type);
         } break;
+        case MIT_CONSTANT:
         case MIT_STATIC: {
-            Static* s = mi->item;
-            if (s->type->def == NULL) resolve_typevalue(program, module, s->type, func_generics, type_generics);
+            Global* g = mi->item;
+            if (g->type->def == NULL) resolve_typevalue(program, module, g->type, func_generics, type_generics);
         } break;
         default:
             unreachable();
@@ -320,6 +317,7 @@ void* resolve_item(Program* program, Module* module, Path* path, ModuleItemType 
         case MIT_STRUCT:
             gkeys = ((TypeDef*)mi->item)->generics;
             break;
+        case MIT_CONSTANT:
         case MIT_STATIC:
             break;
         default:
@@ -453,7 +451,7 @@ static void var_find(Program* program, Module* module, VarList* vars, Variable* 
         for (int i = vars->length-1;i >= 0;i--) {
             if (str_eq(vars->elements[i]->name, name->name)) {
                 var->box = vars->elements[i];
-                var->static_ref = NULL;
+                var->global_ref = NULL;
                 if (var->values != NULL) spanned_error("Generic variable?", var->path->elements.elements[0]->span, "Variable values are not supposed to be generic");
                 return;
             }
@@ -483,12 +481,20 @@ static void var_find(Program* program, Module* module, VarList* vars, Variable* 
             register_item(NULL, var->values, func->generics);
         } break;
         case MIT_STATIC: {
-            if (var->values != NULL) spanned_error("Generic static?", var->path->elements.elements[0]->span, "Static values are not supposed to be generic (yet?!)");
-            Static* s = item->item;
+            if (var->values != NULL) spanned_error("Generic static?", var->path->elements.elements[0]->span, "Static values are not supposed to be generic");
+            Global* s = item->item;
             resolve_typevalue(program, module, s->type, NULL, NULL);
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = s->type;
-            var->static_ref = s;
+            var->global_ref = s;
+        } break;
+        case MIT_CONSTANT: {
+            if (var->values != NULL) spanned_error("Generic const?", var->path->elements.elements[0]->span, "Constants are not supposed to be generic");
+            Global* s = item->item;
+            resolve_typevalue(program, module, s->type, NULL, NULL);
+            box->resolved = malloc(sizeof(TVBox));
+            box->resolved->type = s->type;
+            var->global_ref = s;
         } break;
         case MIT_STRUCT:
             spanned_error("Expected variable", name->span, "Expected variable or function ref, got struct");
@@ -1507,6 +1513,74 @@ void resolve_module_imports(Program* program, Module* module) {
         }
     });
 }
+Token* const_eval(Expression* expr) {
+    Token* result = malloc(sizeof(Token));
+    result->span = expr->span;
+    switch (expr->type) {
+        case EXPR_BIN_OP: {
+            BinOp* op = expr->expr;
+            Token* left = const_eval(op->lhs);
+            Token* right = const_eval(op->rhs);
+            if (left->type != NUMERAL) spanned_error("Invalid const eval binop argument type", left->span, "Can only const evaluate `%s` on number-like values, not %s", op->op, TokenType__NAMES[left->type]);
+            if (right->type != NUMERAL) spanned_error("Invalid const eval binop argument type", left->span, "Can only const evaluate `%s` on number-like values, not %s", op->op, TokenType__NAMES[left->type]);
+            str endptr = NULL;
+            i64 l = strtoll(left->string, &endptr, 0);
+            if (endptr == NULL) spanned_error("Invalid const eval number", left->span, "Could not convert `%s` to an integer.\nPlease note that const eval does not suppport type suffixes.", left->string);
+            i64 r = strtoll(right->string, &endptr, 0);
+            if (endptr == NULL) spanned_error("Invalid const eval number", left->span, "Could not convert `%s` to an integer.\nPlease note that const eval does not suppport type suffixes.", left->string);
+            i64 x = 0;
+            if (str_eq(op->op, "+")) {
+                x = l + r;
+            } else if (str_eq(op->op, "-")) {
+                x = l - r;
+            } else if (str_eq(op->op, "*")) {
+                x = l * r;
+            } else if (str_eq(op->op, "/")) {
+                x = l / r;
+            } else if (str_eq(op->op, "&")) {
+                x = l & r;
+            } else if (str_eq(op->op, "|")) {
+                x = l ^ r;
+            } else if (str_eq(op->op, "^")) {
+                x = l ^ r;
+            } else if (str_eq(op->op, "%")) {
+                x = l % r;
+            } else if (str_eq(op->op, ">>")) {
+                x = l >> r;
+            } else if (str_eq(op->op, "<<")) {
+                x = l << r;
+            } else if (str_eq(op->op, ">")) {
+                x = l > r;
+            } else if (str_eq(op->op, ">=")) {
+                x = l >= r;
+            } else if (str_eq(op->op, "<")) {
+                x = l < r;
+            } else if (str_eq(op->op, "<=")) {
+                x = l <= r;
+            } else if (str_eq(op->op, "==")) {
+                x = l == r;
+            } else if (str_eq(op->op, "!=")) {
+                x = l != r;
+            } else if (str_eq(op->op, "&&")) {
+                x = l && r;
+            } else if (str_eq(op->op, "||")) {
+                x = l || r;
+            } else {
+                spanned_error("Invalid const eval operation", op->op_span, "Cannot perform `%s` at compile time", op->op);
+            }
+            result->string = to_str_writer(s, fprintf(s, "%lld", x));
+            result->type = NUMERAL;
+            break;
+        } case EXPR_LITERAL: {
+            Token* t = expr->expr;
+            result->string = t->string;
+            result->type = t->type;
+            break;
+        } default:
+            spanned_error("Invalid constant operation", expr->span, "Cannot evaluate expression of type %s at compile time", ExprType__NAMES[expr->type]);
+    }
+    return result;
+}
 void resolve_module(Program* program, Module* module) {
     if (module->resolved) return;
     str path_str = to_str_writer(stream, fprint_path(stream, module->path));
@@ -1540,9 +1614,15 @@ void resolve_module(Program* program, Module* module) {
                 Module* mod = item->item;
                 if (!mod->resolved && !mod->in_resolution) resolve_module(program, mod);
             } break;
+            case MIT_CONSTANT:
             case MIT_STATIC: {
-                Static* s = item->item;
-                resolve_typevalue(program, module, s->type, NULL, NULL);
+                Global* g = item->item;
+                resolve_typevalue(program, module, g->type, NULL, NULL);
+                if (g->value != NULL) {
+                    g->computed_value = const_eval(g->value);
+                } else {
+                    if (g->constant) spanned_error("Uninitialized constant", g->name->span, "Constant needs an associasted value.\nNote that this is optional for statics.");
+                }
             } break;
             case MIT_ANY: 
                 unreachable();

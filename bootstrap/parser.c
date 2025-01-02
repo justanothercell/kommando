@@ -252,24 +252,34 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         } else if (token_compare(t, "impl", IDENTIFIER)) {
             ImplBlock* impl = parse_impl(stream, module);
             list_append(&module->impls, impl);
-        } else if(token_compare(t, "static", IDENTIFIER)) {
+        } else if(token_compare(t, "static", IDENTIFIER) || token_compare(t, "const", IDENTIFIER)) {
+            bool constant = token_compare(t, "const", IDENTIFIER);
             t = next_token(stream); // skip static
-            Static* s = malloc(sizeof(Static));
-            s->name = parse_identifier(stream);
+            Global* g = malloc(sizeof(Global));
+            g->name = parse_identifier(stream);
             t = next_token(stream);
-            if(!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t, "static %s: ...;", s->name->name);
-            s->type = parse_type_value(stream);
+            if(!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t, "static|const %s: ...;", g->name->name);
+            g->type = parse_type_value(stream);
             t = next_token(stream);
-            if(!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t, "static %s: ...;", s->name->name);
-            s->module = module;
-            s->annotations = annos;
+            g->module = module;
+            g->annotations = annos;
+            g->constant = constant;
+            g->computed_value = NULL;
+            g->value = NULL;
+            if(!token_compare(t, ";", SNOWFLAKE)) {
+                if(!token_compare(t, "=", SNOWFLAKE)) unexpected_token(t, "static|const %s: ... = ...;", g->name->name);
+                g->value = parse_expression(stream, true);
+                t = next_token(stream);
+                if(!token_compare(t, ";", SNOWFLAKE)) unexpected_token(t, "static|const %s: ... = ...;", g->name->name);
+            }
             ModuleItem* mi = malloc(sizeof(ModuleItem));
-            mi->item = s;
-            mi->type = MIT_STATIC;
+            mi->item = g;
+            if (constant) mi->type = MIT_CONSTANT;
+            else mi->type = MIT_STATIC;
             mi->module = module;
             mi->origin = NULL;
             mi->vis = vis;
-            mi->name = s->name;
+            mi->name = g->name;
             ModuleItem* old = map_put(module->items, mi->name->name, mi);
             if (old != NULL) {
                 spanned_error("Name conflict", mi->name->span, "Name %s is already defined in this scope at %s", mi->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
@@ -318,7 +328,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         end = name->span.right;
         LetExpr* let = malloc(sizeof(LetExpr));
         Variable* var = malloc(sizeof(Variable));
-        var->static_ref = NULL;
+        var->global_ref = NULL;
         var->path = path_simple(name);
         let->var = var;
         t = next_token(stream);
@@ -436,7 +446,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 var->values = generics;
                 var->method_name = method;
                 var->method_values = method_generics;
-                var->static_ref = NULL;
+                var->global_ref = NULL;
                 expression->expr = var;
                 expression->type = EXPR_VARIABLE;
             }
@@ -503,7 +513,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             var->values = generics;
             var->method_name = NULL;
             var->method_values = NULL;
-            var->static_ref = NULL;
+            var->global_ref = NULL;
             expression->expr = var;
             expression->type = EXPR_VARIABLE;
         }
@@ -863,7 +873,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
             }
             Argument* argument = malloc(sizeof(Argument));
             Variable* var = malloc(sizeof(Variable));
-            var->static_ref = NULL;
+            var->global_ref = NULL;
             var->path = path_simple(parse_identifier(stream));
             argument->var = var;
             t = next_token(stream);

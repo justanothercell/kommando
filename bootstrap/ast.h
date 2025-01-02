@@ -89,11 +89,11 @@ typedef struct TypeValue {
 void fprint_typevalue(FILE* file, TypeValue* tval);
 
 typedef struct VarBox VarBox;
-typedef struct Static Static;
+typedef struct Global Global;
 typedef struct Variable {
     Path* path;
     VarBox* box;
-    Static* static_ref;
+    Global* global_ref;
     GenericValues* values;
     Identifier* method_name;
     GenericValues* method_values;
@@ -240,12 +240,15 @@ typedef struct FuncDef {
     TypeValue* impl_type;
 } FuncDef;
 
-typedef struct Static {
+typedef struct Global {
     Identifier* name;
     TypeValue* type;
     AnnoList annotations;
     Module* module;
-} Static;
+    Expression* value;
+    Token* computed_value;
+    bool constant;
+} Global;
 
 ENUM(Visibility,
     V_PRIVATE,
