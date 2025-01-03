@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include "lib.h"
+#include "lib/str.h"
 LIB
 #include "resolver.h"
 #include "ast.h"
@@ -139,8 +140,8 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
         Visibility required = V_PRIVATE;
         if (context_module != result->module) required = V_LOCAL;
         if (mod_root != result_root) required = V_PUBLIC;
-        if (result->vis < required) spanned_error("Lacking visibility", path->elements.elements[0]->span, "Cannot get item %s::%s while in %s as this would require it having a visibility of %s,\nbut %s was only declared as %s",
-                                            to_str_writer(s, fprint_path(s, result->module->path)), result->name->name, to_str_writer(s, fprint_path(s, context_module->path)), Visibility__NAMES[required], result->name->name, Visibility__NAMES[result->vis]);
+        if (result->vis < required) spanned_error("Lacking visibility", path->elements.elements[0]->span, "Cannot get item %s::%s @ %s while in %s as this would require it having a visibility of %s,\nbut %s was only declared as %s",
+                                            to_str_writer(s, fprint_path(s, result->module->path)), result->name->name, to_str_writer(s, fprint_span(s, &result->name->span)), to_str_writer(s, fprint_path(s, context_module->path)), Visibility__NAMES[required], result->name->name, Visibility__NAMES[result->vis]);
         Module* res_tree = result->module;
         while (res_tree != NULL) {
             Module* ctx_tree = context_module;
@@ -148,8 +149,8 @@ static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path
                 if (ctx_tree == res_tree) goto done_checking_tree;
                 ctx_tree = ctx_tree->parent;
             }
-            if (res_tree->vis < required) spanned_error("Lacking visibility", path->elements.elements[0]->span, "Cannot get item %s::%s while in %s as this would require the ancestor module %s to have a visibility of %s,\nbut %s was only declared as %s",
-                                            to_str_writer(s, fprint_path(s, result->module->path)), result->name->name, to_str_writer(s, fprint_span(s, &result->module->path->elements.elements[0]->span)), Visibility__NAMES[required], to_str_writer(s, fprint_path(s, context_module->path)), to_str_writer(s, fprint_path(s, res_tree->path)), ctx_tree->name->name, to_str_writer(s, fprint_span(s, &result->name->span)), Visibility__NAMES[res_tree->vis]);
+            if (res_tree->vis < required) spanned_error("Lacking visibility", path->elements.elements[0]->span, "Cannot get item %s::%s @ %s while in %s as this would require the ancestor module %s to have a visibility of %s,\nbut %s was only declared as %s",
+                                            to_str_writer(s, fprint_path(s, result->module->path)), result->name->name, to_str_writer(s, fprint_span(s, &result->name->span)), to_str_writer(s, fprint_span(s, &result->module->path->elements.elements[0]->span)), Visibility__NAMES[required], to_str_writer(s, fprint_path(s, context_module->path)), to_str_writer(s, fprint_path(s, res_tree->path)), ctx_tree->name->name, to_str_writer(s, fprint_span(s, &result->name->span)), Visibility__NAMES[res_tree->vis]);
             res_tree = res_tree->parent;
         }
         done_checking_tree: {}
@@ -768,7 +769,7 @@ MethodImpl* resolve_method_instance(Program* program, TypeValue* tv, Identifier*
     if (list == NULL || list->length == 0) spanned_error("No such method", name->span, "No such method `%s` defined on any type in package `%s` (on %s).", name->name, base->name->name,  to_str_writer(s, fprint_typevalue(s, tv)));
     MethodImpl* chosen = NULL;
     for (usize i = 0;i < list->length; i++) {
-        MethodImpl* impl = &list->elements[i];
+        MethodImpl* impl = list->elements[i];
         if (satisfies_impl_bounds(tv, impl)) {
             if (chosen != NULL) spanned_error("Multiple method candiates", tv->name->elements.elements[0]->span, "Multiple candiates found for %s::%s\n#1: %s::%s @ %s\n#2: %s::%s @ %s", 
                 to_str_writer(s, fprint_typevalue(s, tv)), name->name,
@@ -1397,7 +1398,10 @@ void register_impl(Program* program, Module* module, ImplBlock* impl) {
     map_foreach(impl->methods, str name, ModuleItem* mi, ({
         switch (mi->type) {
             case MIT_FUNCTION: {
-                MethodImpl mimpl = { .tv=impl->type, .keys=impl->generics, .func = mi->item };
+                MethodImpl* mimpl = malloc(sizeof(MethodImpl));
+                mimpl->tv=impl->type;
+                mimpl->keys=impl->generics; 
+                mimpl->func = mi->item;
                 MethodImplList* list;
                 if (map_contains(module->package_method_map, name)) {
                     list = map_get(module->package_method_map, name);

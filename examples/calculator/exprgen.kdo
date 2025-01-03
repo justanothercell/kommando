@@ -1,0 +1,37 @@
+use std::*;
+use c_api::printf;
+
+fn gen_expr(d: usize, topmost: bool) {
+    let r = c_api::rand() % 5;
+    if r == 0 || d == 0 {
+        printf("%d", c_api::rand() % 100);
+    } else {
+        let p = c_api::rand() % 2;
+        if p == 0 { 
+            printf("(");
+        };
+        gen_expr(d - 1, false);
+        let r = c_api::rand() % 4;
+        if r == 0 {
+            printf(" + ");
+        }; if r == 1 {
+            printf(" - ");
+        }; if r == 2 {
+            printf(" * ");
+        }; if r == 3 {
+            printf(" / ");
+        };
+        gen_expr(d - 1, false);
+        if p == 0 { 
+            printf(")");
+        };
+    };
+    if topmost {
+        printf("\n");
+    }
+}
+
+fn main() {
+    c_api::srand(numcast(c_api::time(c_api::null)));
+    gen_expr(5, true);
+}

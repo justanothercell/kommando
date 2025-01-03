@@ -45,7 +45,7 @@ typedef struct MethodImpl {
     GenericKeys* keys;
     FuncDef* func;
 } MethodImpl;
-LIST(MethodImplList, MethodImpl);
+LIST(MethodImplList, MethodImpl*);
 
 typedef struct Program {
     Map* packages;

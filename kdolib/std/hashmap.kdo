@@ -1,0 +1,16 @@
+use std::*;
+use std::vec::Vec;
+
+pub struct HashMap<K, V> {
+    buckets: Vec<unit>,
+    random: u32,
+}
+
+impl<K, V> HashMap<K, V> {
+    pub fn new() -> HashMap<K, V> {
+        _ {
+            buckets: Vec::<_>::new_with({}, 256),
+            random: numcast(c_api::rand())
+        }
+    }
+}

@@ -26,4 +26,11 @@ fn main() {
         printf("%3u ", item);
     };
     printf("\n");
+    printf("New bulk filled:\n");
+    let pies = Vec::<f32>::new_with(math::PIf32, 10);
+    while pies.length > 0 {
+        let item = pies.pop().unwrap();
+        printf("%f ", item);
+    };
+    printf("\n");
 }

@@ -1,0 +1,143 @@
+use std::*;
+use std::vec::Vec;
+use c_api::printf;
+
+// convert na infix expression to its corresponding postfix notation
+// example:
+// 3 + 4 * 5   =>   3 4 5 * +
+// resources:
+// https://en.wikipedia.org/wiki/Shunting_yard_algorithm
+
+fn main() {
+    while true {
+        let input: c_str = io::input(">>> ");
+        if input == c_api::nullstr { // EOF
+            c_api::printf("\n");
+            break;
+        };
+        let len = c_api::str::strlen(input);
+        let text: ptr<u8> = typecast(input);
+        let i = 0usize;
+        let numstate = 0;
+        let last_num = false;
+        let ops = Vec::<u8>::new();
+
+        while i <= len {
+            let c = if i < len {
+                *mem::arr_offset(text, i)
+            } else {
+                32 // ' ' append a single whitespace
+            };
+            i += 1;
+            if c >= 48 && c <= 57 { // 0 - 9
+                if last_num {
+                    printf("\nERROR: Expected operand between two numbers");
+                    last_num = true;
+                    ops.clear();
+                    break;
+                };
+                if numstate == 0 {
+                    numstate = 1;
+                };
+                printf("%c", c);
+                continue;
+            };
+            if numstate == 1 && c == 46 { // .
+                numstate = 2;
+                printf(".");
+                continue;
+            };
+            // not continued: end of number!
+            if numstate != 0 {
+                numstate = 0;
+                last_num = true;
+                printf(" ");
+            };
+            if c == 32 { // ' '
+                continue;
+            };
+            if c == 40 { // (
+                last_num = false;
+                ops.push(c);
+                continue;
+            };
+            if c == 41 { // )
+                if last_num == false {
+                    printf("\nERROR: did not expect operator directly before closing parenthesis");
+                    ops.clear();
+                    last_num = true;
+                    break;
+                };
+                while ops.length > 0 {
+                    let op = ops.pop().unwrap();
+                    if op == 40 { // (
+                        break;
+                    };
+                    if ops.length == 0 {
+                        printf("\nERROR: mismatched parenthesis");
+                        last_num = true;
+                        ops.clear();
+                        i = len + 1; // break out of outer loop
+                        break;
+                    };
+                    printf("%c ", op);
+                };
+                continue;
+            };
+            if last_num == false {
+                printf("\nERROR: expected number before operand");
+                last_num = true;
+                ops.clear();
+                break;
+            };
+            last_num = false;
+            let precedence = 0;
+            if c == 43 || c == 45 { // + -
+                precedence = 1;
+            };
+            if c == 42 || c == 47 { // * /
+                precedence = 2;
+            };
+            if precedence == 0 {
+                printf("\nERROR: invalid operator `%c`", c);
+                last_num = true;
+                ops.clear();
+                break;
+            };
+            while ops.length > 0 {
+                let op = ops.last().unwrap();
+                if op == 40 { // (
+                    break;
+                };
+                let op_precedence = 0;
+                if op == 43 || op == 45 { // + -
+                    op_precedence = 1;
+                };
+                if op == 42 || op == 47 { // * /
+                    op_precedence = 2;
+                };
+                if op_precedence >= precedence {
+                    ops.pop();
+                    printf("%c ", op);
+                } else {
+                    break;
+                }
+            };
+            ops.push(c);
+        };
+        if last_num == false {
+            printf("\nERROR: expected number after operand");
+            ops.clear();
+        };
+        while ops.length > 0 {
+            let op = ops.pop().unwrap();
+            if op == 40 { // (
+                printf("\nERROR: mismatched parenthesis");
+                break;
+            };
+            printf("%c ", op);
+        };
+        printf("\n");
+        ops.free(); // clear allocated memory
+    }
+}

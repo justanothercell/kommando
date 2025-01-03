@@ -297,7 +297,11 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
     CodePoint start = t->span.left;
     CodePoint end = t->span.right;
     
-    if (token_compare(t, "(", SNOWFLAKE)) {
+    if (token_compare(t, "{", SNOWFLAKE)) {
+        stream->peek = t;
+        expression->expr = parse_block(stream);
+        expression->type = EXPR_BLOCK;
+    } else if (token_compare(t, "(", SNOWFLAKE)) {
         expression = parse_expression(stream, true);
         t = next_token(stream);
         if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
@@ -671,7 +675,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                 bin_op_precedence(t->string, t->span); // make sure op is valid
                 if (rhs->type == EXPR_BIN_OP) {
                     BinOp* rhs_inner = rhs->expr;
-                    if (bin_op_precedence(t->string, t->span) >= bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
+                    if (bin_op_precedence(t->string, t->span) > bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
                         Expression* a = expr;
                         Expression* b = rhs_inner->lhs;
                         Expression* c = rhs_inner->rhs;
