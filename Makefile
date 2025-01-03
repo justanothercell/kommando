@@ -4,7 +4,7 @@ build: clean
 clean:
 	rm -f kommando
 	rm -f CACHELOG.txt
-	rm -f MEMCACHE.txt
+	rm -f MEMTRACE.txt
 
 br: build run
 
