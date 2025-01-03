@@ -27,7 +27,7 @@ test: build
 	printf "Running tests...\n"; \
 	for file in $$all_files; do \
 		index=$$((index + 1)); \
-		if make compile file=$$file > /dev/null; then \
+		if make compile file=$$file > /dev/null 2>&1; then \
 			printf "[\x1b[1;32mOK\x1b[0m] ($$index/$$count) $$file\n"; \
 			success=$$((success + 1)); \
 		else \
@@ -36,4 +36,8 @@ test: build
 		fi; \
 	done; \
 	printf "Tests complete.\n"; \
-	printf "\x1b[1;32msuccess: $$success\x1b[0m\t\x1b[1;31mfail: $$fail\x1b[0m\n";
+	printf "\x1b[1;32msuccess: $$success\x1b[0m\t\x1b[1;31mfail: $$fail\x1b[0m\n"; \
+	if (test $$fail -ne 0) \
+	then \
+		(exit 1); \
+	fi \
