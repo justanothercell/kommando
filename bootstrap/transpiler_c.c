@@ -6,6 +6,7 @@
 
 #include "lib.h"
 #include "lib/exit.h"
+#include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
 LIB
@@ -50,10 +51,10 @@ void fprint_resolved_typevalue(FILE* stream, TypeValue* tv, GenericValues* type_
     }
 } 
 
-str gen_c_type_name(TypeValue* tv, GenericValues* type_generics, GenericValues* func_generics) {
+static str gen_c_type_name_inner(TypeValue* tv, GenericValues* type_generics, GenericValues* func_generics, bool toplevel) {
     TypeDef* ty = tv->def;
     if (ty == NULL) spanned_error("Unresolved type", tv->name->elements.elements[0]->span,  "Couldn't resolve %s", to_str_writer(s, fprint_typevalue(s, tv)));
-    if (ty->extern_ref != NULL) {
+    if (ty->extern_ref != NULL && toplevel) {
         return ty->extern_ref;
     }
     if (ty->module == NULL) {
@@ -73,7 +74,7 @@ str gen_c_type_name(TypeValue* tv, GenericValues* type_generics, GenericValues* 
             spanned_error("Unsubsituted generic", ty->name->span, "Cannot substitute `%s` with a concrete as there is nothing to subsitute from", ty->name->name);
         }
         if (concrete->def != tv->def) {
-            return gen_c_type_name(concrete, func_generics, type_generics);
+            return gen_c_type_name_inner(concrete, func_generics, type_generics, toplevel);
         }
     }
     if (tv->ctx != NULL) spanned_error("Indirect generic type", ty->name->span, "Type %s is not concrete", ty->name->name);
@@ -112,13 +113,16 @@ str gen_c_type_name(TypeValue* tv, GenericValues* type_generics, GenericValues* 
             fprintf(stream, "<");
             list_foreach(&tv->generics->generics, i, TypeValue* generic_tv, {
                 if (i > 0) fprintf(stream, ",");
-                fprintf(stream, "%s", gen_c_type_name(generic_tv, func_generics, type_generics));
+                fprintf(stream, "%s", gen_c_type_name_inner(generic_tv, func_generics, type_generics, false));
             });
             fprintf(stream, ">");
         }
     });
     u32 hash = str_hash(key);
     return to_str_writer(stream, fprintf(stream,"struct %s%lx", ty->name->name, hash));
+}
+str gen_c_type_name(TypeValue* tv, GenericValues* type_generics, GenericValues* func_generics) {
+    return gen_c_type_name_inner(tv, type_generics, func_generics, true);
 }
 
 str gen_c_fn_name(FuncDef* def, GenericValues* type_generics, GenericValues* func_generics) {
@@ -584,11 +588,11 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
             goto type_done;
         }
         map_foreach(type_contexted->ctx->generic_uses, str key, GenericUse* use, {
-            log(" -> %s ", key);
             UNUSED(key);
             GenericValues* expanded = expand_generics(type_instance, use->type_context, use->func_context);
             str expanded_key = tfvals_to_key(expanded, func_instance);
-            if (!map_contains(instance_host->generic_uses, expanded_key)) {
+            TypeValue* expanded_contexted = find_contexted(expanded);
+            if (expanded_contexted != type_contexted && !map_contains(instance_host->generic_uses, expanded_key)) {
                 GenericUse* use = malloc(sizeof(GenericUse));
                 use->type_context = expanded;
                 use->func_context = func_instance;
@@ -606,7 +610,6 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
             if (!is_fully_defined(func_instance)) spanned_error("Not fully defined", func_instance->span, "This is probably a compiler error. For now just supply more generic hints.");
             goto func_done;
         }
-        log(" > found (func) contexted %s with %llu uses", to_str_writer(s, fprint_typevalue(s, func_contexted)), map_size(func_contexted->ctx->generic_uses));
         map_foreach(func_contexted->ctx->generic_uses, str key, GenericUse* use, {
             UNUSED(key);
             GenericValues* expanded = expand_generics(func_instance, use->type_context, use->func_context);

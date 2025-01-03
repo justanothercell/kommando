@@ -79,3 +79,8 @@ pub fn swap<T>(p1: ptr<T>, p2: ptr<T>) {
     *p1 = *p2;
     *p2 = temp;
 }
+
+pub fn replace<T>(ptr: ptr<T>, item: T) -> T {
+    swap(ptr, &item);
+    item
+}

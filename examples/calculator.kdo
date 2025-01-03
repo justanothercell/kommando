@@ -80,63 +80,63 @@ fn main() {
             };
             if c == 43 { // +
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = a + b;
+                *stack.get_ref(stack.length - 1).unwrap() = a + b;
                 continue;
             };
             if c == 45 { // -
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = a - b;
+                *stack.get_ref(stack.length - 1).unwrap() = a - b;
                 continue;
             };
             if c == 42 { // *
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = a * b;
+                *stack.get_ref(stack.length - 1).unwrap() = a * b;
                 continue;
             };
             if c == 47 { // /
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = a / b;
+                *stack.get_ref(stack.length - 1).unwrap() = a / b;
                 continue;
             };
             if c == 62 { // >
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
+                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 60 { // <
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
+                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 61 { // =
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 2);
-                let b = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 2).unwrap();
+                let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1) = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
+                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 91 { // [
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
-                let x = stack.get(stack.length - 1);
+                let x = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
                 if numcast::<_, i64>(x * PRECISION) == 0 {
                     while i < len {
@@ -149,7 +149,7 @@ fn main() {
             };
             if c == 93 { // [
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
-                let x = stack.get(stack.length - 1);
+                let x = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
                 if numcast::<_, i64>(x * PRECISION) != 0 {
                     while i > 0 {
@@ -162,21 +162,21 @@ fn main() {
             };
             if c == 35 { // # swap
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let a = stack.get(stack.length - 1);
-                let b = stack.get(stack.length - 2);
-                *stack.get_ref(stack.length - 1) = b;
-                *stack.get_ref(stack.length - 2) = a;
+                let a = stack.get(stack.length - 1).unwrap();
+                let b = stack.get(stack.length - 2).unwrap();
+                *stack.get_ref(stack.length - 1).unwrap() = b;
+                *stack.get_ref(stack.length - 2).unwrap() = a;
                 continue;
             };
             if c == 58 { // : dup
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
-                let v = stack.get(stack.length - 1);
+                let v = stack.get(stack.length - 1).unwrap();
                 stack.push(v);
                 continue;
             };
             if c == 59 { // ; dup 2nd: a, b, c, ... -> b, a, b, c, ...
                 if stack.length < 2 { c_api::printf("Stack needs at least 2 elements, got %lu\n", stack.length); break; };
-                let v = stack.get(stack.length - 2);
+                let v = stack.get(stack.length - 2).unwrap();
                 stack.push(v);
                 continue;
             };
@@ -187,13 +187,13 @@ fn main() {
             };
             if c == 33 { // ! fact
                 if stack.length < 1 { c_api::printf("Stack is empty\n"); break; };
-                let a = stack.get(stack.length - 1);
+                let a = stack.get(stack.length - 1).unwrap();
                 let sum: f64 = 1;
                 while a > 0 {
                     sum *= a;
                     a -= 1;
                 };
-                *stack.get_ref(stack.length - 1) = sum;
+                *stack.get_ref(stack.length - 1).unwrap() = sum;
                 continue;
             };
             c_api::printf("Invalid op '%c'\n", c);
@@ -206,7 +206,7 @@ fn main() {
         c_api::printf(" = ");
         let i = stack.length;
         while i > 0 {
-            c_api::printf("%f ", stack.get(i-1));
+            c_api::printf("%f ", stack.get(i-1).unwrap());
             i -= 1;
         };
         c_api::printf("\n");

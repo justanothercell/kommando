@@ -27,23 +27,31 @@ impl<T> Vec<T> {
     pub fn push(v: ptr<Vec<T>>, item: T) {
         v.reserve_armortized(v.length + 1);
         *std::mem::arr_offset(v.buffer, v.length) = item;
-        v.length = v.length + 1;
+        v.length += 1;
     }
 
-    pub fn get(v: ptr<Vec<T>>, i: usize) -> T {
-        *v.get_ref(i)
-    }
-
-    pub fn get_ref(v: ptr<Vec<T>>, i: usize) -> ptr<T> {
-        std::mem::arr_offset(v.buffer, i)
-    }
-
-    pub fn pop(v: ptr<Vec<T>>) -> T {
-        if v.length > 0 {
-            v.length = v.length - 1;
-            *std::mem::arr_offset(v.buffer, v.length)
+    pub fn get(v: ptr<Vec<T>>, i: usize) -> Option<T> {
+        if i < v.length {
+            Option::<_>::some(*std::mem::arr_offset(v.buffer, i))
         } else {
-            std::mem::new_uninit()
+            Option::<_>::none()
+        }
+    }
+
+    pub fn get_ref(v: ptr<Vec<T>>, i: usize) -> Option<ptr<T>> {
+        if i < v.length {
+            Option::<_>::some(std::mem::arr_offset(v.buffer, i))
+        } else {
+            Option::<_>::none()
+        }
+    }
+
+    pub fn pop(v: ptr<Vec<T>>) -> Option<T> {
+        if v.length > 0 {
+            v.length -= 1;
+            Option::<_>::some(*std::mem::arr_offset(v.buffer, v.length))
+        } else {
+            Option::<_>::none()
         }
     }
 

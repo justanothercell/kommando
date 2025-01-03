@@ -609,14 +609,9 @@ void patch_tvs(TypeValue** tv1ref, TypeValue** tv2ref) {
 }
 
 static void r_collect_generics(TypeValue* template, TypeValue* match, GenericKeys* keys, GenericValues* gvals) {
-    if ((template->generics == NULL && match->generics != NULL) || (template->generics != NULL && match->generics == NULL)) {
-        spanned_error("Type structure mismatch", match->name->elements.elements[0]->span, "Type %s @ %s does not structurally match its tempate %s @ %s (generic/ungeneric)",
-            to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_span(s, &match->name->elements.elements[0]->span)),
-            to_str_writer(s, fprint_typevalue(s, template)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)));
-    }
-    if (template->generics == NULL) { // match->generics also NULL
+    if (template->generics == NULL) {
         // is generic param?
-        if (template->name->elements.length == 1 && map_contains(keys->resolved, template->name->elements.elements[0]->name)) {
+        if (template->def->module == NULL) {
             str name = template->name->elements.elements[0]->name;
             list_foreach(&keys->generics, i, Identifier* ident, {
                 if (str_eq(ident->name, name)) {
@@ -627,6 +622,11 @@ static void r_collect_generics(TypeValue* template, TypeValue* match, GenericKey
             });
         }
         return;
+    }
+    if ((template->generics == NULL && match->generics != NULL) || (template->generics != NULL && match->generics == NULL)) {
+        spanned_error("Type structure mismatch", match->name->elements.elements[0]->span, "Type %s @ %s does not structurally match its tempate %s @ %s (generic/ungeneric)",
+            to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_span(s, &match->name->elements.elements[0]->span)),
+            to_str_writer(s, fprint_typevalue(s, template)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)));
     }
     if (template->generics->generics.length != match->generics->generics.length) {
         spanned_error("Type structure mismatch", match->name->elements.elements[0]->span, "Type %s @ %s does not structurally match its tempate %s @ %s (generic item mismatch)",
@@ -722,7 +722,7 @@ void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, Gen
     if (template->generics == NULL && match->generics == NULL && value->generics == NULL) {
         return;
     }
-    panic("%s @ %s, %s @ %s and %s @ %s do not match in generics", 
+    spanned_error("Generic mismatch", value->name->elements.elements[0]->span, "%s @ %s, %s @ %s and %s @ %s do not match in generics", 
         to_str_writer(s, fprint_typevalue(s, template)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)),
         to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_span(s, &match->name->elements.elements[0]->span)),
         to_str_writer(s, fprint_typevalue(s, value)), to_str_writer(s, fprint_span(s, &value->name->elements.elements[0]->span))

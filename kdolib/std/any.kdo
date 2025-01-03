@@ -16,25 +16,25 @@ impl Any {
         }
     }
 
-    pub fn is<A>(self: Any) -> bool {
-        typeid::<A>() == self.tid
+    pub fn is<T>(self: Any) -> bool {
+        typeid::<T>() == self.tid
     }
 
-    pub fn as<B>(self: Any) -> ptr<B> {
-        if self.is::<B>() {
+    pub fn as<T>(self: Any) -> ptr<T> {
+        if self.is::<T>() {
             typecast(self.object)
         } else {
-            c_api::fprintf(stderr, "ERROR: cannot interpret this `Any` object as %s\n", typename::<B>());
+            c_api::fprintf(stderr, "ERROR: cannot interpret this `Any` object as %s\n", typename::<T>());
             c_api::exit(1);
             unreachable()
         }
     }
 
-    pub fn try_as<C>(self: Any) -> ptr<C> {
-        if self.is::<C>() {
-            typecast(self.object)
+    pub fn try_as<T>(self: Any) -> Option<ptr<T>> {
+        if self.is::<T>() {
+            Option::<_>::some(typecast(self.object))
         } else {
-            std::mem::null()
+            Option::<_>::none()
         }
     }
 }

@@ -9,6 +9,7 @@ fn main() {
     printf("a is c_str? %d\n", a.is::<c_str>());
     let s: c_str = *a.as::<c_str>();
     printf("c_str value of a: %s\n", s);
+    if a.try_as::<i32>().is_some() { unreachable::<unit>(); };
     let i: i32 = *a.as::<i32>(); // crashes at runtime
     printf("unreachable!\n");
 }
