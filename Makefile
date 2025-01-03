@@ -3,6 +3,8 @@ build: clean
 
 clean:
 	rm -f kommando
+	rm -f CACHELOG.txt
+	rm -f MEMCACHE.txt
 
 br: build run
 
@@ -17,7 +19,10 @@ compile:
 help:
 	./kommando --help
 
-test: build
+clean_examples:
+	git clean -fx examples
+
+test: build clean_examples
 	@success=0; \
 	fail=0; \
 	all_files=$$(find ./examples -name "*.kdo"); \
