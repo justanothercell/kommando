@@ -1487,9 +1487,9 @@ void resovle_imports(Program* program, Module* module, List* mask) {
             imported->module = import->container;
             imported->origin = item;
             imported->item = item->item;
-            imported->name = item->name;
             Identifier* oname = item->name;
             if (import->alias != NULL) oname = import->alias;
+            imported->name = oname;
             if (map_contains(module->items, oname->name)) {
                 ModuleItem* orig = map_get(module->items, oname->name);
                 if (orig->item == imported->item) continue;
@@ -1586,6 +1586,11 @@ Token* const_eval(Expression* expr) {
     return result;
 }
 void resolve_module(Program* program, Module* module) {
+    if (module->parent != NULL) {
+        if (!module->parent->resolved && !module->parent->in_resolution) {
+            resolve_module(program, module->parent);
+        }
+    }
     if (module->resolved) return;
     str path_str = to_str_writer(stream, fprint_path(stream, module->path));
     if (module->in_resolution) panic("recursion detected while resolving %s", path_str);
@@ -1621,6 +1626,11 @@ void resolve_module(Program* program, Module* module) {
             case MIT_CONSTANT:
             case MIT_STATIC: {
                 Global* g = item->item;
+                if(g->constant) {
+                    log("Resolving constant %s::%s", to_str_writer(s, fprint_path(s, module->path)), g->name->name);
+                } else {
+                    log("Resolving static %s::%s", to_str_writer(s, fprint_path(s, module->path)), g->name->name);
+                }
                 resolve_typevalue(program, module, g->type, NULL, NULL);
                 if (g->value != NULL) {
                     g->computed_value = const_eval(g->value);

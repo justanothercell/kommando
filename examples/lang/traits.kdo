@@ -1,0 +1,29 @@
+use std::*;
+use c_api::printf;
+
+trait T: Grow {
+    fn grow(self: ptr<T>);
+}
+
+struct Tree {
+    height: f64
+}
+
+impl Tree: Grow {
+    fn grow(self: ptr<Tree>) {
+        height += 1.4372;
+    }
+}
+
+fn fertilize<T: Grow>(object: ptr<T>) {
+    object.grow();
+    object.grow();
+}
+
+fn main() {
+    let tree = Tree { height: 1.0 };
+    printf("tree has height %f\n", tree.height);
+    printf("fertilizing...");
+    fertilize(&tree);
+    printf("tree has height %f\n", tree.height);
+}

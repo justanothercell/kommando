@@ -15,6 +15,14 @@ impl<T> Vec<T> {
         }
     }
 
+    pub fn new_with_capacity(capacity: usize) -> Vec<T> {
+        _ {
+            length: 0,
+            capacity: capacity,
+            buffer: std::mem::arr_malloc(capacity)
+        }
+    }
+
     pub fn new_with(item: T, count: usize) -> Vec<T> {
         let v = Vec::<T>::new();
         while count > 0 {
@@ -79,5 +87,17 @@ impl<T> Vec<T> {
         v.buffer = std::mem::null();
         v.length = 0;
         v.capacity = 0;
+    }
+}
+
+impl Vec<char> {
+    // assumes str owned if  the vector is to be modified or free'd
+    pub fn from_str(str: c_str) -> Vec<char> {
+        let length = c_api::str::strlen(str);
+        _ {
+            length: length,
+            capacity: length,
+            buffer: typecast(str)
+        }
     }
 }

@@ -40,7 +40,7 @@ fn main() {
             break;
         };
         let len = c_api::str::strlen(input);
-        let text: ptr<u8> = typecast(input);
+        let text: ptr<char> = typecast(input);
         let i = 0usize;
         let numstate = 0;
         let num: f64 = 0.0;

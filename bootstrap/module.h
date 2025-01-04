@@ -54,8 +54,8 @@ typedef struct Program {
 
 void insert_module(Program* program, Module* module, Visibility vis);
 
-Module* gen_intrinsics();
-Module* gen_intrinsics_types();
+Module* gen_core_intrinsics();
+Module* gen_core_types();
 
 Identifier* gen_identifier(str name);
 TypeValue* gen_typevalue(str typevalue, Span* span);

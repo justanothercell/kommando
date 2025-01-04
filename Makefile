@@ -20,13 +20,12 @@ help:
 	./kommando --help
 
 clean_examples:
-	git clean -fx examples
+	git clean -fX examples
 
 test: build clean_examples
 	@success=0; \
 	fail=0; \
 	all_files=$$(find ./examples -name "*.kdo"); \
-	echo $$all_files; \
 	count=$$(echo $$all_files | wc -w); \
 	index=0; \
 	printf "Running tests...\n"; \

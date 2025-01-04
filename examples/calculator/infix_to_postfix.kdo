@@ -16,11 +16,11 @@ fn main() {
             break;
         };
         let len = c_api::str::strlen(input);
-        let text: ptr<u8> = typecast(input);
+        let text: ptr<char> = typecast(input);
         let i = 0usize;
         let numstate = 0;
         let last_num = false;
-        let ops = Vec::<u8>::new();
+        let ops = Vec::<char>::new();
 
         while i <= len {
             let c = if i < len {

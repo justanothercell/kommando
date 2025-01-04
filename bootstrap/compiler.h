@@ -14,8 +14,8 @@ typedef struct CompilerOptions {
     bool run;
     bool raw;
     bool compile;
-    StrList module_names;
-    Map* modules;
+    StrList package_names;
+    Map* packages;
 } CompilerOptions;
 
 CompilerOptions build_args(StrList* args);

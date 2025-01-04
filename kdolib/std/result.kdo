@@ -1,0 +1,62 @@
+use std::*;
+
+// Generics are a bit meh currently, so let's start with these primitive results for now.
+pub struct Result<T> {
+    // layout is probably okay for most applications
+    // Also we do not have any unions.
+    error: c_str,
+    item: T,
+    is_ok: bool
+}
+
+impl<T> Result<T> {
+    pub fn ok(item: T) -> Result<T> {
+        _ { item: item, error: c_api::nullstr, is_ok: true }
+    }
+
+    pub fn err(error: c_str) -> Result<T> {
+        _ { item: std::mem::new_uninit(), error: error, is_ok: false }
+    }
+
+    pub fn is_ok(self: Result<T>) -> bool {
+        self.is_ok
+    }
+
+    pub fn is_err(self: Result<T>) -> bool {
+        self.is_ok == false
+    }
+
+    pub fn unwrap(self: Result<T>) -> T {
+        if self.is_ok {
+            self.item
+        } else {
+            c_api::printf("ERROR: Unwrapping erroneous Result: %s\n", self.error);
+            c_api::exit(1);
+            unreachable()
+        }
+    }
+
+    pub fn unwrap_or(self: Result<T>, fallback: T) -> T {
+        if self.is_ok {
+            self.item
+        } else {
+            fallback
+        }
+    }
+
+    pub fn as_ref(self: ptr<Result<T>>) -> Result<ptr<T>> {
+        if self.is_ok {
+            Result::<_>::ok(&self.item)
+        } else {
+            Result::<_>::err(self.error)
+        }
+    }
+
+    pub fn as_deref(self: ptr<Result<ptr<T>>>) -> Result<T> {
+        if self.is_ok {
+            Result::<_>::ok(*self.item)
+        } else {
+            Result::<_>::err(self.error)
+        }
+    }
+}

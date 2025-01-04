@@ -326,10 +326,6 @@ void transpile_expression(FILE* code_stream, str modkey, FuncDef* func, GenericV
         case EXPR_STATIC_METHOD_CALL: {
             StaticMethodCall* call = expr->expr;
             FuncDef* fd = call->def->func;
-            log("%p", call);
-            log("%p", call->def);
-            log("%s", to_str_writer(s, fprint_span(s, &call->name->span)));
-            log("%p", fd);
             GenericValues* call_generics = expand_generics(call->generics, type_generics, func_generics);
             GenericValues* type_call_generics = expand_generics(call->impl_vals, type_generics, func_generics);
             str c_fn_name = gen_c_fn_name(fd, type_call_generics, call_generics);
