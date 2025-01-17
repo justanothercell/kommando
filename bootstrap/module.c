@@ -5,6 +5,8 @@
 #include "module.h"
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
+#include "lib/map.h"
 LIB;
 #include "parser.h"
 #include "token.h"
