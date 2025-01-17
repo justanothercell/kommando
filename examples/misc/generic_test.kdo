@@ -1,0 +1,51 @@
+use core::types::*;
+
+#[extern]
+fn printf(fmt: c_str, *) -> i32; 
+
+fn noop<N>() {
+    foop::<N>();
+    L::<N> {};
+}
+
+fn foop<F>() {}
+
+struct V<T> {}
+struct W<T> {}
+struct U<T> {}
+struct L<T> {}
+
+struct Foo<T> {
+
+}
+
+struct Bar<T> {
+
+}
+
+impl<T> Foo<T> {
+    fn x(self: Foo<T>, t: T) -> ptr<T> {
+        noop::<W<T>>();
+        &t
+    }
+    fn z(self: Foo<T>, t: ptr<T>) -> ptr<T> {
+        noop::<V<T>>();
+        &Bar::<T> {}.y(t)
+    }
+}
+impl<K> Bar<K> {
+    fn y(self: Foo<K>, t: ptr<K>) -> K {
+        noop::<U<K>>();
+        *Foo::<K> {}.x(*t)
+    }
+}
+
+fn main() {
+    printf("Hello, world\n");
+    let seven = 7u8;
+
+    let f = Foo::<u8> { };
+    f.x(seven);
+    let g = Foo::<ptr<u8>> { };
+    g.x(&seven);
+}

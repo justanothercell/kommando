@@ -15,8 +15,7 @@ impl<A, T> CoroContext<A, T> {
     pub fn yield(ctx: ptr<CoroContext<A, T>>, ret: T) -> A {
         ctx.ret = ret;
         if c_api::ucontext::swapcontext(&ctx.runner_ctx, &ctx.main_ctx) == 0-1 {
-            c_api::fprintf(io::stderr, "Error: swapcontext\n");
-            c_api::exit(1);
+            panic("Coroutine: swapcontext failed")
         };
         ctx.arg
     }
@@ -41,8 +40,7 @@ impl<A, T> Coroutine<A, T> {
         ctx.function = function;
     
         if c_api::ucontext::getcontext(&ctx.runner_ctx) == 0-1 {
-            c_api::fprintf(io::stderr, "Error: getcontext\n");
-            c_api::exit(1);
+            panic("Coroutine: getcontext failed")
         };
     
         ctx.runner_ctx.uc_stack.ss_sp = stack;

@@ -3,7 +3,7 @@
 
 #include "stddef.h"
 
-#define DEBUG_MEM
+// #define DEBUG_MEM
 // #define DEBUG_CACHE
 
 void* debug_malloc(size_t size, char* file, int line);

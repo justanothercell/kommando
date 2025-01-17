@@ -1,9 +1,16 @@
 pub mod io;
 pub mod vec;
+pub mod queue;
+pub mod hashmap;
+pub mod math;
 pub mod mem;
 pub mod env;
 pub mod coroutine;
 pub mod any;
+pub mod option;
+pub use option::Option;
+pub mod result;
+pub use result::Result;
 
 pub use core::types::*;
 pub use u8 as char;
@@ -14,7 +21,11 @@ pub use core::intrinsics::typecast;
 pub use core::intrinsics::numcast;
 
 pub fn unreachable<T>() -> T {
-    c_api::printf("ERROR: Unreachable state reached");
+    panic("Unreachable state reached")
+}
+
+pub fn panic<T>(msg: c_str) -> T {
+    c_api::fprintf(io::stderr, "ERROR: %s", msg);
     c_api::exit(1);
     // dummy: control flow will never reach this
     std::mem::new_uninit()

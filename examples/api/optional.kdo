@@ -1,0 +1,23 @@
+use std::*;
+use c_api::printf;
+
+fn main() {
+    printf("--- First option ---\n");
+    let o = Option::<_>::some(4);
+    printf("Option contains some? %d\n", o.is_some());
+    printf("Option is: %d\n", o.unwrap());
+    printf("--- Next option ---\n");
+    let o1 = Option::<u8>::none();
+    let o = &o1;
+    printf("Option contains some? %d\n", o.is_some());
+    printf("Filling with value...\n");
+    let old = o.replace(42);
+    printf("Option contains some? %d\n", o.is_some());
+    printf("Old option contains some? %d\n", old.is_some());
+    printf("Option is: %d\n", o.unwrap());
+    printf("--- Next option ---\n");
+    let o = Option::<u8>::none();
+    printf("Option contains some? %d\n", o.is_some());
+    printf("Unwrap or value: %d\n", o.unwrap_or(255));
+    printf("Option is: %d\n", o.unwrap()); // errors at runtime
+}

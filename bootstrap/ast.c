@@ -1,5 +1,7 @@
 #include "ast.h"
 #include "lib.h"
+#include "lib/defines.h"
+#include "lib/list.h"
 LIB;
 #include "module.h"
 
@@ -55,7 +57,20 @@ void fprint_td_path(FILE* file, TypeDef* td) {
     fprintf(file, "%s", td->name->name);
 }
 
+void fprint_generic_keys(FILE* file, GenericKeys* keys) {
+    if (keys == NULL || keys->generics.length == 0) return;
+    fprintf(file, "<");
+    list_foreach(&keys->generics, i, Identifier* t, fprintf(file, "%s", t->name));
+    fprintf(file, ">");
+}
+
+void fprint_type(FILE* file, TypeDef* def) {
+    fprint_td_path(file, def);
+    fprint_generic_keys(file, def->generics);
+}
+
 void fprint_expression(FILE* file, Expression* expression) {
+    UNUSED(file);
     switch (expression->type) {
         default:
             unreachable("fprintf_expression %s", ExprType__NAMES[expression->type]);

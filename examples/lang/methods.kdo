@@ -1,0 +1,51 @@
+use std::*;
+use c_api::printf;
+
+struct Car {
+    beeps: u8
+}
+
+impl Car {
+    fn new() -> Car {
+        _ { beeps: 3 }
+    }
+
+    fn beep(car: ptr<Car>) {
+        if car.beeps > 0 {
+            car.beeps = car.beeps - 1;
+            printf("beep beep!\n");
+        } else {
+            printf("error: out of blinker fluid\n");
+        }
+    } 
+}
+
+struct X<T> {
+
+}
+
+impl X<u8> {
+    fn foo() {
+        printf("hello u8\n");
+    }
+}
+
+impl X<bool> {
+    fn foo() {
+        printf("hello bool\n");
+    }
+}
+
+fn main() {
+    let car = Car::<>::new();
+    Car::<>::beep(&car);
+    car.beep();
+    car.beep();
+    car.beep();
+
+    printf("\n");
+
+    X::<u8>::foo();
+    X::<bool>::foo();
+}
+

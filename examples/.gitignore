@@ -11,5 +11,4 @@
 *.data
 *.data.old
 *.script
-out.txt
 vgcore.*

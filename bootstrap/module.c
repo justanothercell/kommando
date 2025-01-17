@@ -55,6 +55,8 @@ void insert_module(Program* program, Module* module, Visibility vis) {
     if (old != NULL) {
         spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
     }
+
+    if (program->o_verbosity >= 2) log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
 }
 
 Identifier* gen_identifier(str name) {
@@ -135,7 +137,7 @@ void register_intrinsic(Module* module, str prototype, str intrinsic, Map* var_b
     map_put(module->items, fd->name->name, mi);
 }
 
-Module* gen_intrinsics_types() {
+Module* gen_core_types() {
     Module* module = malloc(sizeof(Module));
     module->path = gen_path("::core::types");
     module->imports = list_new(ImportList);
@@ -165,8 +167,13 @@ Module* gen_intrinsics_types() {
     register_extern_type(module, "u128", "__uint128_t");
     register_extern_type(module, "usize", "uintptr_t");
 
+    register_extern_type(module, "f16", "_Float16");
     register_extern_type(module, "f32", "float");
     register_extern_type(module, "f64", "double");
+    register_extern_type(module, "f128", "_Float128");
+
+    register_extern_type(module, "bool", "bool");
+    register_extern_type(module, "TypeId", "uint32_t");
 
     register_extern_type(module, "bool", "bool");
     register_extern_type(module, "TypeId", "uint32_t");
@@ -219,7 +226,7 @@ Module* gen_intrinsics_types() {
     return module;
 }
 
-Module* gen_intrinsics() {
+Module* gen_core_intrinsics() {
     Module* module = malloc(sizeof(Module));
     module->path = gen_path("::core::intrinsics");
     module->imports = list_new(ImportList);

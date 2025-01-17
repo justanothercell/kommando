@@ -138,6 +138,15 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
             func->generics->generics = list_new(IdentList);
             func->generics->span = func->name->span;
         }
+        if (impl->generics != NULL) {
+            func->type_generics = malloc(sizeof(GenericKeys));
+            func->type_generics->span = impl->generics->span;
+            func->type_generics->generic_use_keys = list_new(StrList);
+            func->type_generics->generic_uses = map_new();
+            func->type_generics->resolved = map_new();
+            func->type_generics->generics = list_new(IdentList);
+            list_foreach(&impl->generics->generics, i, Identifier* ident, { list_append(&func->type_generics->generics, ident); });
+        }
         ModuleItem* mi = malloc(sizeof(ModuleItem));
         mi->item = func;
         mi->type = MIT_FUNCTION;
@@ -297,7 +306,11 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
     CodePoint start = t->span.left;
     CodePoint end = t->span.right;
     
-    if (token_compare(t, "(", SNOWFLAKE)) {
+    if (token_compare(t, "{", SNOWFLAKE)) {
+        stream->peek = t;
+        expression->expr = parse_block(stream);
+        expression->type = EXPR_BLOCK;
+    } else if (token_compare(t, "(", SNOWFLAKE)) {
         expression = parse_expression(stream, true);
         t = next_token(stream);
         if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
@@ -671,7 +684,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                 bin_op_precedence(t->string, t->span); // make sure op is valid
                 if (rhs->type == EXPR_BIN_OP) {
                     BinOp* rhs_inner = rhs->expr;
-                    if (bin_op_precedence(t->string, t->span) >= bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
+                    if (bin_op_precedence(t->string, t->span) > bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
                         Expression* a = expr;
                         Expression* b = rhs_inner->lhs;
                         Expression* c = rhs_inner->rhs;
@@ -913,5 +926,6 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->head_resolved = false;
     func->impl_type = NULL;
     func->annotations = list_new(AnnoList);
+    func->type_generics = NULL;
     return func;
 }

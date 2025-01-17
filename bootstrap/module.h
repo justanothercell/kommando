@@ -45,17 +45,18 @@ typedef struct MethodImpl {
     GenericKeys* keys;
     FuncDef* func;
 } MethodImpl;
-LIST(MethodImplList, MethodImpl);
+LIST(MethodImplList, MethodImpl*);
 
 typedef struct Program {
     Map* packages;
     Module* main_module;
+    int o_verbosity;
 } Program;
 
 void insert_module(Program* program, Module* module, Visibility vis);
 
-Module* gen_intrinsics();
-Module* gen_intrinsics_types();
+Module* gen_core_intrinsics();
+Module* gen_core_types();
 
 Identifier* gen_identifier(str name);
 TypeValue* gen_typevalue(str typevalue, Span* span);

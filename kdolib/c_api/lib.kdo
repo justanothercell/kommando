@@ -69,3 +69,11 @@ pub fn is_shell() -> bool {
 
 #[extern]
 pub fn fork() -> i32;
+
+#[extern]
+pub fn rand() -> i32;
+#[extern]
+pub fn srand(seed: u32);
+
+#[extern]
+pub fn time(tloc: raw_ptr) -> u64;

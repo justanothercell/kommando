@@ -1,0 +1,31 @@
+use std::*;
+use std::queue::Queue;
+use c_api::printf;
+
+fn main() {
+    let queue: _<u8> = Queue::<_>::new();
+
+    queue.push(1);
+    queue.push(2);
+    queue.push(4);
+
+    printf("length=%ld, capacity=%ld\n", queue.length, queue.capacity);
+    while queue.length > 0 { printf(" %u", queue.pop().unwrap()); };
+    printf("\n");
+
+    queue.push(1);
+    queue.push(2);
+    queue.push(3);
+    queue.push(4);
+    queue.push(5);
+    queue.push(6);
+    queue.push(7);
+    queue.push(8);
+    queue.push(9);
+    queue.push(10);
+    
+    printf("length=%ld, capacity=%ld\n", queue.length, queue.capacity);
+    while queue.length > 0 { printf(" %u", queue.pop().unwrap()); };
+    printf("\n");
+
+}

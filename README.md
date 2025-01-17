@@ -26,6 +26,20 @@ make br file=examples/hello
 # run witout any arguments to see a list of options
 ./kommando
 ```
+## Examples
+```rs
+use core::types::*;
+
+#[extern]
+fn printf(fmt: c_str, *) -> i32; 
+
+// this is compilable with 
+// ./kommando -cr examples/misc/no_std.kdo examples/misc/no_std ::core=kdolib/core
+// without the use of any libraries except the core library.
+fn main() {
+    printf("Hello, world\n");
+}
+```
+---
 Note that this is meant to be compiled with gcc and uses certain gnu compiler extensions. There exists a [./bootstrap/.clangd](./bootstrap/.clangd) file,
-but that is only to fix VSCode errors/hints. Specifically, the defined macro `__INTELLISENSE__` temporarily removes inline functions from
-the `lambda` macro in [./bootstrap/lib/defines.h](./bootstrap/lib/defines.h) and as such cannot be used for compilation.
+but that is only to fix VSCode linting. Specifically, the macro `__INTELLISENSE__` disables these gcc extensions. Other compilers might work but support is not guaranteed.

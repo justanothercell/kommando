@@ -5,6 +5,7 @@
 
 #include "lib.h"
 #include "lib/list.h"
+#include "lib/str.h"
 LIB;
 #include "compiler.h"
 #include "ast.h"
@@ -24,9 +25,11 @@ CompilerOptions build_args(StrList* args) {
         printf("    --run     -r - run the compiled binary\n");
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
+        printf("    --silent  -s - verbosity = 0\n");
+        printf("    --verbose -v - verbosity += 1 (default verbosity = 1)\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
-        printf("    ::lib::path=<path/to/lib_file.kdo> (multiple possible)\n");
+        printf("    ::package=<path/to/package> (multiple possible)\n");
         printf("Alternatively use:\n");
         printf("make run file=<infile>\n");
         quit(0);
@@ -40,8 +43,9 @@ CompilerOptions build_args(StrList* args) {
     options.raw = false;
     options.compile = false;
     options.run = false;
-    options.module_names = list_new(StrList);
-    options.modules = map_new();
+    options.package_names = list_new(StrList);
+    options.packages = map_new();
+    options.verbosity = 1;
 
     for (usize i = 1;i < args->length;i++) {
         str arg = args->elements[i];
@@ -54,8 +58,10 @@ CompilerOptions build_args(StrList* args) {
                 options.run = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
-            } else if (str_eq(arg, "raw")) {
-                options.raw = true;
+            } else if (str_eq(arg, "silent")) {
+                options.verbosity = 0;
+            } else if (str_eq(arg, "verbose")) {
+                options.verbosity += 1;
             } else if (str_startswith(arg, "dir=")){
                 arg += 4;
                 if (options.out_dir != NULL) panic("dir already supplied as `%s` but was supplied again: `--dir=%s`", options.out_dir, arg);
@@ -78,18 +84,22 @@ CompilerOptions build_args(StrList* args) {
                     options.compile = true;
                 } else if (arg[j] == 'w') {
                     options.raw = true;
+                } else if (arg[j] == 's') {
+                    options.verbosity = 0;
+                } else if (arg[j] == 'v') {
+                    options.verbosity += 1;
                 } else {
                     log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid flag `%c` in `-%s`", arg[j], arg);
                     goto print_help;
                 }
             } 
         } else if (str_startswith(arg, "::")) {
-            for (usize i = 0;i < strlen(arg);i++) {
+            for (usize i = 2;i < strlen(arg);i++) {
                 if (arg[i] == '=') {
-                    str mod = to_str_writer(stream, fprintf(stream, "%.*s", (int)i, arg));
-                    str file = arg + i + 1;
-                    map_put(options.modules, mod, file);
-                    list_append(&options.module_names, mod);
+                    str package = to_str_writer(stream, fprintf(stream, "%.*s", (int)(i-2), arg+2));
+                    str path = arg + i + 1;
+                    map_put(options.packages, package, path);
+                    list_append(&options.package_names, package);
                 }
             }
         } else {
@@ -119,88 +129,94 @@ CompilerOptions build_args(StrList* args) {
     return options;
 }
 
+typedef struct Submodule {
+    Path* current;
+    str parentfile;
+    Identifier* mod;
+    Visibility vis;
+} Submodule;
+LIST(SubList, Submodule);
+
 void compile(CompilerOptions options) {
     Program* program = malloc(sizeof(Program));
+    program->o_verbosity = options.verbosity;
     program->packages = map_new();
 
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "PARSER" ANSI_RESET_SEQUENCE, "Parsing source files...");
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
-    log("Parsing package ::main");
+    if (options.verbosity >= 2) log("Parsing package ::main");
     Module* main = parse_module_contents(stream, gen_path("::main"));
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
-
-    Module* intrinsics = gen_intrinsics();
-    Module* intrinsics_types = gen_intrinsics_types();
 
     program->main_module = main;
 
     insert_module(program, main, V_PUBLIC);
 
-    list_foreach(&options.module_names, i, str modname, {
-        str fp = map_get(options.modules, modname);
+    list_foreach(&options.package_names, i, str package_name, {
+        str fp = map_get(options.packages, package_name);
         str file = to_str_writer(s, fprintf(s, "%s/lib.kdo", fp));
-        if (access(file, F_OK) != 0) panic("Could not load package %s: no such file %s", file, modname);
+        if (access(file, F_OK) != 0) panic("Could not load package %s: no such file %s", file, package_name);
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
-    log("Parsing library package %s", modname);
-        Path* modpath = gen_path(modname);
+        if (options.verbosity >= 2) log("Parsing library package %s", package_name);
+        Path* modpath = gen_path(to_str_writer(s, fprintf(s, "::%s", package_name)));
         if (modpath->elements.length != 1) panic("Library path may not be a submodule: expected path to look like ::foo, not %s", modpath);
-        if (!modpath->absolute) panic("Library path must be absolute: expected path to look like ::foo, not %s", modpath);
-        Module* mod = parse_module_contents(s, modpath);
-        mod->filepath = file;
-        insert_module(program, mod, V_PUBLIC);
-    });
-
-    insert_module(program, intrinsics, V_PUBLIC);
-    insert_module(program, intrinsics_types, V_PUBLIC);
-
-    typedef struct Submodule {
-        Path* current;
-        str parentfile;
-        Identifier* mod;
-        Visibility vis;
-    } Submodule;
-    LIST(SubList, Submodule);
-    SubList sublist = list_new(SubList);
-    map_foreach(program->packages, str key, Module* item, {
-        UNUSED(key);
-        list_foreach(&item->subs, i, ModDef* m, ({
-            if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, item->path)));
-            if (item->filepath == NULL) spanned_error("Synthetic module error", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
-                    to_str_writer(s, fprint_path(s, item->path)), m->name->name);
-            Submodule sm = (Submodule){ .current = item->path, .parentfile=item->filepath, .mod = m->name, .vis = m->vis};
+        Module* package = parse_module_contents(s, modpath);
+        package->filepath = file;
+        insert_module(program, package, V_PUBLIC);
+        if (str_eq(package->name->name, "core")) {
+            insert_module(program, gen_core_intrinsics(), V_PUBLIC);
+            if (options.verbosity >= 2) log("Added synthetic module ::core::intrinsics");
+            insert_module(program, gen_core_types(), V_PUBLIC);
+            if (options.verbosity >= 2) log("Added synthetic module ::core::types");
+        }
+        SubList sublist = list_new(SubList);
+        list_foreach(&package->subs, i, ModDef* m, ({
+            if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, package->path)));
+            if (package->filepath == NULL) spanned_error("Synthetic module error", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
+                    to_str_writer(s, fprint_path(s, package->path)), m->name->name);
+            Submodule sm = (Submodule){ .current = package->path, .parentfile=package->filepath, .mod = m->name, .vis = m->vis};
             list_append(&sublist, sm);
         }));
+        for (usize i = 0;i < sublist.length;i++) {
+            Submodule sm = sublist.elements[i];
+            Path* modpath = path_new(true, sm.current->elements);
+            path_append(modpath, sm.mod);
+            str pf = sm.parentfile;
+            StrList split = rsplitn(pf, '/', 1);
+            str fp = split.elements[0];
+            str parent = split.elements[1];
+            if (!str_eq(parent, "mod.kdo") && !str_eq(parent, "lib.kdo")) spanned_error("Invalid parent", sm.mod->span, "%s may not register the child module %s as it is located at %s, such is reserved for files named mod.kdo or lib.kdo", to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name, pf);
+            str leafname = to_str_writer(s, fprintf(s, "%s/%s.kdo", fp, sm.mod->name));
+            str nodename = to_str_writer(s, fprintf(s, "%s/%s/mod.kdo", fp, sm.mod->name));
+            bool lx = false;
+            bool nx = false;
+            if (access(leafname, F_OK) == 0) lx = true;
+            if (access(nodename, F_OK) == 0) nx = true;
+            if (!lx && !nx) spanned_error("No such module", sm.mod->span, "%s::%s could not be found in %s or %s", to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name, leafname, nodename);
+            if (lx && nx) spanned_error("Ambigous module file", sm.mod->span, "Found both %s and %s for %s::%s, remove on of them", leafname, nodename, to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name);
+            str file = NULL;
+            if (lx) file = leafname;
+            if (nx) file = nodename;
+            TokenStream* s = tokenstream_new(file, read_file_to_string(file));
+            Module* mod = parse_module_contents(s, modpath);
+            mod->name = sm.mod;
+            mod->filepath = file;
+            insert_module(program, mod, sm.vis);
+            list_foreach(&mod->subs, i, ModDef* m, ({
+                if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, package->path)));
+                if (mod->filepath == NULL) spanned_error("Synthetic module error", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
+                        to_str_writer(s, fprint_path(s, package->path)), m->name->name);
+                Submodule sm = (Submodule){ .current = package->path, .parentfile=package->filepath, .mod = m->name, .vis = m->vis};
+                list_append(&sublist, sm);
+            }));
+        }
     });
 
-    for (usize i = 0;i < sublist.length;i++) {
-        Submodule sm = sublist.elements[i];
-        Path* modpath = path_new(true, sm.current->elements);
-        path_append(modpath, sm.mod);
-        str pf = sm.parentfile;
-        StrList split = rsplitn(pf, '/', 1);
-        str fp = split.elements[0];
-        str parent = split.elements[1];
-        if (!str_eq(parent, "mod.kdo") && !str_eq(parent, "lib.kdo")) spanned_error("Invalid parent", sm.mod->span, "%s may not register the child module %s as it is located at %s, such is reserved for files named mod.kdo or lib.kdo", to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name, pf);
-        str leafname = to_str_writer(s, fprintf(s, "%s/%s.kdo", fp, sm.mod->name));
-        str nodename = to_str_writer(s, fprintf(s, "%s/%s/mod.kdo", fp, sm.mod->name));
-        bool lx = false;
-        bool nx = false;
-        if (access(leafname, F_OK) == 0) lx = true;
-        if (access(nodename, F_OK) == 0) nx = true;
-        if (!lx && !nx) spanned_error("No such module", sm.mod->span, "%s::%s could not be found in %s or %s", to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name, leafname, nodename);
-        if (lx && nx) spanned_error("Ambigous module file", sm.mod->span, "Found both %s and %s for %s::%s, remove on of them", leafname, nodename, to_str_writer(s, fprint_path(s, sm.current)), sm.mod->name);
-        str file = NULL;
-        if (lx) file = leafname;
-        if (nx) file = nodename;
-        TokenStream* s = tokenstream_new(file, read_file_to_string(file));
-        Module* mod = parse_module_contents(s, modpath);
-        mod->name = sm.mod;
-        mod->filepath = file;
-        insert_module(program, mod, sm.vis);
-    }
-
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RESOLVER" ANSI_RESET_SEQUENCE, "Resolving types...");
     resolve(program);
 
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "TRANSPILER" ANSI_RESET_SEQUENCE, "Transpiling to c code...");
     str code_file_name = to_str_writer(stream, fprintf(stream, "%s.c", options.outname));
     str header_file_name = to_str_writer(stream, fprintf(stream, "%s.h", options.outname));
     FILE* code_file = fopen(code_file_name, "w");
@@ -209,13 +225,13 @@ void compile(CompilerOptions options) {
     fclose(header_file);
     fclose(code_file);
 
-    if (options.compile) {
-        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compilign generated c code... ");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wswitch-enum -Wno-unused -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
-        i32 r = system(command);
-        if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
-        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Done!");
-    }
-
     report_item_cache_stats();
+
+    if (options.compile) {
+        if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
+        i32 r = system(command);
+        if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
+    }
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "CONPILER" ANSI_RESET_SEQUENCE, "Compilation finished!");
 }
