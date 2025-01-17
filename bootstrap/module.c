@@ -175,9 +175,6 @@ Module* gen_core_types() {
     register_extern_type(module, "bool", "bool");
     register_extern_type(module, "TypeId", "uint32_t");
 
-    register_extern_type(module, "bool", "bool");
-    register_extern_type(module, "TypeId", "uint32_t");
-
     {
         TypeDef* ty_unit = gen_simple_type("unit");
         ModuleItem* ty_unit_mi = malloc(sizeof(ModuleItem));

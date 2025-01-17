@@ -90,13 +90,6 @@ str tfvals_to_key(GenericValues* type_generics, GenericValues* func_generics) {
     });
 }
 
-str tfvals_to_key(GenericValues* type_generics, GenericValues* func_generics) {
-    return to_str_writer(s, {
-       fprintf(s, "%s", gvals_to_key(type_generics)); 
-       fprintf(s, "%s", gvals_to_key(func_generics)); 
-    });
-}
-
 void resovle_imports(Program* program, Module* module, List* mask);
 static ModuleItem* resolve_item_raw(Program* program, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
     Module* context_module = module;
