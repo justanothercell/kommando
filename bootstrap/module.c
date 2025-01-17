@@ -5,9 +5,6 @@
 #include "module.h"
 #include "ast.h"
 #include "lib.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
 LIB;
 #include "parser.h"
 #include "token.h"
@@ -57,7 +54,7 @@ void insert_module(Program* program, Module* module, Visibility vis) {
         spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
     }
 
-    log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
+    if (program->o_verbosity >= 2) log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
 }
 
 Identifier* gen_identifier(str name) {

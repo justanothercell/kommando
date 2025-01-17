@@ -5,17 +5,17 @@ pub struct Result<T> {
     // layout is probably okay for most applications
     // Also we do not have any unions.
     error: c_str,
-    item: T,
+    value: T,
     is_ok: bool
 }
 
 impl<T> Result<T> {
-    pub fn ok(item: T) -> Result<T> {
-        _ { item: item, error: c_api::nullstr, is_ok: true }
+    pub fn ok(value: T) -> Result<T> {
+        _ { value: value, error: c_api::nullstr, is_ok: true }
     }
 
     pub fn err(error: c_str) -> Result<T> {
-        _ { item: std::mem::new_uninit(), error: error, is_ok: false }
+        _ { value: std::mem::new_uninit(), error: error, is_ok: false }
     }
 
     pub fn is_ok(self: Result<T>) -> bool {
@@ -26,11 +26,37 @@ impl<T> Result<T> {
         self.is_ok == false
     }
 
+    pub fn to_ok_option(self: Result<T>) -> Option<T> {
+        if self.is_ok {
+            Option::<_>::some(self.value)
+        } else {
+            Option::<_>::none()
+        }
+    }
+
+    pub fn to_err_option(self: Result<T>) -> Option<c_str> {
+        if self.is_ok {
+            Option::<_>::none()
+        } else {
+            Option::<_>::some(self.error)
+        }
+    }
+
     pub fn unwrap(self: Result<T>) -> T {
         if self.is_ok {
-            self.item
+            self.value
         } else {
-            c_api::printf("ERROR: Unwrapping erroneous Result: %s\n", self.error);
+            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping erroneous result: %s\n", self.error);
+            c_api::exit(1);
+            unreachable()
+        }
+    }
+
+    pub fn expect(self: Result<T>, error: c_str) -> T {
+        if self.is_ok {
+            self.value
+        } else {
+            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping empty result: %s: %s\n", self.error, error);
             c_api::exit(1);
             unreachable()
         }
@@ -38,7 +64,7 @@ impl<T> Result<T> {
 
     pub fn unwrap_or(self: Result<T>, fallback: T) -> T {
         if self.is_ok {
-            self.item
+            self.value
         } else {
             fallback
         }
@@ -46,15 +72,15 @@ impl<T> Result<T> {
 
     pub fn as_ref(self: ptr<Result<T>>) -> Result<ptr<T>> {
         if self.is_ok {
-            Result::<_>::ok(&self.item)
+            Result::<_>::ok(&self.value)
         } else {
             Result::<_>::err(self.error)
         }
     }
 
-    pub fn as_deref(self: ptr<Result<ptr<T>>>) -> Result<T> {
+    pub fn deref(self: Result<ptr<T>>) -> Result<T> {
         if self.is_ok {
-            Result::<_>::ok(*self.item)
+            Result::<_>::ok(*self.value)
         } else {
             Result::<_>::err(self.error)
         }

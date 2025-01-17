@@ -8,28 +8,15 @@ pub struct Vec<T> {
 
 impl<T> Vec<T> {
     pub fn new() -> Vec<T> {
-        _ {
-            length: 0,
-            capacity: 0,
-            buffer: std::mem::null()
-        }
+        Vec::<T>::new_with(0)
     }
 
-    pub fn new_with_capacity(capacity: usize) -> Vec<T> {
+    pub fn new_with(capacity: usize) -> Vec<T> {
         _ {
             length: 0,
             capacity: capacity,
             buffer: std::mem::arr_malloc(capacity)
         }
-    }
-
-    pub fn new_with(item: T, count: usize) -> Vec<T> {
-        let v = Vec::<T>::new();
-        while count > 0 {
-            v.push(item);
-            count -= 1;
-        };
-        v
     }
 
     fn reserve_armortized(v: ptr<Vec<T>>, size: usize) {
@@ -63,9 +50,15 @@ impl<T> Vec<T> {
         }
     }
     pub fn last(v: ptr<Vec<T>>) -> Option<T> {
+        if v.length == 0 {
+            return Option::<_>::none();
+        };
         v.get(v.length - 1)
     }
     pub fn last_ref(v: ptr<Vec<T>>) -> Option<ptr<T>> {
+        if v.length == 0 {
+            return Option::<_>::none();
+        };
         v.get_ref(v.length - 1)
     }
 
@@ -76,6 +69,33 @@ impl<T> Vec<T> {
         } else {
             Option::<_>::none()
         }
+    }
+
+    pub fn swap_remove(v: ptr<Vec<T>>, index: usize) -> Option<T> {
+        if index >= v.length {
+            return Option::<_>::none();
+        };
+        if index < v.length - 1 {
+            std::mem::swap(
+                std::mem::arr_offset(v.buffer, index),
+                std::mem::arr_offset(v.buffer, v.length - 1)
+            );
+        };
+        v.length -= 1;
+        Option::<_>::some(*std::mem::arr_offset(v.buffer, v.length))
+    }
+
+    pub fn remove(v: ptr<Vec<T>>, index: usize) -> Option<T> {
+        if index >= v.length {
+            return Option::<_>::none();
+        };
+        let item = *std::mem::arr_offset(v.buffer, index);
+        v.length -= 1;
+        while index < v.length {
+            *std::mem::arr_offset(v.buffer, index) = *std::mem::arr_offset(v.buffer, index+1);
+            index += 1;
+        };
+        Option::<_>::some(item)
     }
 
     pub fn clear(v: ptr<Vec<T>>) {
@@ -100,4 +120,13 @@ impl Vec<char> {
             buffer: typecast(str)
         }
     }
+
+    // returns a reference to the itnernal buffer as a c string.
+    // may move internal buffer to ensure proper \0 termination.
+    //pub fn as_c_str(v: Vec<char>) -> c_str {
+    //    v.reserve_armortized(v.length + 1);
+    //    // make buffer end in '\0' without actually inserting it or affecting the string.
+    //    *std::mem::arr_offset(v.buffer, v.length) = 0;
+    //    typecast(v.buffer)
+   // }
 }

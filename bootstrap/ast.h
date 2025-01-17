@@ -60,6 +60,7 @@ typedef struct TypeDef {
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
 void fprint_td_path(FILE* file, TypeDef* def);
+void fprint_type(FILE* file, TypeDef* def);
 
 typedef struct GenericKeys {
     Span span;
@@ -68,6 +69,7 @@ typedef struct GenericKeys {
     Map* generic_uses;
     Map* resolved;
 } GenericKeys;
+void fprint_generic_keys(FILE* file, GenericKeys* keys);
 
 typedef struct GenericValues {
     Span span;
@@ -78,7 +80,9 @@ typedef struct GenericValues {
 typedef struct GenericUse {
     GenericValues* type_context;
     GenericValues* func_context;
+    FuncDef* in_func;
 } GenericUse;
+
 
 typedef struct TypeValue {
     Path* name;
@@ -232,6 +236,7 @@ typedef struct FuncDef {
     TypeValue* return_type;
     ArgumentList args;
     GenericKeys* generics;
+    GenericKeys* type_generics;
     Module* module;
     AnnoList annotations;
     bool no_mangle;

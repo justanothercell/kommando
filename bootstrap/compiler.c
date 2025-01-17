@@ -25,6 +25,8 @@ CompilerOptions build_args(StrList* args) {
         printf("    --run     -r - run the compiled binary\n");
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
+        printf("    --silent  -s - verbosity = 0\n");
+        printf("    --verbose -v - verbosity += 1 (default verbosity = 1)\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
         printf("    ::package=<path/to/package> (multiple possible)\n");
@@ -43,6 +45,7 @@ CompilerOptions build_args(StrList* args) {
     options.run = false;
     options.package_names = list_new(StrList);
     options.packages = map_new();
+    options.verbosity = 1;
 
     for (usize i = 1;i < args->length;i++) {
         str arg = args->elements[i];
@@ -55,8 +58,10 @@ CompilerOptions build_args(StrList* args) {
                 options.run = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
-            } else if (str_eq(arg, "raw")) {
-                options.raw = true;
+            } else if (str_eq(arg, "silent")) {
+                options.verbosity = 0;
+            } else if (str_eq(arg, "verbose")) {
+                options.verbosity += 1;
             } else if (str_startswith(arg, "dir=")){
                 arg += 4;
                 if (options.out_dir != NULL) panic("dir already supplied as `%s` but was supplied again: `--dir=%s`", options.out_dir, arg);
@@ -79,6 +84,10 @@ CompilerOptions build_args(StrList* args) {
                     options.compile = true;
                 } else if (arg[j] == 'w') {
                     options.raw = true;
+                } else if (arg[j] == 's') {
+                    options.verbosity = 0;
+                } else if (arg[j] == 'v') {
+                    options.verbosity += 1;
                 } else {
                     log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid flag `%c` in `-%s`", arg[j], arg);
                     goto print_help;
@@ -130,10 +139,12 @@ LIST(SubList, Submodule);
 
 void compile(CompilerOptions options) {
     Program* program = malloc(sizeof(Program));
+    program->o_verbosity = options.verbosity;
     program->packages = map_new();
 
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "PARSER" ANSI_RESET_SEQUENCE, "Parsing source files...");
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
-    log("Parsing package ::main");
+    if (options.verbosity >= 2) log("Parsing package ::main");
     Module* main = parse_module_contents(stream, gen_path("::main"));
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
@@ -147,7 +158,7 @@ void compile(CompilerOptions options) {
         str file = to_str_writer(s, fprintf(s, "%s/lib.kdo", fp));
         if (access(file, F_OK) != 0) panic("Could not load package %s: no such file %s", file, package_name);
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
-    log("Parsing library package %s", package_name);
+        if (options.verbosity >= 2) log("Parsing library package %s", package_name);
         Path* modpath = gen_path(to_str_writer(s, fprintf(s, "::%s", package_name)));
         if (modpath->elements.length != 1) panic("Library path may not be a submodule: expected path to look like ::foo, not %s", modpath);
         Module* package = parse_module_contents(s, modpath);
@@ -155,9 +166,9 @@ void compile(CompilerOptions options) {
         insert_module(program, package, V_PUBLIC);
         if (str_eq(package->name->name, "core")) {
             insert_module(program, gen_core_intrinsics(), V_PUBLIC);
-            log("Added synthetic module ::core::intrinsics");
+            if (options.verbosity >= 2) log("Added synthetic module ::core::intrinsics");
             insert_module(program, gen_core_types(), V_PUBLIC);
-            log("Added synthetic module ::core::types");
+            if (options.verbosity >= 2) log("Added synthetic module ::core::types");
         }
         SubList sublist = list_new(SubList);
         list_foreach(&package->subs, i, ModDef* m, ({
@@ -202,8 +213,10 @@ void compile(CompilerOptions options) {
         }
     });
 
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RESOLVER" ANSI_RESET_SEQUENCE, "Resolving types...");
     resolve(program);
 
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "TRANSPILER" ANSI_RESET_SEQUENCE, "Transpiling to c code...");
     str code_file_name = to_str_writer(stream, fprintf(stream, "%s.c", options.outname));
     str header_file_name = to_str_writer(stream, fprintf(stream, "%s.h", options.outname));
     FILE* code_file = fopen(code_file_name, "w");
@@ -212,13 +225,13 @@ void compile(CompilerOptions options) {
     fclose(header_file);
     fclose(code_file);
 
-    if (options.compile) {
-        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compilign generated c code... ");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wswitch-enum -Wno-unused -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
-        i32 r = system(command);
-        if (r != 0) panic("%s failed with error code %lu", options.c_compiler, r);
-        info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Done!");
-    }
-
     report_item_cache_stats();
+
+    if (options.compile) {
+        if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
+        i32 r = system(command);
+        if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
+    }
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "CONPILER" ANSI_RESET_SEQUENCE, "Compilation finished!");
 }

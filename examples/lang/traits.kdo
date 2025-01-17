@@ -13,7 +13,7 @@ impl Tree: Grow {
     fn grow(self: ptr<Tree>) {
         height += 1.4372;
     }
-}
+}   
 
 fn fertilize<T: Grow>(object: ptr<T>) {
     object.grow();

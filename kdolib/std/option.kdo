@@ -2,17 +2,17 @@
 use std::*;
 
 pub struct Option<T> {
-    item: T,
+    value: T,
     exists: bool
 }
 
 impl<T> Option<T> {
-    pub fn some(item: T) -> Option<T> {
-        _ { item: item, exists: true }
+    pub fn some(value: T) -> Option<T> {
+        _ { value: value, exists: true }
     }
 
     pub fn none() -> Option<T> {
-        _ { item: std::mem::new_uninit(), exists: false }
+        _ { value: std::mem::new_uninit(), exists: false }
     }
 
     pub fn is_some(self: Option<T>) -> bool {
@@ -23,11 +23,19 @@ impl<T> Option<T> {
         self.exists == false
     }
 
+    pub fn to_result(self: Option<T>, error: c_str) -> Result<T> {
+        if self.exists {
+            Result::<_>::ok(self.value)
+        } else {
+            Result::<_>::err(error)
+        }
+    }
+
     pub fn unwrap(self: Option<T>) -> T {
         if self.exists {
-            self.item
+            self.value
         } else {
-            c_api::printf("ERROR: Cannot unwrap empty option\n");
+            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping empty option\n");
             c_api::exit(1);
             unreachable()
         }
@@ -35,17 +43,27 @@ impl<T> Option<T> {
 
     pub fn unwrap_or(self: Option<T>, fallback: T) -> T {
         if self.exists {
-            self.item
+            self.value
         } else {
             fallback
         }
     }
 
+    pub fn expect(self: Option<T>, error: c_str) -> T {
+        if self.exists {
+            self.value
+        } else {
+            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping empty option: %s\n", error);
+            c_api::exit(1);
+            unreachable()
+        }
+    }
+
     pub fn replace(self: ptr<Option<T>>, new: T) -> Option<T> {
         if self.exists {
-            Option::<_>::some(std::mem::replace(&self.item, new))
+            Option::<_>::some(std::mem::replace(&self.value, new))
         } else {
-            self.item = new;
+            self.value = new;
             self.exists = true;
             Option::<_>::none()
         }
@@ -54,9 +72,9 @@ impl<T> Option<T> {
     pub fn take(self: ptr<Option<T>>) -> T {
         if self.exists {
             self.exists = false;
-            self.item
+            self.value
         } else {
-            c_api::printf("ERROR: Cannot take item out of empty option\n");
+            c_api::fprintf(std::io::stderr, "ERROR: Cannot take value out of empty option\n");
             c_api::exit(1);
             unreachable()
         }
@@ -65,7 +83,7 @@ impl<T> Option<T> {
     pub fn try_take(self: ptr<Option<T>>) -> Option<T> {
         if self.exists {
             self.exists = false;
-            Option::<_>::some(self.item)
+            Option::<_>::some(self.value)
         } else {
             self.exists = false;
             Option::<_>::none()
@@ -74,15 +92,15 @@ impl<T> Option<T> {
 
     pub fn as_ref(self: ptr<Option<T>>) -> Option<ptr<T>> {
         if self.exists {
-            Option::<_>::some(&self.item)
+            Option::<_>::some(&self.value)
         } else {
             Option::<_>::none()
         }
     }
 
-    pub fn as_deref(self: ptr<Option<ptr<T>>>) -> Option<T> {
+    pub fn deref(self: Option<ptr<T>>) -> Option<T> {
         if self.exists {
-            Option::<_>::some(*self.item)
+            Option::<_>::some(*self.value)
         } else {
             Option::<_>::none()
         }

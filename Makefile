@@ -1,26 +1,26 @@
 build: clean
-	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-parameter
+	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=unused-parameter
 
 clean:
-	rm -f kommando
-	rm -f CACHELOG.txt
-	rm -f MEMTRACE.txt
+	@rm -f kommando
+	@rm -f CACHELOG.txt
+	@rm -f MEMTRACE.txt
 
 br: build run
 
 run:
 	name=$(basename $(file) .kdo); \
-	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr -vv
 
 compile:
 	name=$(basename $(file) .kdo); \
-	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c -vv
 
 help:
 	./kommando --help
 
 clean_examples:
-	git clean -fX examples
+	@git clean -fX examples >/dev/null
 
 test: build clean_examples
 	@success=0; \

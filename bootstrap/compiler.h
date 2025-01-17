@@ -16,6 +16,7 @@ typedef struct CompilerOptions {
     bool compile;
     StrList package_names;
     Map* packages;
+    int verbosity;
 } CompilerOptions;
 
 CompilerOptions build_args(StrList* args);

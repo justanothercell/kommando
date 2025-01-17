@@ -21,7 +21,11 @@ pub use core::intrinsics::typecast;
 pub use core::intrinsics::numcast;
 
 pub fn unreachable<T>() -> T {
-    c_api::printf("ERROR: Unreachable state reached");
+    panic("Unreachable state reached")
+}
+
+pub fn panic<T>(msg: c_str) -> T {
+    c_api::fprintf(io::stderr, "ERROR: %s", msg);
     c_api::exit(1);
     // dummy: control flow will never reach this
     std::mem::new_uninit()

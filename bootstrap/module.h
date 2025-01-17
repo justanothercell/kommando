@@ -50,6 +50,7 @@ LIST(MethodImplList, MethodImpl*);
 typedef struct Program {
     Map* packages;
     Module* main_module;
+    int o_verbosity;
 } Program;
 
 void insert_module(Program* program, Module* module, Visibility vis);

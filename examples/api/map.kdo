@@ -1,0 +1,27 @@
+use std::*;
+use std::hashmap::HashMap;
+use c_api::printf;
+
+fn x<T>(t: T) {}
+
+fn main() {
+    let map = HashMap::<u32, c_str>::new();
+    map.put(42, "forty two");
+    map.put(11, "eleven");
+    map.put(19, "nineteen");
+    map.put(81, "nine times nine");
+    map.put(100, "too big of a number");
+
+    printf("map contains %ld items\n", map.length);
+    printf("map doesn't contain 5: %u\n", map.contains(5) == false);
+    printf("value of key 11: %s\n", map.get(11).unwrap());
+
+    printf("Iterating entries:\n");
+    let iter = map.iter();
+    let next = iter.next();
+    while next.is_some() {
+        let entry = next.unwrap();
+        printf("  %u: %s\n", entry.key, entry.value);
+        next = iter.next();
+    }
+}
