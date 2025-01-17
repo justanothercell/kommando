@@ -9,7 +9,6 @@ pub struct Vec<T> {
 impl<T> Vec<T> {
     pub fn new() -> Vec<T> {
         Vec::<T>::new_with(0)
-<<<<<<< HEAD
     }
 
     pub fn new_with(capacity: usize) -> Vec<T> {
@@ -108,120 +107,8 @@ impl<T> Vec<T> {
         v.buffer = std::mem::null();
         v.length = 0;
         v.capacity = 0;
-=======
->>>>>>> master
     }
-
-<<<<<<< HEAD
-impl Vec<char> {
-    // assumes str owned if  the vector is to be modified or free'd
-    pub fn from_str(str: c_str) -> Vec<char> {
-        let length = c_api::str::strlen(str);
-        _ {
-            length: length,
-            capacity: length,
-            buffer: typecast(str)
-        }
-    }
-
-=======
-    pub fn new_with(capacity: usize) -> Vec<T> {
-        _ {
-            length: 0,
-            capacity: capacity,
-            buffer: std::mem::arr_malloc(capacity)
-        }
-    }
-
-    fn reserve_armortized(v: ptr<Vec<T>>, size: usize) {
-        if v.capacity >= size { return; };
-        if v.capacity == 0 { v.capacity = 8; };
-        while v.capacity < size {
-            v.capacity *= 2;
-        };
-        v.buffer = std::mem::arr_resize(v.buffer, v.capacity);
-    }
-
-    pub fn push(v: ptr<Vec<T>>, item: T) {
-        v.reserve_armortized(v.length + 1);
-        *std::mem::arr_offset(v.buffer, v.length) = item;
-        v.length += 1;
-    }
-
-    pub fn get(v: ptr<Vec<T>>, i: usize) -> Option<T> {
-        if i < v.length {
-            Option::<_>::some(*std::mem::arr_offset(v.buffer, i))
-        } else {
-            Option::<_>::none()
-        }
-    }
-
-    pub fn get_ref(v: ptr<Vec<T>>, i: usize) -> Option<ptr<T>> {
-        if i < v.length {
-            Option::<_>::some(std::mem::arr_offset(v.buffer, i))
-        } else {
-            Option::<_>::none()
-        }
-    }
-    pub fn last(v: ptr<Vec<T>>) -> Option<T> {
-        if v.length == 0 {
-            return Option::<_>::none();
-        };
-        v.get(v.length - 1)
-    }
-    pub fn last_ref(v: ptr<Vec<T>>) -> Option<ptr<T>> {
-        if v.length == 0 {
-            return Option::<_>::none();
-        };
-        v.get_ref(v.length - 1)
-    }
-
-    pub fn pop(v: ptr<Vec<T>>) -> Option<T> {
-        if v.length > 0 {
-            v.length -= 1;
-            Option::<_>::some(*std::mem::arr_offset(v.buffer, v.length))
-        } else {
-            Option::<_>::none()
-        }
-    }
-
-    pub fn swap_remove(v: ptr<Vec<T>>, index: usize) -> Option<T> {
-        if index >= v.length {
-            return Option::<_>::none();
-        };
-        if index < v.length - 1 {
-            std::mem::swap(
-                std::mem::arr_offset(v.buffer, index),
-                std::mem::arr_offset(v.buffer, v.length - 1)
-            );
-        };
-        v.length -= 1;
-        Option::<_>::some(*std::mem::arr_offset(v.buffer, v.length))
-    }
-
-    pub fn remove(v: ptr<Vec<T>>, index: usize) -> Option<T> {
-        if index >= v.length {
-            return Option::<_>::none();
-        };
-        let item = *std::mem::arr_offset(v.buffer, index);
-        v.length -= 1;
-        while index < v.length {
-            *std::mem::arr_offset(v.buffer, index) = *std::mem::arr_offset(v.buffer, index+1);
-            index += 1;
-        };
-        Option::<_>::some(item)
-    }
-
-    pub fn clear(v: ptr<Vec<T>>) {
-        v.length = 0;
-    }
-
-    pub fn free(v: ptr<Vec<T>>) {
-        std::mem::free(v.buffer);
-        v.buffer = std::mem::null();
-        v.length = 0;
-        v.capacity = 0;
-    }
+}
 
 impl Vec<char> {
     // assumes str owned if  the vector is to be modified or free'd
@@ -234,7 +121,6 @@ impl Vec<char> {
         }
     }
 
->>>>>>> master
     // returns a reference to the itnernal buffer as a c string.
     // may move internal buffer to ensure proper \0 termination.
     //pub fn as_c_str(v: Vec<char>) -> c_str {
