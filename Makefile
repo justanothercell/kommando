@@ -10,11 +10,11 @@ br: build run
 
 run:
 	name=$(basename $(file) .kdo); \
-	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr -vv
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr
 
 compile:
 	name=$(basename $(file) .kdo); \
-	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c -vv
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c
 
 help:
 	./kommando --help

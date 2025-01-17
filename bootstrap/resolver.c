@@ -1651,6 +1651,7 @@ void resolve(Program* program, CompilerOptions* options) {
 
     program->tracegen.top_frame = malloc(sizeof(Variable));
     program->tracegen.top_frame->path = gen_path("::core::trace::TOP_FRAME");
+    program->tracegen.top_frame->values = NULL;
     var_find(program, options, program->main_module, NULL, program->tracegen.top_frame, NULL, NULL);
     program->tracegen.frame_type = gen_typevalue("::core::trace::Frame", NULL);
     resolve_typevalue(program, options, program->main_module, program->tracegen.frame_type, NULL, NULL);

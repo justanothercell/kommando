@@ -239,6 +239,7 @@ Module* gen_core_intrinsics() {
     {
         Map* var_bindings = map_new();
         Variable* var = malloc(sizeof(Variable));
+        var->values = NULL;
         var->path = path_simple(gen_identifier("t"));
         map_put(var_bindings, "t", var);
         Map* type_bindings = map_new();
@@ -252,6 +253,7 @@ Module* gen_core_intrinsics() {
     {
         Map* var_bindings = map_new();
         Variable* var = malloc(sizeof(Variable));
+        var->values = NULL;
         var->path = path_simple(gen_identifier("t"));
         map_put(var_bindings, "t", var);
         Map* type_bindings = map_new();

@@ -343,6 +343,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         Variable* var = malloc(sizeof(Variable));
         var->global_ref = NULL;
         var->path = path_simple(name);
+        var->values= NULL;
         let->var = var;
         t = next_token(stream);
         if (token_compare(t, ":", SNOWFLAKE)) {
@@ -887,6 +888,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
             Argument* argument = malloc(sizeof(Argument));
             Variable* var = malloc(sizeof(Variable));
             var->global_ref = NULL;
+            var->values = NULL;
             var->path = path_simple(parse_identifier(stream));
             argument->var = var;
             t = next_token(stream);
