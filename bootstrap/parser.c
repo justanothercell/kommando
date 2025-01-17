@@ -927,5 +927,6 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->impl_type = NULL;
     func->annotations = list_new(AnnoList);
     func->type_generics = NULL;
+    func->untraced = false;
     return func;
 }

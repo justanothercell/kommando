@@ -1,0 +1,59 @@
+use std::*;
+use std::io::CFileStream;
+
+use c_api::fprintf;
+
+use core::trace::*;
+
+pub use core::trace::Frame;
+pub use core::trace::Function;
+
+pub struct Traceback {
+    top: ptr<Frame>
+}
+
+pub impl Traceback {
+    #[no_trace]
+    fn collect_allocated() -> Traceback {
+        let frame = TOP_FRAME;
+        let top: ptr<Frame> = std::mem::malloc();
+        let current = top;
+        while frame != std::mem::null() {
+            *current = *frame;
+            if frame.parent != std::mem::null() {
+                current.parent = std::mem::malloc();
+                current = current.parent;
+            };
+            frame = frame.parent;
+        };
+        _ {
+            top: top
+        }
+    }
+
+    pub fn fprint_trace(self: ptr<Traceback>, stream: CFileStream) {
+        fprintf(stream, "Stacktrace:\n");
+        let index = 0;
+        let frame = self.top;
+        while frame != std::mem::null() {
+            if (frame.callflags & CF_ROOT != 0) {
+                fprintf(stream, "%3d. [ENTRY]\n", index);
+                fprintf(stream, "\t%s\t%s:%ld\n", frame.call.full_name, frame.call.file, frame.call.line+1);
+            } else {
+                fprintf(stream, "%3d. %s:%ld\n", index, frame.file, frame.line+1);
+                fprintf(stream, "\t%s\t%s:%ld\n", frame.call.full_name, frame.call.file, frame.call.line+1);
+            };
+            index += 1;
+            frame = frame.parent;
+        }
+    }
+
+    pub fn free(self: ptr<Traceback>) {
+        let frame = self.top;
+        while frame != std::mem::null() {
+            let parent = frame.parent;
+            std::mem::free(frame);
+            frame = parent;
+        }
+    }
+}

@@ -1,0 +1,20 @@
+use std::*;
+use std::trace::Traceback;
+
+fn baz() {
+    let tb = Traceback::<>::collect_allocated();
+    tb.fprint_trace(std::io::stdout);
+    tb.free();
+}
+
+fn bar() {
+    baz();
+}
+
+fn foo() {
+    bar();
+}
+
+fn main() {
+    foo();
+}

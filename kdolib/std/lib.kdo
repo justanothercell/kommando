@@ -7,9 +7,12 @@ pub mod mem;
 pub mod env;
 pub mod coroutine;
 pub mod any;
+pub mod trace;
+
 pub mod option;
-pub use option::Option;
 pub mod result;
+
+pub use option::Option;
 pub use result::Result;
 
 pub use core::types::*;
@@ -25,7 +28,7 @@ pub fn unreachable<T>() -> T {
 }
 
 pub fn panic<T>(msg: c_str) -> T {
-    c_api::fprintf(io::stderr, "ERROR: %s", msg);
+    c_api::fprintf(io::stderr, "ERROR: %s\n", msg);
     c_api::exit(1);
     // dummy: control flow will never reach this
     std::mem::new_uninit()

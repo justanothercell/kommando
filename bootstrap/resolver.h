@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include "module.h"
+#include "compiler.h"
 
 typedef struct VarBox {
     str name;
@@ -13,7 +14,7 @@ typedef struct VarBox {
 } VarBox;
 LIST(VarList, VarBox*);
 
-void resolve(Program* program);
+void resolve(Program* program, CompilerOptions* options);
 str gvals_to_key(GenericValues* generics);
 str gvals_to_c_key(GenericValues* generics);
 str gvals_to_dbg_key(GenericValues* generics);

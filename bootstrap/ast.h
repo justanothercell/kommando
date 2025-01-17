@@ -239,10 +239,11 @@ typedef struct FuncDef {
     GenericKeys* type_generics;
     Module* module;
     AnnoList annotations;
+    TypeValue* impl_type;
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
-    TypeValue* impl_type;
+    bool untraced;
 } FuncDef;
 
 typedef struct Global {

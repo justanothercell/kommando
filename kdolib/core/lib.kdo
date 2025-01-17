@@ -1,5 +1,6 @@
 pub mod env;
 pub mod hash;
+pub mod trace;
 // pub mod intrinsics - synthetically generated
 // pub mod types - synthetically generated
 
