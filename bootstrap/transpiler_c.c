@@ -505,17 +505,50 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
         } break;
         case EXPR_DYN_RAW_CALL: {
             DynRawCall* fc = expr->expr;
-            fprintf(code_stream, "(");
             str c_ret = gen_c_type_name(expr->resolved->type, type_generics, func_generics);
-            fprintf(code_stream, "(%s(*)())", c_ret);
-            transpile_expression(program, options, code_stream, func, type_generics, func_generics, fc->callee, true, indent + 1);
-            fprintf(code_stream, ")");
-            fprintf(code_stream, "(");
-            list_foreach(&fc->args, i, Expression* arg, {
-                if (i > 0) fprintf(code_stream, ", ");
-                transpile_expression(program, options, code_stream, func, type_generics, func_generics, arg, true, indent + 1);
-            });
-            fprintf(code_stream, ")");
+            if (program->tracegen.trace_this) {
+                str temp = gen_temp_c_name("result");
+                str result_type = gen_c_type_name(expr->resolved->type, type_generics, func_generics);
+                StrList argnames = list_new(StrList);
+                fprintf(code_stream, "({\n");
+                list_foreach(&fc->args, i, Expression* arg, {
+                    str argname = gen_temp_c_name("arg");
+                    fprint_indent(code_stream, indent);
+                    fprintf(code_stream, "%s %s = ", gen_c_type_name(arg->resolved->type, type_generics, func_generics), argname);
+                    transpile_expression(program, options, code_stream, func, type_generics, func_generics, arg, true, indent + 1);
+                    fprintf(code_stream, ";\n");
+                    list_append(&argnames, argname);
+                });
+                fprint_indent(code_stream, indent);
+                fprintf(code_stream, "%s %s = { .parent=%s, .call=0, .file=\"%s\", .line=%lld, .callflags=0b1000 };\n", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, expr->span.left.file, expr->span.left.line);
+                fprint_indent(code_stream, indent);
+                fprintf(code_stream, "%s = &%s;\n", program->tracegen.top_frame_c_name, program->tracegen.local_frame_name);
+                fprint_indent(code_stream, indent);
+                if (use_result) fprintf(code_stream, "%s %s = ", result_type, temp);
+                fprintf(code_stream, "((%s(*)())", c_ret);
+                transpile_expression(program, options, code_stream, func, type_generics, func_generics, fc->callee, true, indent + 1);
+                fprintf(code_stream, ")(");
+                list_foreach(&argnames, i, str arg, {
+                    if (i > 0) fprintf(code_stream, ", ");
+                    fprintf(code_stream, "%s", arg);
+                });
+                fprintf(code_stream, ");\n");
+                fprint_indent(code_stream, indent);
+                fprintf(code_stream, "%s = %s.parent;\n", program->tracegen.top_frame_c_name, program->tracegen.local_frame_name);
+                fprint_indent(code_stream, indent);
+                if (use_result) fprintf(code_stream, "%s;\n", temp);
+                fprint_indent(code_stream, indent-1);
+                fprintf(code_stream, "})");
+            } else {
+                fprintf(code_stream, "((%s(*)())", c_ret);
+                transpile_expression(program, options, code_stream, func, type_generics, func_generics, fc->callee, true, indent + 1);
+                fprintf(code_stream, ")(");
+                list_foreach(&fc->args, i, Expression* arg, {
+                    if (i > 0) fprintf(code_stream, ", ");
+                    transpile_expression(program, options, code_stream, func, type_generics, func_generics, arg, true, indent + 1);
+                });
+                fprintf(code_stream, ")");
+            }
         } break;
         case EXPR_LITERAL: {
             Token* lit = expr->expr;

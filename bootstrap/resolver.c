@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include "lib.h"
+#include "lib/str.h"
 LIB
 #include "resolver.h"
 #include "ast.h"
@@ -994,8 +995,8 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
 
             TVBox* dyncall = new_tvbox();
             dyncall->type = gen_typevalue("::core::types::function_ptr<_>", &expr->span);
-            dyncall->type->generics->generics.elements[0] = t_return->type;
-            resolve_typevalue(program, options, func->module, dyncall->type, func->generics, type_generics);
+            if (t_return->type != NULL) dyncall->type->generics->generics.elements[0] = t_return->type;
+            resolve_typevalue(program, options, func->module, dyncall->type, NULL, NULL);
             resolve_expr(program, options, func, type_generics, call->callee, vars, dyncall);
             fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, dyncall->type->generics->generics.elements[0]);
             // resolving args, no typehints here, unsafe yada yada
@@ -1299,14 +1300,24 @@ void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, 
         resolve_typevalue(program, options, func->module, arg->type, func->generics, type_generics);
     });
     resolve_typevalue(program, options, func->module, func->return_type, func->generics, type_generics);
+    bool is_extern = false;
     list_foreach(&func->annotations, i, Annotation a, {
         str p = to_str_writer(s, fprint_path(s, a.path));
         if (str_eq(p, "no_trace")) {            
             if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[no_trace]`, found %s", AnnotationType__NAMES[a.type]);
             if (func->untraced) spanned_error("Duplicate annotation flag", a.path->elements.elements[0]->span, "Flag `#[no_trace]` already set");
             func->untraced = true;
+        } else if (str_eq(p, "extern")) {            
+            if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[extern]`, found %s", AnnotationType__NAMES[a.type]);
+            if (is_extern) spanned_error("Duplicate annotation flag", a.path->elements.elements[0]->span, "Flag `#[extern]` already set");
+            is_extern = true;
         } 
     });
+    if (func->body != NULL) {
+        if (is_extern) spanned_error("Local function marked as extern", func->name->span, "Function is marked as extern but also has a body");
+    } else {
+        if (!is_extern) spanned_error("Extern function not marked as such", func->name->span, "Extern function should have the appropiate tag: `#[extern]`");
+    }
     func->head_resolved = true;
 
     if (func->body != NULL) {

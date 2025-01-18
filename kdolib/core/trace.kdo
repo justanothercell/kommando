@@ -25,7 +25,10 @@ pub struct Frame {
 // Likewise frame.parent is NULL. 
 pub const CF_ROOT: u8 = 1 << 0; 
 // calling a function which itself does not trace. this either means it is an extern function or it is in a library package with --trace=this set.
-// Note that functions annotated with #[no_trace] are not included in the trace at all and have nothign to do with this flag.
-pub const CF_OPAQUE: u8 = 1 << 2;
+// Note that functions annotated with #[no_trace] are not included in the trace at all and have nothing to do with this flag.
+pub const CF_OPAQUE: u8 = 1 << 1;
 // calling extern function. implies CF_OPAQUE 
-pub const CF_EXTERN: u8 = 1 << 1; 
+pub const CF_EXTERN: u8 = 1 << 2;
+// calling a function pointer. 
+// frame.call is NULL since we do not know which function we are actually calling. 
+pub const CF_POINTER: u8 = 1 << 3;

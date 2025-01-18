@@ -319,6 +319,8 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             DynRawCall* call = malloc(sizeof(DynRawCall));
             call->callee = expression;
             call->args = list_new(ExpressionList);
+            t = next_token(stream);
+            stream->peek = t;
             if (!token_compare(t, ")", SNOWFLAKE)) {
                 while (true) {
                     Expression* argument = parse_expression(stream, true);
@@ -329,6 +331,8 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                         break;
                     } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
                 }
+            } else {
+                t = next_token(stream);
             }
             expression = malloc(sizeof(Expression));
             expression->expr = call;

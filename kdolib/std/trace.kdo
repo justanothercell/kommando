@@ -37,10 +37,13 @@ pub impl Traceback {
         let frame = self.top;
         while frame != std::mem::null() {
             if (frame.callflags & CF_ROOT != 0) {
-                fprintf(stream, "%3d. [ENTRY]\n", index);
-                fprintf(stream, "\t%s\t%s:%ld\n", frame.call.full_name, frame.call.file, frame.call.line+1);
+                fprintf(stream, "%3d. (entry)\n", index);
             } else {
                 fprintf(stream, "%3d. %s:%ld\n", index, frame.file, frame.line+1);
+            };
+            if (frame.callflags & CF_POINTER != 0) {
+                fprintf(stream, "\t(function_ptr)\t---\n");
+            } else {
                 fprintf(stream, "\t%s\t%s:%ld\n", frame.call.full_name, frame.call.file, frame.call.line+1);
             };
             index += 1;

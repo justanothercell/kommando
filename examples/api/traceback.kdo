@@ -7,12 +7,23 @@ fn baz() {
     tb.free();
 }
 
-fn bar() {
+// we do not want a vampire in our trace
+#[no_trace]
+fn vampire() {
     baz();
 }
 
-fn foo() {
+fn bar() {
+    vampire();
+}
+
+fn fou() {
     bar();
+}
+
+fn foo() {
+    let f = fou;
+    (f)();
 }
 
 fn main() {
