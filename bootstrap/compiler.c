@@ -26,7 +26,7 @@ CompilerOptions build_args(StrList* args) {
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --silent  -s - verbosity = 0\n");
-        printf("    --verbose -v - verbosity += 1 (default verbosity = 1)\n");
+        printf("    --verbose -v - verbosity += 1 (default = 1)\n");
         printf("    --trace=[none|main|all]\n");
         printf("             none - do not generate traceback info\n");
         printf("             main - (default) generate traceback info for the main package\n");
@@ -34,8 +34,8 @@ CompilerOptions build_args(StrList* args) {
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
         printf("    ::package=<path/to/package> (multiple possible)\n");
-        printf("Alternatively use:\n");
-        printf("make run file=<infile>\n");
+        printf("Using `make` with sensibe defaults:\n");
+        printf("make run file=<infile> flags=\"<optional compiler flags>\"\n");
         quit(0);
     }
 
