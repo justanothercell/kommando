@@ -1,12 +1,22 @@
 use core::types::*;
 
+pub struct Location {
+    file: c_str,
+    line: usize,
+}
+
+impl Location {
+    pub fn fprint(self: Location, stream: c_api::CFileStream) {
+        c_api::fprintf(stream, "%s:%ld", self.file, self.line + 1);
+    }
+}
+
 pub struct Function {
     name: c_str,
     full_name: c_str,
     mangled_name: c_str,
-    file: c_str,
-    line: usize,
     is_method: bool,
+    loc: Location
 }
 
 #[thread_local]
@@ -15,8 +25,7 @@ pub static TOP_FRAME: ptr<Frame> = 0;
 pub struct Frame {
     parent: ptr<Frame>,
     call: ptr<Function>,
-    file: c_str,
-    line: usize,
+    loc: Location,
     callflags: u8
 }
 

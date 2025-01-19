@@ -3,7 +3,7 @@ use std::trace::Traceback;
 
 fn baz() {
     let tb = Traceback::<>::collect_allocated();
-    tb.fprint_trace(std::io::stdout);
+    tb.fprint(std::io::stdout);
     tb.free();
 }
 
@@ -14,6 +14,10 @@ fn vampire() {
 }
 
 fn bar() {
+    let loc = Traceback::<>::here(0).unwrap();
+    c_api::printf("We are at ");
+    loc.fprint(std::io::stdout);
+    c_api::printf("\n");
     vampire();
 }
 

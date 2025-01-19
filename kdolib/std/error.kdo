@@ -63,10 +63,14 @@ pub fn unreachable<T>() -> T {
     panic("Unreachable state reached")
 }
 
+pub fn todo<T>() -> T {
+    panic("TODO: not implemented yet (too lazy)")
+}
+
 pub fn panic<T>(msg: c_str) -> T {
-    c_api::fprintf(io::stderr, "ERROR: %s\n", msg);
+    c_api::fprintf(io::stderr, "[ERROR]: %s\n", msg);
     let tb = Traceback::<>::collect_allocated();
-    tb.fprint_trace(std::io::stdout);
+    tb.fprint(std::io::stdout);
     tb.free();
     c_api::exit(1);
     std::mem::new_uninit() // dummy: control flow will never reach this

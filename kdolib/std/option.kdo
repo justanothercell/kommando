@@ -35,9 +35,7 @@ impl<T> Option<T> {
         if self.exists {
             self.value
         } else {
-            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping empty option\n");
-            c_api::exit(1);
-            unreachable()
+            panic("Unwrapping empty option")
         }
     }
 
@@ -53,9 +51,12 @@ impl<T> Option<T> {
         if self.exists {
             self.value
         } else {
-            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping empty option: %s\n", error);
-            c_api::exit(1);
-            unreachable()
+            let msg = c_api::nullstr;
+            let size = 0usize;
+            let stream = c_api::open_memstream(&msg, &size);
+            c_api::fprintf(stream, "Unwrapping empty option: %s", error);
+            c_api::fclose(stream);
+            panic(msg)
         }
     }
 
@@ -74,9 +75,7 @@ impl<T> Option<T> {
             self.exists = false;
             self.value
         } else {
-            c_api::fprintf(std::io::stderr, "ERROR: Cannot take value out of empty option\n");
-            c_api::exit(1);
-            unreachable()
+            panic("ERROR: Cannot take value out of empty option\n")
         }
     }
 

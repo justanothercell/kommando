@@ -9,6 +9,7 @@
 
 #include "compiler.h"
 #include "lib.h"
+#include "lib/defines.h"
 LIB
 #include "transpiler_c.h"
 #include "ast.h"
@@ -364,7 +365,7 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
                     list_append(&argnames, argname);
                 });
                 fprint_indent(code_stream, indent);
-                fprintf(code_stream, "%s %s = { .parent=%s, .call=&TRACE_%s, .file=\"%s\", .line=%lld, .callflags=", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(fd, NULL, fc_generics), fc->name->elements.elements[0]->span.left.file, fc->name->elements.elements[0]->span.left.line);
+                fprintf(code_stream, "%s %s = { .parent=%s, .call=&TRACE_%s, .loc={ .file=\"%s\", .line=%lld }, .callflags=", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(fd, NULL, fc_generics), fc->name->elements.elements[0]->span.left.file, fc->name->elements.elements[0]->span.left.line);
                 if (fd->body == NULL) fprintf(code_stream, "0b110");
                 else if (func->module == program->main_module && root != program->main_module && options->tracelevel < 2) fprintf(code_stream, "0b100");
                 else fprintf(code_stream, "0b0");
@@ -422,7 +423,7 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
                     list_append(&argnames, argname);
                 });
                 fprint_indent(code_stream, indent);
-                fprintf(code_stream, "%s %s = { .parent=%s, .call=&TRACE_%s, .file=\"%s\", .line=%lld, .callflags=", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(fd, type_call_generics, call_generics), call->name->span.left.file, call->name->span.left.line);
+                fprintf(code_stream, "%s %s = { .parent=%s, .call=&TRACE_%s, .loc={ .file=\"%s\", .line=%lld }, .callflags=", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(fd, type_call_generics, call_generics), call->name->span.left.file, call->name->span.left.line);
                 if (fd->body == NULL) fprintf(code_stream, "0b110");
                 else if (func->module == program->main_module && root != program->main_module && options->tracelevel < 2) fprintf(code_stream, "0b100");
                 else fprintf(code_stream, "0b0");
@@ -476,7 +477,7 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
                     list_append(&argnames, argname);
                 });
                 fprint_indent(code_stream, indent);
-                fprintf(code_stream, "%s %s = { .parent=%s, .call=&TRACE_%s, .file=\"%s\", .line=%lld, .callflags=", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(fd, type_call_generics, call_generics), call->name->span.left.file, call->name->span.left.line);
+                fprintf(code_stream, "%s %s = { .parent=%s, .call=&TRACE_%s, .loc={ .file=\"%s\", .line=%lld }, .callflags=", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(fd, type_call_generics, call_generics), call->name->span.left.file, call->name->span.left.line);
                 if (fd->body == NULL) fprintf(code_stream, "0b110");
                 else if (func->module == program->main_module && root != program->main_module && options->tracelevel < 2) fprintf(code_stream, "0b100");
                 else fprintf(code_stream, "0b0");
@@ -523,7 +524,7 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
                     list_append(&argnames, argname);
                 });
                 fprint_indent(code_stream, indent);
-                fprintf(code_stream, "%s %s = { .parent=%s, .call=0, .file=\"%s\", .line=%lld, .callflags=0b1000 };\n", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, expr->span.left.file, expr->span.left.line);
+                fprintf(code_stream, "%s %s = { .parent=%s, .call=0, .loc={ .file=\"%s\", .line=%lld }, .callflags=0b1000 };\n", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, expr->span.left.file, expr->span.left.line);
                 fprint_indent(code_stream, indent);
                 fprintf(code_stream, "%s = &%s;\n", program->tracegen.top_frame_c_name, program->tracegen.local_frame_name);
                 fprint_indent(code_stream, indent);
@@ -948,14 +949,14 @@ void transpile_function_generic_variant(Program* program, CompilerOptions* optio
         else fprintf(code_stream, "// %s%s::%s%s\n", to_str_writer(s, fprint_td_path(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
     }
     if (options->tracelevel >= 0) {
-        if (func->impl_type == NULL) fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s::%s%s%s\", .mangled_name=\"%s\", .file=\"%s\", .line=%lld, .is_method=1 };\n",
+        if (func->impl_type == NULL) fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s::%s%s%s\", .mangled_name=\"%s\", .loc={ .file=\"%s\", .line=%lld }, .is_method=1 };\n",
             program->tracegen.function_type_c_name, trace_f_name, 
             func->name->name, 
             modpath, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics), 
             c_fn_name,
             func->name->span.left.file,
             func->name->span.left.line);
-        else fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s%s::%s%s\", .mangled_name=\"%s\", .file=\"%s\", .line=%lld, .is_method=1 };\n",
+        else fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s%s::%s%s\", .mangled_name=\"%s\", .loc={ .file=\"%s\", .line=%lld }, .is_method=1 };\n",
             program->tracegen.function_type_c_name, trace_f_name, 
             func->name->name, 
             modpath, gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics), 
@@ -1141,6 +1142,7 @@ void transpile_module(Program* program, CompilerOptions* options, FILE* header_s
         });
     }
     map_foreach(module->items, str key, ModuleItem* item, {
+        UNUSED(key);
         if (item->origin != NULL) continue; // we are an imported item!
         switch (item->type) {
             case MIT_MODULE:
@@ -1215,7 +1217,7 @@ void transpile_to_c(Program* program, CompilerOptions* options, FILE* header_str
         fprintf(code_stream, "    __global_argc = argc;\n");
         fprintf(code_stream, "    __global_argv = argv;\n");
         if (options->tracelevel > 0) {
-            fprintf(code_stream, "    %s %s = { .parent=%s, .call=&TRACE_%s, .file=0, .line=0, .callflags=0b1 };\n", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(main_func, NULL, NULL));
+            fprintf(code_stream, "    %s %s = { .parent=%s, .call=&TRACE_%s, .loc={ .file=0, .line=0 }, .callflags=0b1 };\n", program->tracegen.frame_type_c_name, program->tracegen.local_frame_name, program->tracegen.top_frame_c_name, gen_default_c_fn_name(main_func, NULL, NULL));
             fprintf(code_stream, "    %s = &%s;\n", program->tracegen.top_frame_c_name, program->tracegen.local_frame_name);
         }
         fprintf(code_stream, "    %s();\n", main_c_name);

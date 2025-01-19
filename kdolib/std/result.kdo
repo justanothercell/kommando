@@ -46,9 +46,12 @@ impl<T> Result<T> {
         if self.is_ok {
             self.value
         } else {
-            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping erroneous result: %s\n", self.error);
-            c_api::exit(1);
-            unreachable()
+            let msg = c_api::nullstr;
+            let size = 0usize;
+            let stream = c_api::open_memstream(&msg, &size);
+            c_api::fprintf(stream, "Unwrapping erroneous result: %s", self.error);
+            c_api::fclose(stream);
+            panic(msg)
         }
     }
 
@@ -56,9 +59,12 @@ impl<T> Result<T> {
         if self.is_ok {
             self.value
         } else {
-            c_api::fprintf(std::io::stderr, "ERROR: Unwrapping empty result: %s: %s\n", self.error, error);
-            c_api::exit(1);
-            unreachable()
+            let msg = c_api::nullstr;
+            let size = 0usize;
+            let stream = c_api::open_memstream(&msg, &size);
+            c_api::fprintf(stream, "Unwrapping erroneous result: %s: %s", self.error, error);
+            c_api::fclose(stream);
+            panic(msg)
         }
     }
 

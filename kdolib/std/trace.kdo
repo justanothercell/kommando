@@ -5,14 +5,30 @@ use c_api::fprintf;
 
 use core::trace::*;
 
-pub use core::trace::Frame;
-pub use core::trace::Function;
+pub use Frame;
+pub use Function;
+pub use Location;
 
 pub struct Traceback {
     top: ptr<Frame>
 }
 
 pub impl Traceback {
+    fn here(depth: usize) -> Result<Location> {
+        let frame = TOP_FRAME;
+        if frame == std::mem::null() || frame.callflags & CF_ROOT != 0 {
+            return Result::<_>::err("Cannot get location at this depth");
+        };
+        while depth > 0 {
+            frame = frame.parent;
+            depth -= 1;
+            if frame == std::mem::null() || frame.callflags & CF_ROOT != 0 {
+                return Result::<_>::err("Cannot get location at this depth");
+            };
+        };
+        Result::<_>::ok(frame.loc)
+    }
+
     #[no_trace]
     fn collect_allocated() -> Traceback {
         if TOP_FRAME == std::mem::null() {
@@ -34,7 +50,7 @@ pub impl Traceback {
         }
     }
 
-    pub fn fprint_trace(self: ptr<Traceback>, stream: CFileStream) {
+    pub fn fprint(self: ptr<Traceback>, stream: CFileStream) {
         let index = 0;
         let frame = self.top;
         if frame == std::mem::null() {
@@ -46,12 +62,16 @@ pub impl Traceback {
             if (frame.callflags & CF_ROOT != 0) {
                 fprintf(stream, "%3d. (entry)\n", index);
             } else {
-                fprintf(stream, "%3d. %s:%ld\n", index, frame.file, frame.line+1);
+                fprintf(stream, "%3d. ", index);
+                frame.loc.fprint(stream);
+                fprintf(stream, "\n");
             };
             if (frame.callflags & CF_POINTER != 0) {
                 fprintf(stream, "\t(function_ptr)\t---\n");
             } else {
-                fprintf(stream, "\t%s\t%s:%ld\n", frame.call.full_name, frame.call.file, frame.call.line+1);
+                fprintf(stream, "\t%s\t", frame.call.full_name);
+                frame.call.loc.fprint(stream);
+                fprintf(stream, "\n");
             };
             index += 1;
             frame = frame.parent;

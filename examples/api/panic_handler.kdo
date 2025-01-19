@@ -7,6 +7,6 @@ fn crash() {
 }
 
 fn main() {
-    std::signal::init_handler();
+    std::error::init_handler();
     crash();
 }

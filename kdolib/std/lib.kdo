@@ -8,7 +8,7 @@ pub mod env;
 pub mod coroutine;
 pub mod any;
 pub mod trace;
-pub mod signal;
+pub mod error;
 
 pub mod option;
 pub mod result;
@@ -16,8 +16,9 @@ pub mod result;
 pub use option::Option;
 pub use result::Result;
 
-pub use signal::panic;
-pub use signal::unreachable;
+pub use error::panic;
+pub use error::unreachable;
+pub use error::todo;
 
 pub use core::types::*;
 pub use u8 as char;
