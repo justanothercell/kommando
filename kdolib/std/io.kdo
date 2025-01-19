@@ -1,15 +1,12 @@
-pub use std::raw_ptr as CFileStream;
+pub use c_api::CFileStream;
 
 #[extern]
-#[no_mangle]
 pub static stdin: CFileStream;
 
 #[extern]
-#[no_mangle]
 pub static stdout: CFileStream;
 
 #[extern]
-#[no_mangle]
 pub static stderr: CFileStream;
 
 pub fn input(message: std::c_str) -> std::c_str {

@@ -1482,10 +1482,11 @@ void resovle_imports(Program* program, CompilerOptions* options, Module* module,
             });
         } else {
             ModuleItem* item = resolve_item_raw(program, options, import->container, import->path, MIT_ANY, mask);
-            if (item->vis < import->vis) spanned_error("", import->path->elements.elements[0]->span, "Cannot reexport %s @ %s as %s while it is only declared as %s",
+            if (item->vis < import->vis && !(item->origin != NULL && import->path->elements.length == 1 && item->origin->vis >= import->vis)) spanned_error("Visibility error", import->path->elements.elements[0]->span, "Cannot reexport %s @ %s as %s while it is only declared as %s",
                     item->name->name, to_str_writer(s, fprint_span(s, &item->name->span)), Visibility__NAMES[import->vis], Visibility__NAMES[item->vis]);
             ModuleItem* imported = malloc(sizeof(ModuleItem));
             imported->vis = import->vis;
+            if (item->origin != NULL && import->path->elements.length == 1) imported->vis = item->origin->vis;
             imported->type = item->type;
             imported->module = import->container;
             imported->origin = item;

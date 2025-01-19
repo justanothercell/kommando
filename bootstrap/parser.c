@@ -395,7 +395,19 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         end = conditional->then->span.right;
         t = next_token(stream);
         if (token_compare(t, "else", IDENTIFIER)) {
-            conditional->otherwise = parse_block(stream);
+            t = next_token(stream);
+            stream->peek = t;
+            if (token_compare(t, "if", IDENTIFIER)) {
+                Expression* otherwise = parse_expresslet(stream, true);
+                if (otherwise->type != EXPR_CONDITIONAL) spanned_error("Invalid continuation of else", otherwise->span, "Expected `else if ... { ... }`, got %s", ExprType__NAMES[otherwise->type]);
+                conditional->otherwise = malloc(sizeof(Block));
+                conditional->otherwise->span = otherwise->span;
+                conditional->otherwise->expressions = list_new(ExpressionList);
+                list_append(&conditional->otherwise->expressions, otherwise);
+                conditional->otherwise->yield_last = true;
+            } else {
+                conditional->otherwise = parse_block(stream);
+            }
             end = conditional->otherwise->span.right;
         } else {
             conditional->otherwise = NULL;

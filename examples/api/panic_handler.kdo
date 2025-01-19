@@ -1,0 +1,12 @@
+use std::*;
+
+fn crash() {
+    c_api::printf("crashing...\n");
+    let _ = *std::mem::null::<i32>();
+    c_api::printf("crashed! (lmao)\n");
+}
+
+fn main() {
+    std::signal::init_handler();
+    crash();
+}

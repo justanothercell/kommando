@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,10 +9,6 @@
 
 #include "compiler.h"
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/exit.h"
-#include "lib/list.h"
-#include "lib/str.h"
 LIB
 #include "transpiler_c.h"
 #include "ast.h"
@@ -254,13 +251,19 @@ str gen_c_static_name(Global* s) {
             if (t->type != STRING) unexpected_token(t, "Annotation expects string value");
             name = t->string;
             state = 1;
-        }
-        if (str_eq(p, "no_mangle")) {
+        } if (str_eq(p, "no_mangle")) {
             if (state == 1) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "Cannot both define symbol name and no_mangle");
-            if (state == 2) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "no_mangle already set");
+            if (state == 2) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "`#[no_mangle]` already set");
+            if (state == 3) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "flag extern implies flag no_mangle");
             if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[no_mangle]`, found %s", AnnotationType__NAMES[a.type]);
             name = s->name->name;
             state = 2;
+        } if (str_eq(p, "extern")) {
+            if (state == 2) spanned_error("Invalid annotation", a.path->elements.elements[0]->span, "flag extern implies flag no_mangle");
+            if (state == 3) spanned_error("Duplicate annotation", a.path->elements.elements[0]->span, "`#[extern]` already set");
+            if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[extern]`, found %s", AnnotationType__NAMES[a.type]);
+            if (name == NULL) name = s->name->name;
+            state = 3;
         }
     });
     if (name == NULL) {

@@ -15,6 +15,9 @@ pub struct Traceback {
 pub impl Traceback {
     #[no_trace]
     fn collect_allocated() -> Traceback {
+        if TOP_FRAME == std::mem::null() {
+            return _ { top: std::mem::null() };
+        };
         let frame = TOP_FRAME;
         let top: ptr<Frame> = std::mem::malloc();
         let current = top;
@@ -32,9 +35,13 @@ pub impl Traceback {
     }
 
     pub fn fprint_trace(self: ptr<Traceback>, stream: CFileStream) {
-        fprintf(stream, "Stacktrace:\n");
         let index = 0;
         let frame = self.top;
+        if frame == std::mem::null() {
+            fprintf(stream, "No stack trace available\n");
+            return;
+        };
+        fprintf(stream, "Stack trace:\n");
         while frame != std::mem::null() {
             if (frame.callflags & CF_ROOT != 0) {
                 fprintf(stream, "%3d. (entry)\n", index);

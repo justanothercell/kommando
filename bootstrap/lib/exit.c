@@ -38,7 +38,6 @@ void signal_handler(int signal) {
 void init_exit_handler(void (*exit_func)(str file, usize line, int code)) {
     if (EXIT_FUNC != NULL) panic("Exit handler may not be initialized twice");
     EXIT_FUNC = exit_func;
-    signal(SIGINT, signal_handler);
     signal(SIGSEGV, signal_handler);
     signal(SIGFPE, signal_handler);
 }

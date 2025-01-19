@@ -150,7 +150,7 @@ Module* gen_core_types() {
     module->subs = list_new(ModDefList);
     module->name = module->path->elements.elements[module->path->elements.length-1];
 
-    register_extern_type(module, "c_void", "void");
+    register_extern_type(module, "c_void", "void*"); // now this is not actually void, but this makes it more compatible
     register_extern_type(module, "raw_ptr", "void*");
     register_extern_type(module, "c_str", "char*");
 

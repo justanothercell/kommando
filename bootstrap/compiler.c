@@ -65,7 +65,7 @@ CompilerOptions build_args(StrList* args) {
                 options.compile = true;
             } else if (str_eq(arg, "silent")) {
                 options.verbosity = 0;
-            } else if (str_eq(arg, "trace=")) {
+            } else if (str_startswith(arg, "trace=")) {
                 arg += 6;
                 if (str_eq(arg, "none")) {
                     options.tracelevel = 0;
@@ -239,11 +239,11 @@ void compile(CompilerOptions options) {
     fclose(header_file);
     fclose(code_file);
 
-    report_item_cache_stats();
+    if (options.verbosity >= 1) report_item_cache_stats();
 
     if (options.compile) {
         if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
     }

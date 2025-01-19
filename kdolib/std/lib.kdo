@@ -8,12 +8,16 @@ pub mod env;
 pub mod coroutine;
 pub mod any;
 pub mod trace;
+pub mod signal;
 
 pub mod option;
 pub mod result;
 
 pub use option::Option;
 pub use result::Result;
+
+pub use signal::panic;
+pub use signal::unreachable;
 
 pub use core::types::*;
 pub use u8 as char;
@@ -22,14 +26,3 @@ pub use core::false;
 
 pub use core::intrinsics::typecast;
 pub use core::intrinsics::numcast;
-
-pub fn unreachable<T>() -> T {
-    panic("Unreachable state reached")
-}
-
-pub fn panic<T>(msg: c_str) -> T {
-    c_api::fprintf(io::stderr, "ERROR: %s\n", msg);
-    c_api::exit(1);
-    // dummy: control flow will never reach this
-    std::mem::new_uninit()
-}

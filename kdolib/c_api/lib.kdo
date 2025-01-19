@@ -4,19 +4,23 @@ pub mod math;
 pub mod str;
 pub mod ucontext;
 
+pub use core::types::raw_ptr as CFileStream;
+
 #[extern]
 pub fn printf(fmt: c_str, *) -> i32;
 #[extern]
-pub fn fprintf(stream: raw_ptr, fmt: c_str, *) -> i32;
+pub fn fprintf(stream: CFileStream, fmt: c_str, *) -> i32;
+#[extern]
+pub fn fopen(path: c_str, mode: c_str) -> CFileStream;
+#[extern]
+pub fn fclose(stream: CFileStream) -> i32;
+#[extern]
+pub fn fflush(stream: CFileStream) -> i32;
+#[extern]
+pub fn feof(stream: CFileStream) -> i32;
 
 #[extern]
-pub fn fopen(path: c_str, mode: c_str) -> raw_ptr;
-#[extern]
-pub fn fclose(stream: raw_ptr) -> i32;
-#[extern]
-pub fn fflush(stream: raw_ptr) -> i32;
-#[extern]
-pub fn feof(stream: raw_ptr) -> i32;
+pub fn open_memstream(stream: ptr<c_str>, size: ptr<usize>) -> CFileStream;
 
 #[extern]
 pub fn exit(code: i32) -> c_void;
@@ -58,7 +62,7 @@ pub fn raise(signal: i32) -> i32;
 #[extern]
 pub fn kill(pid: i32, signal: i32) -> i32;
 #[extern]
-pub fn signal(signal: i32, handler: function_ptr) -> function_ptr;
+pub fn signal(signal: i32, handler: function_ptr<i32>) -> function_ptr<i32>;
 
 #[extern]
 pub fn system(cmd: c_str) -> i32;
