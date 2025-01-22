@@ -12,7 +12,7 @@ impl<T> Option<T> {
     }
 
     pub fn none() -> Option<T> {
-        _ { value: std::mem::new_uninit(), exists: false }
+        _ { value: std::mem::uninit(), exists: false }
     }
 
     pub fn is_some(self: Option<T>) -> bool {

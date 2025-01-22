@@ -1,7 +1,7 @@
 use std::*;
 use std::io::stderr;
 
-pub fn malloc<T>() -> ptr<T> {
+pub fn new_uninit<T>() -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 { return null(); };
     let raw_ptr = c_api::malloc(size);
@@ -11,7 +11,13 @@ pub fn malloc<T>() -> ptr<T> {
     typecast(raw_ptr)
 }
 
-pub fn malloc_zeroed<T>() -> ptr<T> {
+pub fn new<T>(t: T) -> ptr<T>{
+    let object: _<T> = new_uninit();
+    *object = t;
+    object
+}
+
+pub fn new_zeroed<T>() -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 { return null(); };
     let raw_ptr = c_api::calloc(1, size); // calloc is faster than memset(raw_ptr, 0, size)
@@ -21,13 +27,13 @@ pub fn malloc_zeroed<T>() -> ptr<T> {
     typecast(raw_ptr)
 }
 
-pub fn new_uninit<T>() -> T {
+pub fn uninit<T>() -> T {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
     *typecast(raw_ptr)
 }
 
-pub fn new_zeroed<T>() -> T {
+pub fn zeroed<T>() -> T {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
     *typecast(c_api::memset(raw_ptr, 0, size))
@@ -40,7 +46,7 @@ pub fn free<T>(ptr: ptr<T>) {
     c_api::free(raw_ptr);
 }
 
-pub fn arr_malloc<T>(n: usize) -> ptr<T> {
+pub fn arr_new<T>(n: usize) -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 || n == 0 { return null(); };
     let raw_ptr = c_api::calloc(n, size);

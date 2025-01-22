@@ -15,7 +15,7 @@ impl<T> Vec<T> {
         _ {
             length: 0,
             capacity: capacity,
-            buffer: std::mem::arr_malloc(capacity)
+            buffer: std::mem::arr_new(capacity)
         }
     }
 

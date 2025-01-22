@@ -35,12 +35,12 @@ pub impl Traceback {
             return _ { top: std::mem::null() };
         };
         let frame = TOP_FRAME;
-        let top: ptr<Frame> = std::mem::malloc();
+        let top: ptr<Frame> = std::mem::new_uninit();
         let current = top;
         while frame != std::mem::null() {
             *current = *frame;
             if frame.parent != std::mem::null() {
-                current.parent = std::mem::malloc();
+                current.parent = std::mem::new_uninit();
                 current = current.parent;
             };
             frame = frame.parent;

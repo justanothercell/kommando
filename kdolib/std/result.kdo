@@ -15,7 +15,7 @@ impl<T> Result<T> {
     }
 
     pub fn err(error: c_str) -> Result<T> {
-        _ { value: std::mem::new_uninit(), error: error, is_ok: false }
+        _ { value: std::mem::uninit(), error: error, is_ok: false }
     }
 
     pub fn is_ok(self: Result<T>) -> bool {

@@ -7,44 +7,42 @@ struct Link<T> {
 }
 
 fn link_new<T>(item: T) -> ptr<Link<T>> {
-    let link = mem::malloc::<Link<T>>();
-    (*link).item = item;
-    link
+    mem::new(_ { prev: mem::null(), next: mem::null(), item: item })
 }
 
 
 fn link_insert_after<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
     let next = link_new::<T>(item);
-    if (*link).next != mem::null::<Link<T>>() {
-        (*next).next = (*link).next;
-        (*(*link).next).prev = next;
+    if link.next != mem::null() {
+        next.next = link.next;
+        link.next.prev = next;
     };
-    (*link).next = next;
-    (*next).prev = link;
+    link.next = next;
+    next.prev = link;
     next
 }
 
 fn link_insert_before<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
     let prev = link_new::<T>(item);
-    if (*link).prev != mem::null::<Link<T>>() {
-        (*prev).prev = (*link).prev;
-        (*(*link).prev).next = prev;
+    if link.prev != mem::null() {
+        prev.prev = link.prev;
+        link.prev.next = prev;
     };
-    (*link).prev = prev;
-    (*prev).next = link;
+    link.prev = prev;
+    prev.next = link;
     prev
 }
 
 fn link_goto_start<T>(link: ptr<Link<T>>) -> ptr<Link<T>> {
-    while (*link).prev != mem::null::<Link<T>>() {
-        link = (*link).prev;
+    while link.prev != mem::null() {
+        link = link.prev;
     };
     link
 }
 
 fn link_goto_end<T>(link: ptr<Link<T>>) -> ptr<Link<T>> {
-    while (*link).next != mem::null::<Link<T>>() {
-        link = (*link).next;
+    while link.next != mem::null() {
+        link = link.next;
     };
     link
 }
@@ -62,11 +60,11 @@ fn main() {
     link = link_insert_after(link, 51);
 
     link = link_goto_start(link);
-    c_api::printf("0: %d\n", (*link).item);
+    c_api::printf("0: %d\n", link.item);
     let elem = 1;
-    while (*link).next != mem::null() {
-        link = (*link).next;
-        c_api::printf("%d: %d\n", elem, (*link).item);
+    while link.next != mem::null() {
+        link = link.next;
+        c_api::printf("%d: %d\n", elem, link.item);
         elem = elem + 1;
     };
 }

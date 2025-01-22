@@ -73,5 +73,5 @@ pub fn panic<T>(msg: c_str) -> T {
     tb.fprint(std::io::stdout);
     tb.free();
     c_api::exit(1);
-    std::mem::new_uninit() // dummy: control flow will never reach this
+    std::mem::uninit() // dummy: control flow will never reach this
 }
