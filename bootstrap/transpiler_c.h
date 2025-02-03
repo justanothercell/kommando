@@ -6,6 +6,6 @@
 #include "compiler.h"
 #include "module.h"
 
-void transpile_to_c(CompilerOptions options, FILE* header_stream, FILE* code_stream, str header_name, Program* program);
+void transpile_to_c(Program* program, CompilerOptions* options, FILE* header_stream, FILE* code_stream, str header_name);
 
 #endif

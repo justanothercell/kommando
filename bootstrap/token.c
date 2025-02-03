@@ -1,6 +1,7 @@
 #include "token.h"
 #include "lib.h"
 #include "lib/exit.h"
+#include "lib/str.h"
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -36,6 +37,12 @@ char next_char(TokenStream* stream) {
 }
 
 Token* try_next_token(TokenStream* stream) {
+    if (stream->ppeek != NULL) {
+        if (stream->peek == NULL) panic("Compiler error: ppeek was available but peek was null @ %s", to_str_writer(s, fprint_span(s, &stream->ppeek->span)));
+        Token* t = stream->ppeek;
+        stream->ppeek = NULL;
+        return t;
+    }
     if (stream->peek != NULL) {
         Token* t = stream->peek;
         stream->peek = NULL;
@@ -121,16 +128,29 @@ Token* next_token(TokenStream* stream) {
     return t;
 }
 
-bool has_next(TokenStream* stream) {
+Token* peek_next_token(TokenStream* stream) {
+    if (stream->ppeek != NULL) return stream->ppeek;
+    if (stream->peek != NULL) return stream->peek;
     Token* t = try_next_token(stream);
+    if (t == NULL) return NULL;
     stream->peek = t;
-    return stream->peek != NULL;
+    return stream->peek;
+}
+
+bool has_next(TokenStream* stream) {
+    if (stream->ppeek != NULL) return true;
+    if (stream->peek != NULL) return true;
+    Token* t = try_next_token(stream);
+    if (t == NULL) return false;
+    stream->peek = t;
+    return true;
 }
 
 TokenStream* tokenstream_new(str file, str source) {
     TokenStream* stream = malloc(sizeof(TokenStream));
 
     stream->peek = NULL;
+    stream->ppeek = NULL;
     stream->peek_char = '\0';
     stream->length = strlen(source);
     stream->point.source = source;
@@ -149,7 +169,7 @@ void fprint_token(FILE* file, Token* t) {
 }
 
 Span from_points(CodePoint* left, CodePoint* right) {
-    if (left->source != right->source) panic("Left and right codepoint have to point to the same source code.");
+    if (left->source != right->source) panic("Left and right codepoint have to point to the same source code: %p in %s and %p in %s", left->source, left->file, right->source, right->file);
     return (Span) { *left, *right };
 }
 

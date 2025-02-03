@@ -1,0 +1,85 @@
+use std::*;
+use std::trace::Traceback;
+
+// List of signals which occure due to runtime errors and should be caught.
+// To be included in this list a singal must
+// a) terminate the process and b) be caused by a runtime error
+// i.e. SIGINT is not included since it is intentional, even though it terminates the process.
+const SIGINT: i32 = 2;   // keyboard interrupt
+const SIGQUIT: i32 = 2;   // quit from keyboard
+const SIGILL: i32 = 4;   // illegal instruction
+const SIGFPE: i32 = 8;   // floating point exception
+const SIGPIPE: i32 = 13; // pipe broken
+const SIGSEGV: i32 = 11; // segvault
+const SIGSYS: i32 = 31;  // invalid system call. Note: is 12 on Alpha/SPARC and MIPS
+
+static SIG_HANDLER: function_ptr<unit> = 0;
+
+pub fn empty_handler(signal: i32) {
+
+}
+
+pub fn default_handler(signal: i32) {
+    let msg = c_api::nullstr;
+    let size = 0usize;
+    let stream = c_api::open_memstream(&msg, &size);
+    if signal == SIGINT {
+        c_api::fprintf(stream, "Signal caught: SIGINT (%d) - Keyboard interrupt", signal);
+    } else if signal == SIGQUIT {
+        c_api::fprintf(stream, "Signal caught: SIGQUIT (%d) - Quit from keyboard", signal);
+    } else if signal == SIGILL {
+        c_api::fprintf(stream, "Signal caught: SIGILL (%d) - Illegal instruction", signal);
+    } else if signal == SIGFPE {
+        c_api::fprintf(stream, "Signal caught: SIGFPE (%d) - Floating point exception", signal);
+    } else if signal == SIGPIPE {
+        c_api::fprintf(stream, "Signal caught: SIGPIPE (%d) - Pipe broken", signal);
+    } else if signal == SIGSEGV {
+        c_api::fprintf(stream, "Signal caught: SIGSEGV (%d) - Segmentation fault", signal);
+    } else if signal == SIGSYS {
+        c_api::fprintf(stream, "Signal caught: SIGSYS (%d) - Invalid syscall", signal);
+    } else {
+        c_api::fprintf(stream, "Signal caught: %d", signal);
+    };
+    c_api::fclose(stream);
+    panic(msg)
+    // c_api::freestr(msg) - panic never return so we do not need to free the buffer
+}
+
+fn __handler(signal: i32) -> i32 {
+    if typecast::<_, usize>(SIG_HANDLER) != 0 {
+        (SIG_HANDLER)(signal);
+    };
+    0
+}
+
+pub fn init_handler() {
+    SIG_HANDLER = default_handler;
+    c_api::signal(SIGINT, __handler);
+    c_api::signal(SIGQUIT, __handler);
+    c_api::signal(SIGILL, __handler);
+    c_api::signal(SIGFPE, __handler);
+    c_api::signal(SIGPIPE, __handler);
+    c_api::signal(SIGSEGV, __handler);
+    c_api::signal(SIGSYS, __handler);
+}
+
+pub fn set_handler(handler: function_ptr<unit>) -> function_ptr<unit> {
+    std::mem::replace(&SIG_HANDLER, handler)
+}
+
+pub fn unreachable<T>() -> T {
+    panic("Unreachable state reached")
+}
+
+pub fn todo<T>() -> T {
+    panic("TODO: not implemented yet (too lazy)")
+}
+
+pub fn panic<T>(msg: c_str) -> T {
+    c_api::fprintf(io::stderr, "[ERROR]: %s\n", msg);
+    let tb = Traceback::<>::collect_allocated();
+    tb.fprint(std::io::stdout);
+    tb.free();
+    c_api::exit(1);
+    std::mem::uninit() // dummy: control flow will never reach this
+}

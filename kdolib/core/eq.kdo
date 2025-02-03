@@ -1,0 +1,34 @@
+use core::*;
+use core::types::*;
+use core::intrinsics::*;
+
+pub trait T: Eq {
+    fn eq(self: T, other: T) -> bool;
+}
+
+#[extern]
+fn strcmp(a: c_str, b: c_str) -> i32;
+impl c_str: Eq {
+    pub fn eq(self: c_str, other: c_str) -> bool {
+        strcmp(self, other) == 0
+    }
+}
+
+impl bool: Eq { pub fn eq(self: bool, other: bool) -> bool { self == other } }
+impl raw_ptr: Eq { pub fn eq(self: raw_ptr, other: raw_ptr) -> bool {self == other } }
+impl<T> ptr<T>: Eq { pub fn eq(self: ptr<T>, other: ptr<T>) -> bool { self == other } }
+impl<T> function_ptr<T>: Eq { pub fn eq(self: function_ptr<T>, other: function_ptr<T>) -> bool { self == other } }
+
+impl i8: Eq { pub fn eq(self: i8, other: i8) -> bool { self == other } }
+impl i16: Eq { pub fn eq(self: i16, other: i16) -> bool { self == other } }
+impl i32: Eq { pub fn eq(self: i32, other: i32) -> bool { self == other } }
+impl i64: Eq { pub fn eq(self: i64, other: i64) -> bool { self == other } }
+impl i128: Eq { pub fn eq(self: i128, other: i128) -> bool { self == other } }
+impl isize: Eq { pub fn eq(self: isize, other: isize) -> bool { self == other } }
+
+impl u8: Eq { pub fn eq(self: u8, other: u8) -> bool { self == other } }
+impl u16: Eq { pub fn eq(self: u16, other: u16) -> bool { self == other } }
+impl u32: Eq { pub fn eq(self: u32, other: u32) -> bool { self == other } }
+impl u64: Eq { pub fn eq(self: u64, other: u64) -> bool { self == other } }
+impl u128: Eq { pub fn eq(self: u128, other: u128) -> bool { self == other } }
+impl usize: Eq { pub fn eq(self: usize, other: usize) -> bool { self == other } }

@@ -1,0 +1,35 @@
+use std::*;
+use std::trace::Traceback;
+
+fn baz() {
+    let tb = Traceback::<>::collect_allocated();
+    tb.fprint(std::io::stdout);
+    tb.free();
+}
+
+// we do not want a vampire in our trace
+#[no_trace]
+fn vampire() {
+    baz();
+}
+
+fn bar() {
+    let loc = Traceback::<>::here(0).unwrap();
+    c_api::printf("We are at ");
+    loc.fprint(std::io::stdout);
+    c_api::printf("\n");
+    vampire();
+}
+
+fn fou() {
+    bar();
+}
+
+fn foo() {
+    let f = fou;
+    (f)();
+}
+
+fn main() {
+    foo();
+}

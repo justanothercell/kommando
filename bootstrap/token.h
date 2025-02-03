@@ -34,6 +34,7 @@ typedef struct Token {
 typedef struct TokenStream {
     char peek_char;
     Token* peek;
+    Token* ppeek;
     usize length;
     CodePoint point;
     bool last;
@@ -45,6 +46,7 @@ Span from_points(CodePoint* left, CodePoint* right);
 
 Token* try_next_token(TokenStream* stream);
 Token* next_token(TokenStream* stream);
+Token* peek_next_token(TokenStream* stream);
 bool has_next(TokenStream* stream);
 void fprint_token(FILE* file, Token* t);
 bool token_compare(Token* token, str string, TokenType type);

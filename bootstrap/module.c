@@ -4,6 +4,7 @@
 
 #include "module.h"
 #include "ast.h"
+#include "compiler.h"
 #include "lib.h"
 #include "lib/list.h"
 #include "lib/map.h"
@@ -11,7 +12,7 @@ LIB;
 #include "parser.h"
 #include "token.h"
 
-void insert_module(Program* program, Module* module, Visibility vis) {
+void insert_module(Program* program, CompilerOptions* options, Module* module, Visibility vis) {
     module->vis = vis;
     module->parent = NULL;
     Path* path = module->path;
@@ -56,7 +57,7 @@ void insert_module(Program* program, Module* module, Visibility vis) {
         spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
     }
 
-    if (program->o_verbosity >= 2) log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
+    if (options->verbosity >= 2) log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
 }
 
 Identifier* gen_identifier(str name) {
@@ -94,6 +95,7 @@ TypeDef* gen_simple_type(str name) {
     td->transpile_state = 0;
     td->module = NULL;
     td->head_resolved = false;
+    td->traits = list_new(TraitList);
     return td;
 }
 
@@ -149,7 +151,7 @@ Module* gen_core_types() {
     module->subs = list_new(ModDefList);
     module->name = module->path->elements.elements[module->path->elements.length-1];
 
-    register_extern_type(module, "c_void", "void");
+    register_extern_type(module, "c_void", "void*"); // now this is not actually void, but this makes it more compatible
     register_extern_type(module, "raw_ptr", "void*");
     register_extern_type(module, "c_str", "char*");
 
@@ -238,6 +240,7 @@ Module* gen_core_intrinsics() {
     {
         Map* var_bindings = map_new();
         Variable* var = malloc(sizeof(Variable));
+        var->values = NULL;
         var->path = path_simple(gen_identifier("t"));
         map_put(var_bindings, "t", var);
         Map* type_bindings = map_new();
@@ -251,6 +254,7 @@ Module* gen_core_intrinsics() {
     {
         Map* var_bindings = map_new();
         Variable* var = malloc(sizeof(Variable));
+        var->values = NULL;
         var->path = path_simple(gen_identifier("t"));
         map_put(var_bindings, "t", var);
         Map* type_bindings = map_new();

@@ -23,7 +23,7 @@ impl<T> Queue<T> {
             index: 0,
             length: 0,
             capacity: capacity,
-            buffer: std::mem::arr_malloc(capacity)
+            buffer: std::mem::arr_new(capacity)
         }
     }
 

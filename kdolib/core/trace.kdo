@@ -1,0 +1,43 @@
+use core::types::*;
+
+pub struct Location {
+    file: c_str,
+    line: usize,
+}
+
+impl Location {
+    pub fn fprint(self: Location, stream: c_api::CFileStream) {
+        c_api::fprintf(stream, "%s:%ld", self.file, self.line + 1);
+    }
+}
+
+pub struct Function {
+    name: c_str,
+    full_name: c_str,
+    mangled_name: c_str,
+    is_method: bool,
+    loc: Location
+}
+
+#[thread_local]
+pub static TOP_FRAME: ptr<Frame> = 0;
+
+pub struct Frame {
+    parent: ptr<Frame>,
+    call: ptr<Function>,
+    loc: Location,
+    callflags: u8
+}
+
+// This is the root of a callstack.
+// frame.line and frame.file are both set to zero/NULL in this case since this a root function is logically called by some intrinsic and not by kommando source code.
+// Likewise frame.parent is NULL. 
+pub const CF_ROOT: u8 = 1 << 0; 
+// calling a function which itself does not trace. this either means it is an extern function or it is in a library package with --trace=this set.
+// Note that functions annotated with #[no_trace] are not included in the trace at all and have nothing to do with this flag.
+pub const CF_OPAQUE: u8 = 1 << 1;
+// calling extern function. implies CF_OPAQUE 
+pub const CF_EXTERN: u8 = 1 << 2;
+// calling a function pointer. 
+// frame.call is NULL since we do not know which function we are actually calling. 
+pub const CF_POINTER: u8 = 1 << 3;

@@ -15,7 +15,7 @@ impl<T> Vec<T> {
         _ {
             length: 0,
             capacity: capacity,
-            buffer: std::mem::arr_malloc(capacity)
+            buffer: std::mem::arr_new(capacity)
         }
     }
 
@@ -108,6 +108,7 @@ impl<T> Vec<T> {
         v.length = 0;
         v.capacity = 0;
     }
+}
 
 impl Vec<char> {
     // assumes str owned if  the vector is to be modified or free'd
@@ -122,10 +123,11 @@ impl Vec<char> {
 
     // returns a reference to the itnernal buffer as a c string.
     // may move internal buffer to ensure proper \0 termination.
-    //pub fn as_c_str(v: Vec<char>) -> c_str {
-    //    v.reserve_armortized(v.length + 1);
-    //    // make buffer end in '\0' without actually inserting it or affecting the string.
-    //    *std::mem::arr_offset(v.buffer, v.length) = 0;
-    //    typecast(v.buffer)
-   // }
+    // repeated calls without modification of the vector in between will not move again.
+    pub fn as_c_str(v: Vec<char>) -> c_str {
+        // make buffer end in '\0' without actually inserting it or affecting the string.
+        v.reserve_armortized(v.length + 1);
+        *std::mem::arr_offset(v.buffer, v.length) = 0;
+        typecast(v.buffer)
+    }
 }

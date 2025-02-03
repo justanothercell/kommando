@@ -1,5 +1,11 @@
+GCC_RELEASE_FLAGS = -O3 -Wno-array-bounds
+GCC_WARNINGS = -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=unused-parameter
+
 build: clean
-	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=unused-parameter
+	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS)
+
+build_resease: clean
+	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
 
 clean:
 	@rm -f kommando
@@ -10,11 +16,11 @@ br: build run
 
 run:
 	name=$(basename $(file) .kdo); \
-	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr -vv
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr $(flags)
 
 compile:
 	name=$(basename $(file) .kdo); \
-	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c -vv
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c $(flags)
 
 help:
 	./kommando --help
@@ -23,6 +29,7 @@ clean_examples:
 	@git clean -fX examples >/dev/null
 
 test: build clean_examples
+	flags="--silent"
 	@success=0; \
 	fail=0; \
 	all_files=$$(find ./examples -name "*.kdo"); \
@@ -41,7 +48,6 @@ test: build clean_examples
 	done; \
 	printf "Tests complete.\n"; \
 	printf "\x1b[1;32msuccess: $$success\x1b[0m\t\x1b[1;31mfail: $$fail\x1b[0m\n"; \
-	if (test $$fail -ne 0) \
-	then \
+	if (test $$fail -ne 0); then \
 		(exit 1); \
 	fi \

@@ -1,25 +1,32 @@
-#include "parser.h"
-#include "ast.h"
-#include "lib.h"
-#include "lib/list.h"
-#include "lib/map.h"
-#include "lib/str.h"
+#include <stdlib.h>
 #include <string.h>
-LIB;
-#include "module.h"
-#include "token.h"
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "parser.h"
+#include "ast.h"
+#include "lib.h"
+#include "lib/exit.h"
+#include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
+LIB;
+#include "module.h"
+#include "token.h"
+
 bool double_double_colon(TokenStream* stream) {
-    Token* t = try_next_token(stream);
-    if (t == NULL) return false;
-    if (!token_compare(t, ":", SNOWFLAKE)) {
-        stream->peek = t;
+    Token* t1 = try_next_token(stream);
+    if (t1 == NULL) return false;
+    if (!token_compare(t1, ":", SNOWFLAKE)) {
+        stream->peek = t1;
         return false;
     }
-    t = next_token(stream);
-    if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
+    Token* t2 = next_token(stream);
+    if (!token_compare(t2, ":", SNOWFLAKE)) {
+        stream->ppeek = t1;
+        stream->peek = t2;
+        return false;
+    }
     return true;
 }
 
@@ -90,6 +97,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     type->transpile_state = 0;
     type->name = name;
     type->head_resolved = false;
+    type->traits = list_new(TraitList);
     return type;
 }
 
@@ -99,14 +107,21 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
     impl->methods = map_new();
     Token* t = next_token(stream);
     if (!token_compare(t, "impl", IDENTIFIER)) unexpected_token(t);
-    t = next_token(stream);
-    stream->peek = t;
+    t = peek_next_token(stream);
     impl->generics = NULL;
     if (token_compare(t, "<", SNOWFLAKE)) {
         impl->generics = parse_generic_keys(stream);
     }
     impl->type = parse_type_value(stream);
     t = next_token(stream);
+    impl->trait = NULL;
+    if (token_compare(t, ":", SNOWFLAKE)) {
+        impl->trait_ref = parse_type_value(stream);
+        if (impl->trait_ref->name->elements.length == 0) panic("");
+        t = next_token(stream);
+    } else {
+        impl->trait_ref = NULL;
+    }
     if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
     while (true) {
         t = next_token(stream);
@@ -130,12 +145,13 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         func->module = module;
         func->annotations = annos;
         func->impl_type = impl->type;
+        func->impl_block = impl;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
             func->generics->generic_use_keys = list_new(StrList);
             func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
-            func->generics->generics = list_new(IdentList);
+            func->generics->generics = list_new(GKeyList);
             func->generics->span = func->name->span;
         }
         if (impl->generics != NULL) {
@@ -144,8 +160,8 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
             func->type_generics->generic_use_keys = list_new(StrList);
             func->type_generics->generic_uses = map_new();
             func->type_generics->resolved = map_new();
-            func->type_generics->generics = list_new(IdentList);
-            list_foreach(&impl->generics->generics, i, Identifier* ident, { list_append(&func->type_generics->generics, ident); });
+            func->type_generics->generics = list_new(GKeyList);
+            list_foreach(&impl->generics->generics, i, GKey* key, { list_append(&func->type_generics->generics, key); });
         }
         ModuleItem* mi = malloc(sizeof(ModuleItem));
         mi->item = func;
@@ -158,6 +174,110 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         if (old != NULL) spanned_error("Methiod already exists", mi->name->span, "Method `%s` already defined in this impl block @ %s", old->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
     }
     return impl;
+}
+
+TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
+    TraitDef* trait = malloc(sizeof(TraitDef));
+    trait->head_resolved = false;
+    trait->methods = map_new();
+    trait->module = module;
+    Token* t = next_token(stream);
+    if (!token_compare(t, "trait", IDENTIFIER)) unexpected_token(t);
+    trait->self_key = malloc(sizeof(GKey));
+    trait->self_key->name = parse_identifier(stream);
+    t = next_token(stream);
+    if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
+    trait->name = parse_identifier(stream);
+    trait->self_key->bounds = list_new(TraitBoundList);
+    TypeValue* selfbound = malloc(sizeof(TypeValue));
+    selfbound->ctx = NULL;
+    selfbound->generics = NULL;
+    selfbound->trait_impls = map_new();
+    selfbound->name = path_new(true, module->path->elements);
+    list_append(&selfbound->name->elements, trait->name);
+    TraitBound* bound = malloc(sizeof(TraitBound));
+    bound->bound = selfbound;
+    bound->resolved = NULL;
+    list_append(&trait->self_key->bounds, bound);
+    t = peek_next_token(stream);
+    trait->keys = NULL;
+    if (token_compare(t, "<", SNOWFLAKE)) {
+        trait->keys = parse_generic_keys(stream);
+    } else {
+        trait->keys = malloc(sizeof(GenericKeys));
+        trait->keys->generic_use_keys = list_new(StrList);
+        trait->keys->generic_uses = map_new();
+        trait->keys->resolved = map_new();
+        trait->keys->generics = list_new(GKeyList);
+        trait->keys->span = trait->name->span;
+    }
+
+    trait->self_type = malloc(sizeof(TypeDef));
+    trait->self_type->annotations = list_new(AnnoList);
+    trait->self_type->flist = list_new(IdentList);
+    trait->self_type->name = trait->self_key->name;
+    trait->self_type->extern_ref = NULL;
+    trait->self_type->fields = map_new();
+    trait->self_type->transpile_state = 0;
+    trait->self_type->generics = NULL;
+    trait->self_type->module = NULL;
+    trait->self_type->head_resolved = true;
+    trait->self_type->traits = list_new(TraitList);
+    list_append(&trait->self_type->traits, trait);
+
+    trait->self_key->bounds.elements[0]->bound->def = trait->self_type;
+
+    trait->self_tv = malloc(sizeof(TypeValue));
+    trait->self_tv->ctx = NULL;
+    trait->self_tv->def = trait->self_type;
+    trait->self_tv->generics = NULL;
+    trait->self_tv->name = path_simple(trait->self_key->name);
+    trait->self_tv->trait_impls = map_new();
+    map_put(trait->self_tv->trait_impls, to_str_writer(s, fprintf(s, "%p", trait)), trait);
+
+    t = next_token(stream);
+    if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
+    while (true) {
+        t = next_token(stream);
+        if (token_compare(t, "}", SNOWFLAKE)) break;
+        stream->peek = t;
+        AnnoList annos = parse_annotations(stream);
+        if (annos.length > 0) spanned_error("Invalid annotations", t->span, "Function annotations in trait definitions not supported");
+        FuncDef* func = parse_function_definition(stream);
+        if (func->body != NULL) spanned_error("Method body inside trait definition", func->name->span, "Expected method definition `fn %s(...);`, got method with body.", func->name->name);
+        func->module = module;
+        func->annotations = annos;
+        func->impl_type = trait->self_tv;
+        func->trait_def = true;
+        func->trait = trait;
+        func->impl_block = NULL;
+        if (func->generics == NULL) {
+            func->generics = malloc(sizeof(GenericKeys));
+            func->generics->generic_use_keys = list_new(StrList);
+            func->generics->generic_uses = map_new();
+            func->generics->resolved = map_new();
+            func->generics->generics = list_new(GKeyList);
+            func->generics->span = func->name->span;
+        }
+        /*func->type_generics = malloc(sizeof(GenericKeys));
+        func->type_generics->span = trait->keys->span;
+        func->type_generics->generic_use_keys = list_new(StrList);
+        func->type_generics->generic_uses = map_new();
+        func->type_generics->resolved = map_new();
+        func->type_generics->generics = list_new(GKeyList);
+        list_foreach(&trait->keys->generics, i, GKey* key, { list_append(&func->type_generics->generics, key); });*/
+        func->type_generics = trait->keys; // undoing the above 7 lines
+        ModuleItem* mi = malloc(sizeof(ModuleItem));
+        mi->item = func;
+        mi->type = MIT_FUNCTION;
+        mi->module = module;
+        mi->origin = NULL;
+        mi->vis = V_PUBLIC;
+        mi->name = func->name;
+        ModuleItem* old = map_put(trait->methods, func->name->name, mi);
+        if (old != NULL) spanned_error("Methiod already exists", mi->name->span, "Method `%s` already defined in this impl block @ %s", old->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
+    }
+    return trait;
 }
 
 
@@ -176,8 +296,7 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
     while (has_next(stream)) {
         AnnoList annos = parse_annotations(stream);
 
-        Token* t = next_token(stream);
-        stream->peek = t;
+        Token* t = peek_next_token(stream);
 
         Visibility vis = V_PRIVATE;
         if (token_compare(t, "pub", IDENTIFIER)) {
@@ -261,6 +380,19 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
         } else if (token_compare(t, "impl", IDENTIFIER)) {
             ImplBlock* impl = parse_impl(stream, module);
             list_append(&module->impls, impl);
+        } else if (token_compare(t, "trait", IDENTIFIER)) {
+            TraitDef* trait = parse_traitdef(stream, module);
+            ModuleItem* mi = malloc(sizeof(ModuleItem));
+            mi->item = trait;
+            mi->type = MIT_TRAIT;
+            mi->module = module;
+            mi->origin = NULL;
+            mi->vis = vis;
+            mi->name = trait->name;
+            ModuleItem* old = map_put(module->items, trait->name->name, mi);
+            if (old != NULL) {
+                spanned_error("Name conflict", trait->name->span, "Name %s is already defined in this scope at %s", trait->name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
+            }
         } else if(token_compare(t, "static", IDENTIFIER) || token_compare(t, "const", IDENTIFIER)) {
             bool constant = token_compare(t, "const", IDENTIFIER);
             t = next_token(stream); // skip static
@@ -319,6 +451,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             DynRawCall* call = malloc(sizeof(DynRawCall));
             call->callee = expression;
             call->args = list_new(ExpressionList);
+            t = peek_next_token(stream);
             if (!token_compare(t, ")", SNOWFLAKE)) {
                 while (true) {
                     Expression* argument = parse_expression(stream, true);
@@ -329,6 +462,8 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                         break;
                     } else if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
                 }
+            } else {
+                t = next_token(stream);
             }
             expression = malloc(sizeof(Expression));
             expression->expr = call;
@@ -343,6 +478,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         Variable* var = malloc(sizeof(Variable));
         var->global_ref = NULL;
         var->path = path_simple(name);
+        var->values= NULL;
         let->var = var;
         t = next_token(stream);
         if (token_compare(t, ":", SNOWFLAKE)) {
@@ -361,8 +497,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         expression->expr = let;
         expression->type = EXPR_LET;
     } else if (token_compare(t, "return", IDENTIFIER)) {
-        t = next_token(stream);
-        stream->peek = t;
+        t = peek_next_token(stream);
         if (token_compare(t, ";", SNOWFLAKE)) {
             expression->expr = NULL;
         } else {
@@ -371,8 +506,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         }
         expression->type = EXPR_RETURN;
     } else if (token_compare(t, "break", IDENTIFIER)) {
-        t = next_token(stream);
-        stream->peek = t;
+        t = peek_next_token(stream);
         if (token_compare(t, ";", SNOWFLAKE)) {
             expression->expr = NULL;
         } else {
@@ -390,7 +524,18 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         end = conditional->then->span.right;
         t = next_token(stream);
         if (token_compare(t, "else", IDENTIFIER)) {
-            conditional->otherwise = parse_block(stream);
+            t = peek_next_token(stream);
+            if (token_compare(t, "if", IDENTIFIER)) {
+                Expression* otherwise = parse_expresslet(stream, true);
+                if (otherwise->type != EXPR_CONDITIONAL) spanned_error("Invalid continuation of else", otherwise->span, "Expected `else if ... { ... }`, got %s", ExprType__NAMES[otherwise->type]);
+                conditional->otherwise = malloc(sizeof(Block));
+                conditional->otherwise->span = otherwise->span;
+                conditional->otherwise->expressions = list_new(ExpressionList);
+                list_append(&conditional->otherwise->expressions, otherwise);
+                conditional->otherwise->yield_last = true;
+            } else {
+                conditional->otherwise = parse_block(stream);
+            }
             end = conditional->otherwise->span.right;
         } else {
             conditional->otherwise = NULL;
@@ -410,13 +555,11 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         Path* path = parse_path(stream);
         if (path->elements.length > 0) end = path->elements.elements[path->elements.length - 1]->span.right;
         GenericValues* generics = NULL;
-        t = next_token(stream);
-        stream->peek = t;
+        t = peek_next_token(stream);
         if (path->ends_in_double_colon && token_compare(t, "<", SNOWFLAKE)) {
             generics = parse_generic_values(stream);
         }
-        t = next_token(stream);
-        stream->peek = t;
+        t = peek_next_token(stream);
         if (double_double_colon(stream)) {
             if (generics == NULL) unexpected_token(t);
             Identifier* method = parse_identifier(stream);
@@ -424,8 +567,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             if (double_double_colon(stream)) {
                 method_generics = parse_generic_values(stream);
             }
-            t = next_token(stream);
-            stream->peek = t;
+            t = peek_next_token(stream);
             if (token_compare(t, "(", SNOWFLAKE)) {
                 t = next_token(stream);
                 ExpressionList arguments = list_new(ExpressionList); 
@@ -451,6 +593,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 call->tv->name = path;
                 call->tv->def = NULL;
                 call->tv->ctx = NULL;
+                call->tv->trait_impls = map_new();
                 expression->expr = call;
                 expression->type = EXPR_STATIC_METHOD_CALL;
             } else {
@@ -513,6 +656,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             tv->generics = generics;
             tv->def = NULL;
             tv->ctx = NULL;
+            tv->trait_impls = map_new();
             slit->type = tv;
             slit->fields = fields;
             expression->expr = slit;
@@ -544,8 +688,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             GenericValues* generics = NULL;
             if (double_double_colon(stream)) {
                 will_call = true;
-                t = next_token(stream);
-                stream->peek = t;
+                t = peek_next_token(stream);
                 if (token_compare(t, "<", SNOWFLAKE)) {
                     generics = parse_generic_values(stream);
                 }
@@ -731,8 +874,7 @@ Path* parse_path(TokenStream* stream) {
     IdentList elements = list_new(IdentList);
     bool ends_in_double_colon = false;
     do {
-        Token* t = next_token(stream);
-        stream->peek = t;
+        Token* t = peek_next_token(stream);
         if (t->type != IDENTIFIER) {
             ends_in_double_colon = true;
             break;
@@ -751,9 +893,9 @@ TypeValue* parse_type_value(TokenStream* stream) {
     tval->generics = NULL;
     tval->def = NULL;
     tval->ctx = NULL;
-    Token* t = try_next_token(stream);
+    tval->trait_impls = map_new();
+    Token* t = peek_next_token(stream);
     if (t != NULL) {
-        stream->peek = t;
         if (token_compare(t, "<", SNOWFLAKE)) {
             tval->generics = parse_generic_values(stream);
         }
@@ -813,15 +955,31 @@ empty: {}
 GenericKeys* parse_generic_keys(TokenStream* stream) {
     Token* t = next_token(stream);
     CodePoint left = t->span.left;
-    IdentList generics = list_new(IdentList);
+    GKeyList generics = list_new(GKeyList);
     if (!token_compare(t, "<", SNOWFLAKE)) unexpected_token(t);
     t = next_token(stream);
     if (!token_compare(t, ">", SNOWFLAKE)) {
         stream->peek = t;
         while (true) {    
             Identifier* generic = parse_identifier(stream);
-            list_append(&generics, generic);
+            GKey* gkey = malloc(sizeof(GKey));
+            gkey->name = generic;
+            gkey->bounds = list_new(TraitBoundList);
             t = next_token(stream);
+            if (token_compare(t, ":", SNOWFLAKE)) {
+                while (true) {
+                    TypeValue* bound = parse_type_value(stream);
+                    TraitBound* tb = malloc(sizeof(TraitBound));
+                    tb->bound = bound;
+                    tb->resolved = NULL;
+                    list_append(&gkey->bounds, tb);
+                    t = next_token(stream);
+                    if (!token_compare(t, "+", SNOWFLAKE)) {
+                        break;
+                    }
+                }
+            }
+            list_append(&generics, gkey);
             if (token_compare(t, ">", SNOWFLAKE)) break;
             if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
         }
@@ -887,6 +1045,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
             Argument* argument = malloc(sizeof(Argument));
             Variable* var = malloc(sizeof(Variable));
             var->global_ref = NULL;
+            var->values = NULL;
             var->path = path_simple(parse_identifier(stream));
             argument->var = var;
             t = next_token(stream);
@@ -925,7 +1084,10 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->generics = keys;
     func->head_resolved = false;
     func->impl_type = NULL;
+    func->trait = NULL;
     func->annotations = list_new(AnnoList);
     func->type_generics = NULL;
+    func->untraced = false;
+    func->trait_def = false;
     return func;
 }

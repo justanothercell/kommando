@@ -32,20 +32,22 @@ impl<A, T> Coroutine<A, T> {
         let stack_size: std::usize = 256 * 64;
         let stack = c_api::malloc(stack_size);
     
-        let ctx = std::mem::malloc::<CoroContext<A, T>>();
-        ctx.main_ctx = std::mem::new_uninit();
-        ctx.runner_ctx = std::mem::new_uninit();
-        ctx.stack = stack;
-        ctx.state = 0;
-        ctx.function = function;
-    
-        if c_api::ucontext::getcontext(&ctx.runner_ctx) == 0-1 {
-            panic("Coroutine: getcontext failed")
-        };
-    
+        let ctx: _<CoroContext<A, T>> = std::mem::new(_ {
+            main_ctx: std::mem::uninit(),
+            runner_ctx: std::mem::uninit(),
+            stack: stack,
+            state: 0,
+            function: function,
+            arg: std::mem::uninit(),
+            ret: std::mem::uninit()
+        });
         ctx.runner_ctx.uc_stack.ss_sp = stack;
         ctx.runner_ctx.uc_stack.ss_size = stack_size;
         ctx.runner_ctx.uc_link = (&ctx.main_ctx);
+        
+        if c_api::ucontext::getcontext(&ctx.runner_ctx) == 0-1 {
+            panic("Coroutine: getcontext failed")
+        };
     
         c_api::ucontext::makecontext(&ctx.runner_ctx, coro_start::<A, T>, 2, ctx);
     

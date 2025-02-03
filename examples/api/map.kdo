@@ -2,10 +2,10 @@ use std::*;
 use std::hashmap::HashMap;
 use c_api::printf;
 
-fn x<T>(t: T) {}
-
 fn main() {
-    let map = HashMap::<u32, c_str>::new();
+    std::error::init_handler();
+    
+    let map = HashMap::<usize, c_str>::new();
     map.put(42, "forty two");
     map.put(11, "eleven");
     map.put(19, "nineteen");
