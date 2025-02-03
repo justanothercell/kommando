@@ -25,7 +25,8 @@ CompilerOptions build_args(StrList* args) {
         printf("    --run     -r - run the compiled binary\n");
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
-        printf("    --silent  -s - verbosity = 0\n");
+        printf("    --silent     - verbosity = 0\n");
+        printf("    --static     - statically link libraries\n");
         printf("    --verbose -v - verbosity += 1 (default = 1)\n");
         printf("    --trace=[none|main|all]\n");
         printf("             none - do not generate traceback info\n");
@@ -65,6 +66,8 @@ CompilerOptions build_args(StrList* args) {
                 options.compile = true;
             } else if (str_eq(arg, "silent")) {
                 options.verbosity = 0;
+            } else if (str_eq(arg, "static")) {
+                options.static_links = true;
             } else if (str_startswith(arg, "trace=")) {
                 arg += 6;
                 if (str_eq(arg, "none")) {
@@ -99,8 +102,6 @@ CompilerOptions build_args(StrList* args) {
                     options.compile = true;
                 } else if (arg[j] == 'w') {
                     options.raw = true;
-                } else if (arg[j] == 's') {
-                    options.verbosity = 0;
                 } else if (arg[j] == 'v') {
                     options.verbosity += 1;
                 } else {
@@ -243,7 +244,8 @@ void compile(CompilerOptions options) {
 
     if (options.compile) {
         if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch -lm %s -o %s", options.c_compiler, code_file_name, options.outname));
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch -lm %s -o %s %s", 
+            options.c_compiler, code_file_name, options.outname, options.static_links ? "-static" : ""));
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
     }

@@ -47,6 +47,20 @@ typedef struct Annotation {
 } Annotation;
 LIST(AnnoList, Annotation);
 
+typedef struct GKey GKey;
+typedef struct TypeDef TypeDef;
+typedef struct TraitDef {
+    Identifier* name;
+    GKey* self_key;
+    TypeDef* self_type;
+    TypeValue* self_tv;
+    Map* methods;
+    GenericKeys* keys;
+    Module* module;
+    bool head_resolved;
+} TraitDef;
+LIST(TraitList, TraitDef*);
+
 typedef struct TypeDef {
     Identifier* name;
     GenericKeys* generics;
@@ -56,18 +70,29 @@ typedef struct TypeDef {
     u32 transpile_state;
     Module* module;
     AnnoList annotations;
+    TraitList traits;
     bool head_resolved;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
 void fprint_td_path(FILE* file, TypeDef* def);
 void fprint_type(FILE* file, TypeDef* def);
 
+typedef struct TraitBound {
+    TypeValue* bound;
+    TraitDef* resolved;
+} TraitBound;
+LIST(TraitBoundList, TraitBound*);
+typedef struct GKey {
+    Identifier* name;
+    TraitBoundList bounds;
+} GKey;
+LIST(GKeyList, GKey*);
 typedef struct GenericKeys {
     Span span;
-    IdentList generics;
+    GKeyList generics;
+    Map* resolved;
     StrList generic_use_keys;
     Map* generic_uses;
-    Map* resolved;
 } GenericKeys;
 void fprint_generic_keys(FILE* file, GenericKeys* keys);
 
@@ -76,6 +101,7 @@ typedef struct GenericValues {
     TypeValueList generics;
     Map* resolved;
 } GenericValues;
+void fprint_generic_values(FILE* file, GenericValues* values);
 
 typedef struct GenericUse {
     GenericValues* type_context;
@@ -83,12 +109,12 @@ typedef struct GenericUse {
     FuncDef* in_func;
 } GenericUse;
 
-
 typedef struct TypeValue {
     Path* name;
     GenericValues* generics;
     TypeDef* def;
     GenericKeys* ctx;
+    Map* trait_impls;
 } TypeValue;
 void fprint_typevalue(FILE* file, TypeValue* tval);
 
@@ -176,12 +202,13 @@ typedef struct DynRawCall {
 } DynRawCall;
 typedef struct MethodImpl MethodImpl;
 typedef struct MethodCall {
+    TypeValue* tv;
     Expression* object;
     Identifier* name;
     ExpressionList arguments;
     GenericValues* generics;
     GenericValues* impl_vals;
-    MethodImpl* def;
+    FuncDef* def;
 } MethodCall;
 typedef struct StaticMethodCall {
     TypeValue* tv;
@@ -189,7 +216,7 @@ typedef struct StaticMethodCall {
     ExpressionList arguments;
     GenericValues* generics;
     GenericValues* impl_vals;
-    MethodImpl* def;
+    FuncDef* def;
 } StaticMethodCall;
 typedef struct Block {
     ExpressionList expressions;
@@ -230,6 +257,7 @@ typedef struct Argument {
     TypeValue* type;
 } Argument;
 LIST(ArgumentList, Argument*);
+typedef struct ImplBlock ImplBlock;
 typedef struct FuncDef {
     Identifier* name;
     Block* body;
@@ -240,6 +268,9 @@ typedef struct FuncDef {
     Module* module;
     AnnoList annotations;
     TypeValue* impl_type;
+    TraitDef* trait;
+    ImplBlock* impl_block;
+    bool trait_def;
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
@@ -266,6 +297,8 @@ typedef struct ImplBlock {
     TypeValue* type;
     Map* methods;
     GenericKeys* generics;
+    TypeValue* trait_ref;
+    TraitDef* trait;
 } ImplBlock;
 LIST(ImplList, ImplBlock*);
 

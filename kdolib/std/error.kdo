@@ -5,6 +5,8 @@ use std::trace::Traceback;
 // To be included in this list a singal must
 // a) terminate the process and b) be caused by a runtime error
 // i.e. SIGINT is not included since it is intentional, even though it terminates the process.
+const SIGINT: i32 = 2;   // keyboard interrupt
+const SIGQUIT: i32 = 2;   // quit from keyboard
 const SIGILL: i32 = 4;   // illegal instruction
 const SIGFPE: i32 = 8;   // floating point exception
 const SIGPIPE: i32 = 13; // pipe broken
@@ -21,7 +23,11 @@ pub fn default_handler(signal: i32) {
     let msg = c_api::nullstr;
     let size = 0usize;
     let stream = c_api::open_memstream(&msg, &size);
-    if signal == SIGILL {
+    if signal == SIGINT {
+        c_api::fprintf(stream, "Signal caught: SIGINT (%d) - Keyboard interrupt", signal);
+    } else if signal == SIGQUIT {
+        c_api::fprintf(stream, "Signal caught: SIGQUIT (%d) - Quit from keyboard", signal);
+    } else if signal == SIGILL {
         c_api::fprintf(stream, "Signal caught: SIGILL (%d) - Illegal instruction", signal);
     } else if signal == SIGFPE {
         c_api::fprintf(stream, "Signal caught: SIGFPE (%d) - Floating point exception", signal);
@@ -48,6 +54,8 @@ fn __handler(signal: i32) -> i32 {
 
 pub fn init_handler() {
     SIG_HANDLER = default_handler;
+    c_api::signal(SIGINT, __handler);
+    c_api::signal(SIGQUIT, __handler);
     c_api::signal(SIGILL, __handler);
     c_api::signal(SIGFPE, __handler);
     c_api::signal(SIGPIPE, __handler);

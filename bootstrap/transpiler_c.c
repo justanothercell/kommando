@@ -10,6 +10,10 @@
 #include "compiler.h"
 #include "lib.h"
 #include "lib/defines.h"
+#include "lib/exit.h"
+#include "lib/list.h"
+#include "lib/map.h"
+#include "lib/str.h"
 LIB
 #include "transpiler_c.h"
 #include "ast.h"
@@ -139,6 +143,7 @@ str gen_default_c_fn_name(FuncDef* def, GenericValues* type_generics, GenericVal
 }
 
 str gen_c_fn_name(FuncDef* def, GenericValues* type_generics, GenericValues* func_generics) {
+    if (def->trait_def) spanned_error("Trait definition transpilation", def->name->span, "Functions in trait definitions do not get transpiled. This is a compiler error.");
     if (def->body == NULL) {
         if (def->generics != NULL) spanned_error("Generic extern function", def->name->span, "Extern functions may not be generic");
         return def->name->name;
@@ -196,6 +201,9 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* type_cont
         map_put(rev, to_str_writer(s, fprintf(s, "%p", val)), key);
     });
     list_foreach(&generics->generics, i, TypeValue* generic, {
+        if (generic->def->traits.length > 0) {
+//log("%s %s - %s %s", to_str_writer(s, fprint_typevalue(s, generic)), to_str_writer(s, fprint_span(s, &generic->name->elements.elements[0]->span)), to_str_writer(s, fprint_type(s, generic->def)), to_str_writer(s, fprint_span(s, &generic->def->name->span)));
+        }
         str key = to_str_writer(stream, fprint_typevalue(stream, generic));
         str real_key = map_get(rev, to_str_writer(s, fprintf(s, "%p", generic)));
         TypeValue* concrete1 = NULL;
@@ -213,6 +221,7 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* type_cont
             concrete_copy->def = concrete->def;
             concrete_copy->generics = concrete->generics;
             concrete_copy->name = concrete->name;
+            concrete_copy->trait_impls = concrete->trait_impls;
             
             if (contains_self(concrete_copy, generic)) return NULL;
 
@@ -230,6 +239,7 @@ GenericValues* expand_generics(GenericValues* generics, GenericValues* type_cont
             concrete_expanded->generics = c_e;
             concrete_expanded->def = concrete->def;
             concrete_expanded->name = concrete->name;
+            concrete_expanded->trait_impls = concrete->trait_impls;
 
             list_append(&expanded->generics, concrete_expanded);
             map_put(expanded->resolved, real_key, concrete_expanded);
@@ -397,7 +407,16 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
         } break;
         case EXPR_METHOD_CALL: {
             MethodCall* call = expr->expr;
-            FuncDef* fd = call->def->func;
+            FuncDef* fd = call->def;
+            if (fd->trait != NULL) {
+                TypeValue* actual = replace_generic(call->tv, func_generics, type_generics, NULL, NULL);
+                ImplBlock* trait_impl = map_get(actual->trait_impls, to_str_writer(s, fprintf(s, "%p", call->def->trait)));
+                if (trait_impl == NULL) spanned_error("No trait impl found", expr->span, "This is probably a compiler error");
+                ModuleItem* method = map_get(trait_impl->methods, fd->name->name);
+                if (method == NULL) spanned_error("No method in trait impl found", expr->span, "This is probably a compiler error");
+                if (method->type != MIT_FUNCTION) spanned_error("is not a method", expr->span, "This is probably a compiler error");
+                fd = method->item;
+            }
             GenericValues* call_generics = expand_generics(call->generics, type_generics, func_generics);
             GenericValues* type_call_generics = expand_generics(call->impl_vals, type_generics, func_generics);
             str c_fn_name = gen_c_fn_name(fd, type_call_generics, call_generics);
@@ -457,7 +476,16 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
         } break;
         case EXPR_STATIC_METHOD_CALL: {
             StaticMethodCall* call = expr->expr;
-            FuncDef* fd = call->def->func;
+            FuncDef* fd = call->def;
+            if (fd->trait != NULL) {
+                TypeValue* actual = replace_generic(call->tv, func_generics, type_generics, NULL, NULL);
+                ImplBlock* trait_impl = map_get(actual->trait_impls, to_str_writer(s, fprintf(s, "%p", call->def->trait)));
+                if (trait_impl == NULL) spanned_error("No trait impl found", expr->span, "This is probably a compiler error");
+                ModuleItem* method = map_get(trait_impl->methods, fd->name->name);
+                if (method == NULL) spanned_error("No method in trait impl found", expr->span, "This is probably a compiler error");
+                if (method->type != MIT_FUNCTION) spanned_error("is not a method", expr->span, "This is probably a compiler error");
+                fd = method->item;
+            }
             GenericValues* call_generics = expand_generics(call->generics, type_generics, func_generics);
             GenericValues* type_call_generics = expand_generics(call->impl_vals, type_generics, func_generics);
             str c_fn_name = gen_c_fn_name(fd, type_call_generics, call_generics);
@@ -847,9 +875,9 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
             goto type_done;
         }
         map_foreach(type_contexted->ctx->generic_uses, str key, GenericUse* use, {
-            if (ctx != NULL && ctx != use->in_func && false) {
+            if (ctx != NULL && ctx != use->in_func) {
                 //log("skipping %s in %s as we are inside %s", key, use->in_func->name->name, ctx->name->name);
-                continue;
+                // continue;
             } else {
                 //if (ctx != NULL) log("key %s inside %s", key, ctx->name->name);
                 //else log("key %s outside", key);
@@ -926,7 +954,7 @@ void transpile_function_generic_variant(Program* program, CompilerOptions* optio
     str c_ret_ty = gen_c_type_name(func->return_type, type_generics, func_generics);
     str trace_f_name = to_str_writer(s, fprintf(s, "TRACE_%s", c_fn_default_name));
     if (func->impl_type == NULL) fprintf(header_stream, "// %s::%s%s%s\n", modpath, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics));
-    else fprintf(header_stream, "// %s%s::%s%s\n", modpath, gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
+    else fprintf(header_stream, "// %s%s::%s%s\n", to_str_writer(s, fprint_type(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
     if (options->tracelevel > 0) {
         fprintf(header_stream, "extern %s %s;\n", program->tracegen.function_type_c_name, trace_f_name);
     }
@@ -946,10 +974,10 @@ void transpile_function_generic_variant(Program* program, CompilerOptions* optio
 
     if (func->body != NULL) {
         if (func->impl_type == NULL) fprintf(code_stream, "// %s::%s%s%s\n", modpath, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics));
-        else fprintf(code_stream, "// %s%s::%s%s\n", to_str_writer(s, fprint_td_path(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
+        else fprintf(code_stream, "// %s%s::%s%s\n", to_str_writer(s, fprint_type(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics));
     }
     if (options->tracelevel >= 0) {
-        if (func->impl_type == NULL) fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s::%s%s%s\", .mangled_name=\"%s\", .loc={ .file=\"%s\", .line=%lld }, .is_method=1 };\n",
+        if (func->impl_type == NULL) fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s::%s%s%s\", .mangled_name=\"%s\", .loc={ .file=\"%s\", .line=%lld }, .is_method=0 };\n",
             program->tracegen.function_type_c_name, trace_f_name, 
             func->name->name, 
             modpath, func->name->name, gvals_to_c_key(type_generics), gvals_to_c_key(func_generics), 
@@ -959,7 +987,7 @@ void transpile_function_generic_variant(Program* program, CompilerOptions* optio
         else fprintf(code_stream, "%s %s = { .name=\"%s\", .full_name=\"%s%s::%s%s\", .mangled_name=\"%s\", .loc={ .file=\"%s\", .line=%lld }, .is_method=1 };\n",
             program->tracegen.function_type_c_name, trace_f_name, 
             func->name->name, 
-            modpath, gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics), 
+            to_str_writer(s, fprint_type(s, func->impl_type->def)), gvals_to_c_key(type_generics), func->name->name, gvals_to_c_key(func_generics), 
             c_fn_name,
             func->name->span.left.file,
             func->name->span.left.line);
@@ -1013,6 +1041,25 @@ void transpile_function(Program* program, CompilerOptions* options, FILE* header
                 }
             }
         });
+        if (func->trait != NULL) {
+            fprintf(code_stream, "// FROM TRAIT\n");
+            ModuleItem* tf = map_get(func->trait->methods, func->name->name);
+            FuncDef* traitfunc = tf->item;
+            // we can safely append to that list, even if it reallocates it should be fine as long as its the last thing we do with the item before refetching
+            list_foreach(&traitfunc->generics->generic_use_keys, i, str key, {
+                GenericUse* use = map_get(traitfunc->generics->generic_uses, key);
+                GenericValues* type_generics = use->type_context;
+                GenericValues* func_generics = use->func_context;
+                if (func_generics == NULL) unreachable("func needs func generic");
+                if (monomorphize(type_generics, func_generics, traitfunc->generics, use->in_func)) {
+                    str fn_c_name = gen_c_fn_name(func, type_generics, func_generics);
+                    if (!map_contains(dupls, fn_c_name)) {
+                        transpile_function_generic_variant(program, options, header_stream, code_stream, func, type_generics, func_generics);
+                        map_put(dupls, fn_c_name, malloc(1));
+                    }
+                }
+            });
+        }
     } else {
         transpile_function_generic_variant(program, options, header_stream, code_stream, func, NULL, NULL);
     }
@@ -1027,6 +1074,7 @@ void transpile_typedef_generic_variant(Program* program, CompilerOptions* option
         tv->def = ty;
         tv->name = NULL;
         tv->generics = generics;
+        tv->trait_impls = map_new();
         str c_name = gen_c_type_name(tv, generics, NULL);
         fprintf(header_stream, "// %s::%s%s\n", modpath, ty->name->name, gvals_to_key(tv->generics));
         fprintf(header_stream, "%s", c_name);
@@ -1153,6 +1201,9 @@ void transpile_module(Program* program, CompilerOptions* options, FILE* header_s
                 break;
             case MIT_STRUCT:
                 if (type == MIT_STRUCT) transpile_typedef(program, options, header_stream, code_stream, item->item, true);
+                break;
+            case MIT_TRAIT:
+                if (type == MIT_TRAIT) todo("trait transpilation");
                 break;
             case MIT_STATIC:
                 if (type == MIT_STATIC) transpile_static(program, options, header_stream, code_stream, item->item);

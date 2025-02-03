@@ -95,6 +95,7 @@ TypeDef* gen_simple_type(str name) {
     td->transpile_state = 0;
     td->module = NULL;
     td->head_resolved = false;
+    td->traits = list_new(TraitList);
     return td;
 }
 

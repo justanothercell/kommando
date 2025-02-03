@@ -14,6 +14,7 @@ typedef struct CompilerOptions {
     bool run;
     bool raw;
     bool compile;
+    bool static_links;
     StrList package_names;
     Map* packages;
     int verbosity;

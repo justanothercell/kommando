@@ -2,6 +2,8 @@
 #include "lib.h"
 #include "lib/defines.h"
 #include "lib/list.h"
+#include "lib/map.h"
+#include "resolver.h"
 LIB;
 #include "module.h"
 
@@ -60,12 +62,40 @@ void fprint_td_path(FILE* file, TypeDef* td) {
 void fprint_generic_keys(FILE* file, GenericKeys* keys) {
     if (keys == NULL || keys->generics.length == 0) return;
     fprintf(file, "<");
-    list_foreach(&keys->generics, i, Identifier* t, fprintf(file, "%s", t->name));
+    list_foreach(&keys->generics, i, GKey* t, {
+        if (i > 0) fprintf(file, ", ");
+        fprintf(file, "%s", t->name->name);
+        if (t->bounds.length > 0) {
+            fprintf(file, ": ");
+            list_foreach(&t->bounds, j, TraitBound* tb, {
+                if (j > 0) fprintf(file, " + ");
+                fprint_typevalue(file, tb->bound);
+            });
+        }
+    });
+    fprintf(file, ">");
+}
+
+void fprint_generic_values(FILE* file, GenericValues* values) {
+    if (values == NULL || values->generics.length == 0) return;
+    fprintf(file, "<");
+    list_foreach(&values->generics, i, TypeValue* tv, {
+        if (i > 0) fprintf(file, ", ");
+        fprint_typevalue(file, tv);
+    });
     fprintf(file, ">");
 }
 
 void fprint_type(FILE* file, TypeDef* def) {
     fprint_td_path(file, def);
+    if (def->traits.length > 0) {
+        fprintf(file, ": ");
+        list_foreach(&def->traits, i, TraitDef* trait, {
+            if (i > 0) fprintf(file, " + ");
+            fprint_path(file, trait->module->path);
+            fprintf(file, "::%s", trait->name->name);
+        });
+    }
     fprint_generic_keys(file, def->generics);
 }
 
@@ -88,6 +118,17 @@ void fprint_typevalue(FILE* file, TypeValue* tval) {
     } else{
         fprint_path(file, tval->name);        
     }
+    /*if (map_size(tval->trait_impls) > 0) {
+        fprintf(file, ": ");
+        bool first = true;
+        map_foreach(tval->trait_impls, str key, ImplBlock* impl, {
+            UNUSED(key);
+            if (!first) fprintf(file, " + ");
+            fprint_path(file, impl->trait->module->path);
+            fprintf(file, "::%s", impl->trait->name->name);
+            first = false;
+        });
+    }*/
     if (tval->generics != NULL && tval->generics->generics.length > 0) {
         fputc('<', file);
         list_foreach(&tval->generics->generics, i, TypeValue* generic, {

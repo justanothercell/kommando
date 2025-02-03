@@ -81,7 +81,7 @@
 #define list_contains(list_ptr, counter, item_var, predicate) ({ \
     bool found1234567890 = false; \
     for (usize counter = 0;counter < (list_ptr)->length;counter++) { \
-        item_var = &(list_ptr)->elements[counter]; \
+        item_var = (list_ptr)->elements[counter]; \
         if (predicate) { \
             found1234567890 = true; \
             break; \

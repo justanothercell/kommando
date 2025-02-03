@@ -11,6 +11,7 @@ ENUM(ModuleItemType,
     MIT_STRUCT,
     MIT_STATIC,
     MIT_CONSTANT,
+    MIT_TRAIT,
     MIT_MODULE,
     MIT_ANY
 );
@@ -40,12 +41,7 @@ typedef struct Module {
     ImplList impls;
     Map* package_method_map;
 } Module;
-typedef struct MethodImpl {
-    TypeValue* tv;
-    GenericKeys* keys;
-    FuncDef* func;
-} MethodImpl;
-LIST(MethodImplList, MethodImpl*);
+LIST(FuncList, FuncDef*);
 
 typedef struct TraceGen {
     Variable* top_frame;
@@ -63,6 +59,7 @@ typedef struct Program {
     Module* main_module;
     TraceGen tracegen;
 } Program;
+
 typedef struct CompilerOptions CompilerOptions;
 void insert_module(Program* program, CompilerOptions* options, Module* module, Visibility vis);
 

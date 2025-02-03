@@ -2,8 +2,7 @@
 #include <stdlib.h>
 
 #include "../lib.h"
-#include "defines.h"
-
+LIB;
 
 Map* map_new() {
     Map* map = malloc(sizeof(Map));
@@ -59,12 +58,11 @@ void* map_remove(Map* map, str key) {
 }
 
 void* map_put(Map* map, str key, void* value) {
-    if (value == NULL) return map_remove(map, key);
     u32 hash = str_hash_seed(key, map->random);
     Bucket* bucket = &map->buckets.elements[hash % map->buckets.length];
     for (usize i = 0;i < bucket->length;i++) {
         if (str_eq(bucket->elements[i].key, key)) {
-            void* old =  bucket->elements[i].value;
+            void* old = bucket->elements[i].value;
             bucket->elements[i].value = value;
             return old;
         }

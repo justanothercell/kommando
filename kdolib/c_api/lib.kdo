@@ -76,6 +76,8 @@ pub fn fork() -> i32;
 
 #[extern]
 pub fn rand() -> i32;
+pub fn rand32() -> u32 { core::intrinsics::typecast(rand()) }
+pub fn rand64() -> u64 { core::intrinsics::numcast::<_, u64>(rand32()) << 32 | core::intrinsics::numcast::<_, u64>(rand32()) }
 #[extern]
 pub fn srand(seed: u32);
 
