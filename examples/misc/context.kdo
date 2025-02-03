@@ -21,8 +21,8 @@ fn foo(main_ctx_ref: ptr<ucontext_t>, runner_ctx_ref: ptr<ucontext_t>) {
 fn main() {
     let stack_size: usize = 256 * 64;
     let stack = c_api::alloca(stack_size);
-    let main_ctx: ucontext_t = mem::new_uninit();
-    let runner_ctx: ucontext_t = mem::new_uninit();
+    let main_ctx: ucontext_t = mem::uninit();
+    let runner_ctx: ucontext_t = mem::uninit();
 
     if getcontext(&runner_ctx) == 0-1 {
         fprintf(io::stderr, "Error: getcontext\n");
