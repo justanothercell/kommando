@@ -2,6 +2,7 @@ use core::types::*;
 
 pub mod math;
 pub mod str;
+pub mod dl;
 pub mod ucontext;
 
 pub use core::types::raw_ptr as CFileStream;

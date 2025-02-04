@@ -1,0 +1,38 @@
+use std::*;
+use c_api::dl::*;
+
+pub struct Dl {
+    handle: raw_ptr
+}
+
+impl Dl {
+    pub fn open(filename: c_str) -> Dl {
+        let handle = dlopen(filename, RTLD_LAZY);
+        if handle == c_api::null {
+            panic(dlerror())
+        };
+        _ { handle: handle }
+    }
+    
+    pub fn get_static<T>(dl: ptr<Dl>, name: c_str) -> ptr<T> {
+        let s: ptr<T> = typecast(c_api::dl::dlsym(dl.handle, name));
+        let err = dlerror();
+        if err != c_api::nullstr {
+            panic(err)
+        };
+        s
+    }
+
+    pub fn get_fn<T>(dl: ptr<Dl>, name: c_str) -> function_ptr<T> {
+        let f: function_ptr<T> = typecast(c_api::dl::dlsym(dl.handle, name));
+        let err = dlerror();
+        if err != c_api::nullstr {
+            panic(err)
+        };
+        f
+    }
+
+    pub fn close(dl: Dl) {
+        dlclose(dl.handle);
+    }
+}

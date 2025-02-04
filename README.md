@@ -40,6 +40,14 @@ fn main() {
     printf("Hello, world\n");
 }
 ```
+[more examples](<https://github.com/justanothercell/kommando/tree/master/examples>) | [postfix expression calculator](<https://github.com/justanothercell/kommando/blob/master/examples/calculator/calculator.kdo>)
+## Notable features
+- structs
+- [generics](<https://github.com/justanothercell/kommando/tree/master/examples/lang/generics.kdo>)
+- [traits](<https://github.com/justanothercell/kommando/tree/master/examples/lang/traits.kdo>) and [methods](<https://github.com/justanothercell/kommando/tree/master/examples/lang/methods.kdo>)
+- c ffi for both export and import, aswell as precise control over name mangling 
+- modules and [packages/libraries](<https://github.com/justanothercell/kommando/tree/master/kdolib>)
+- [constants and globals](<https://github.com/justanothercell/kommando/tree/master/examples/lang/globals.kdo>)
 ---
 Note that this is meant to be compiled with gcc and uses certain gnu compiler extensions. There exists a [./bootstrap/.clangd](./bootstrap/.clangd) file,
 but that is only to fix VSCode linting. Specifically, the macro `__INTELLISENSE__` disables these gcc extensions. Other compilers might work but support is not guaranteed.
