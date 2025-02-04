@@ -310,7 +310,9 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             t = next_token(stream); // setting new peek
             stream->peek = t;
         }
-        if (token_compare(t, "fn", IDENTIFIER)) {
+        if (token_compare(t, "pun", IDENTIFIER) || token_compare(t, "pn", IDENTIFIER)) {
+            spanned_error("Invalid declaration", t->span, "punction cannot be declared here");
+        } else if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
             function->annotations = annos;
             function->module = module;
