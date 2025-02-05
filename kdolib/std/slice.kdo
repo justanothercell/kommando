@@ -60,12 +60,12 @@ impl<T> Slice<T> {
         let pivot = s.get(numcast(c_api::rand64()) % s.length).unwrap();
         let a = 0usize;
         let b = s.length - 1;
-        let homogenious = true;
+        let homogenous = true;
         while a != b {
             let item = s.get_ref(a).unwrap();
             // item is smaller than pivot
             let r = (comparator)(item, &pivot);
-            homogenious &= r == 0;
+            homogenous &= r == 0;
             if r <= 0 {
                 a += 1;
             } else { // item is bigger or equal to pivot
@@ -73,7 +73,7 @@ impl<T> Slice<T> {
                 b -= 1;
             }
         };
-        if (homogenious) {
+        if (homogenous) {
             return;
         };
         let left = s.slice_range(0, a);
