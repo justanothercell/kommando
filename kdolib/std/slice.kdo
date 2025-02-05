@@ -46,7 +46,6 @@ impl<T> Slice<T> {
     }
 }
 
-
 impl<T: Cmp> Slice<T> {
     pub fn sort(s: ptr<Slice<T>>) {
         s.sort_with(T::<>::cmp);
@@ -55,18 +54,31 @@ impl<T: Cmp> Slice<T> {
 
 impl<T> Slice<T> {
     pub fn sort_with(s: ptr<Slice<T>>, comparator: function_ptr<i32>) {
-        let i = 0usize;
-        while i < s.length - 1 {
-            let j = i + 1;
-            while j < s.length {
-                let a = s.get_ref(i).unwrap();
-                let b = s.get_ref(j).unwrap();
-                if (comparator)(a, b) > 0 {
-                    std::mem::swap(a, b);
-                };
-                j += 1;
-            };
-            i += 1;
+        if s.length <= 1 {
+            return;
         };
+        let pivot = s.get(numcast(c_api::rand64()) % s.length).unwrap();
+        let a = 0usize;
+        let b = s.length - 1;
+        let homogenious = true;
+        while a != b {
+            let item = s.get_ref(a).unwrap();
+            // item is smaller than pivot
+            let r = (comparator)(item, &pivot);
+            homogenious &= r == 0;
+            if r <= 0 {
+                a += 1;
+            } else { // item is bigger or equal to pivot
+                std::mem::swap(item, s.get_ref(b).unwrap());
+                b -= 1;
+            }
+        };
+        if (homogenious) {
+            return;
+        };
+        let left = s.slice_range(0, a);
+        let right = s.slice_range(a, s.length);
+        left.sort_with(comparator);
+        right.sort_with(comparator);
     }
 }
