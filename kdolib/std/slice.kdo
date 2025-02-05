@@ -1,0 +1,72 @@
+use std::*;
+use core::cmp::Cmp;
+
+pub struct Slice<T> {
+    buffer: ptr<T>,
+    length: usize
+}
+
+impl<T> Slice<T> {
+    pub fn get(s: ptr<Slice<T>>, i: usize) -> Option<T> {
+        if i < s.length {
+            Option::<_>::some(*std::mem::arr_offset(s.buffer, i))
+        } else {
+            Option::<_>::none()
+        }
+    }
+
+    pub fn get_ref(s: ptr<Slice<T>>, i: usize) -> Option<ptr<T>> {
+        if i < s.length {
+            Option::<_>::some(std::mem::arr_offset(s.buffer, i))
+        } else {
+            Option::<_>::none()
+        }
+    }
+    pub fn last(s: ptr<Slice<T>>) -> Option<T> {
+        if s.length == 0 {
+            return Option::<_>::none();
+        };
+        s.get(s.length - 1)
+    }
+    pub fn last_ref(s: ptr<Slice<T>>) -> Option<ptr<T>> {
+        if s.length == 0 {
+            return Option::<_>::none();
+        };
+        s.get_ref(s.length - 1)
+    }
+
+    pub fn slice(s: ptr<Slice<T>>) -> Slice<T> {
+        s.slice_range(0, s.length)
+    }
+
+    pub fn slice_range(s: ptr<Slice<T>>, from: usize, to: usize) -> Slice<T> {
+        if to < from { panic("Slice range negative") };
+        if s.length < to { panic("Slice out of range for vector") };
+        _ { buffer: std::mem::arr_offset(s.buffer, from), length: to - from }
+    }
+}
+
+
+impl<T: Cmp> Slice<T> {
+    pub fn sort(s: ptr<Slice<T>>) {
+        s.sort_with(T::<>::cmp);
+    }
+}
+
+impl<T> Slice<T> {
+    pub fn sort_with(s: ptr<Slice<T>>, comparator: function_ptr<i32>) {
+        let i = 0usize;
+        while i < s.length - 1 {
+            let j = i + 1;
+            while j < s.length {
+                let a = s.get_ref(i).unwrap();
+                let b = s.get_ref(j).unwrap();
+                if (comparator)(a, b) > 0 {
+                    std::mem::swap(a, b);
+                };
+                j += 1;
+            };
+            i += 1;
+        };
+    }
+}

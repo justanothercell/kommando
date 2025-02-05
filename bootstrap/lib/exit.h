@@ -3,6 +3,8 @@
 
 #include "defines.h"
 
+extern bool TRACE_ON_PANIC;
+
 void init_exit_handler(void (*exit_func)(str file, usize line, int code));
 
 void fprint_stacktrace(FILE* file);

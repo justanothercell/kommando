@@ -1,0 +1,31 @@
+use std::*;
+use std::vec::Vec;
+
+fn main() {
+    std::error::init_handler();
+
+    let names = Vec::<c_str>::new();
+    // names from https://github.com/fosspointer
+    names.push("Marilyn Peck");
+    names.push("Yousef Beasley");
+    names.push("Jaylah Ayers");
+    names.push("Ulises Alexander");
+    names.push("Lyla Coffey");
+    names.push("Kody Howell");
+    names.push("Mckenna Rivas");
+    names.push("Damon Robinson");
+    names.push("Nora Reeves");
+    names.push("Clark Rose");
+    names.push("Magnolia Guzman");
+    names.push("Jude Case");
+    names.push("Cleo Wise");
+
+
+    names.slice().sort();
+
+    let i = 0usize;
+    while i < names.length {
+        c_api::printf("%02ld. %s\n", i+1, names.get(i).unwrap());
+        i += 1;
+    };
+}

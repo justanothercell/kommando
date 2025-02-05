@@ -727,6 +727,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 FieldAccess* fa = malloc(sizeof(FieldAccess));
                 fa->object = expression;
                 fa->field = field;
+                fa->is_ref = false;
                 expression = malloc(sizeof(Expression));
                 expression->span = from_points(&fa->object->span.left, &fa->field->span.right);
                 expression->expr = fa;

@@ -3,6 +3,7 @@ pub mod trace;
 
 pub mod hash;
 pub mod eq;
+pub mod cmp;
 
 // pub mod intrinsics - synthetically generated
 // pub mod types - synthetically generated

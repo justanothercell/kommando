@@ -50,7 +50,6 @@ typedef struct TraceGen {
     str frame_type_c_name;
     TypeValue* function_type;
     str function_type_c_name;
-    str local_frame_name;
     bool trace_this;
 } TraceGen;
 

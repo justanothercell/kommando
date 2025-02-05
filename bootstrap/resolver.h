@@ -15,6 +15,7 @@ typedef struct VarBox {
     str name;
     usize id;
     TVBox* resolved;
+    TypeValue* ty;
     ModuleItem* mi;
     GenericValues* values;
     VarState state;

@@ -56,7 +56,10 @@ Token* try_next_token(TokenStream* stream) {
         start = stream->point;
         next = next_char(stream);
         if (next == '\0') goto eof;
-        if (is_whitespace(next)) continue;
+        if (is_whitespace(next)) { 
+            start = stream->point;
+            continue;
+        }
         if (next == '/') {
             next = next_char(stream);
             if (next == '\0') goto eof;

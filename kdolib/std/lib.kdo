@@ -1,5 +1,6 @@
 pub mod io;
 pub mod vec;
+pub mod slice;
 pub mod queue;
 pub mod hashmap;
 pub mod math;

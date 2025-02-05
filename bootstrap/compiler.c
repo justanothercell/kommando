@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "lib.h"
+#include "lib/exit.h"
 #include "lib/list.h"
 #include "lib/str.h"
 LIB;
@@ -26,15 +27,18 @@ CompilerOptions build_args(StrList* args) {
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --silent     - verbosity = 0\n");
-        printf("    --static     - statically link libraries\n");
+        printf("    --static     - staticmay link libraries\n");
         printf("    --verbose -v - verbosity += 1 (default = 1)\n");
         printf("    --trace=[none|main|all]\n");
         printf("             none - do not generate traceback info\n");
-        printf("             main - (default) generate traceback info for the main package\n");
-        printf("             all  - also generate traceback info for libraries\n");
+        printf("             this - (default) generate traceback info for the main package\n");
+        printf("             full - also generate traceback info for libraries\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
         printf("    ::package=<path/to/package> (multiple possible)\n");
+        printf("The following options are compiler diagnostics:\n");
+        printf("    --trace-compiler - trace the compiler on panic\n");
+        printf("    --emit-spans     - Write source references as comments in generated c\n");
         printf("Using `make` with sensibe defaults:\n");
         printf("make run file=<infile> flags=\"<optional compiler flags>\"\n");
         quit(0);
@@ -48,6 +52,7 @@ CompilerOptions build_args(StrList* args) {
     options.raw = false;
     options.compile = false;
     options.run = false;
+    options.emit_spans = false;
     options.package_names = list_new(StrList);
     options.packages = map_new();
     options.verbosity = 1;
@@ -62,6 +67,10 @@ CompilerOptions build_args(StrList* args) {
                 goto print_help;
             } else if (str_eq(arg, "run")) {
                 options.run = true;
+            } else if (str_eq(arg, "trace-compiler")) {
+                TRACE_ON_PANIC = true;
+            } else if (str_eq(arg, "emit-spans")) {
+                options.emit_spans = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
             } else if (str_eq(arg, "silent")) {
@@ -72,9 +81,9 @@ CompilerOptions build_args(StrList* args) {
                 arg += 6;
                 if (str_eq(arg, "none")) {
                     options.tracelevel = 0;
-                } else if (str_eq(arg, "main")) {
+                } else if (str_eq(arg, "this")) {
                     options.tracelevel = 1;
-                } else if (str_eq(arg, "all")) {
+                } else if (str_eq(arg, "full")) {
                     options.tracelevel = 2;
                 } else {
                     log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid trace level `--trace=%s`", arg);

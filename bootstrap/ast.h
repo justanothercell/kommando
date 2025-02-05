@@ -228,6 +228,7 @@ typedef struct Block {
 typedef struct FieldAccess {
     Expression* object;
     Identifier* field;
+    bool is_ref;
 } FieldAccess;
 
 typedef struct LetExpr {

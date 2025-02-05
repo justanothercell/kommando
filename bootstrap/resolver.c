@@ -421,7 +421,7 @@ void resolve_typevalue(Program* program, CompilerOptions* options, Module* modul
                     tval->name->elements.elements[0]->name,
                     to_str_writer(stream, fprint_span(stream, &func_gen_t->name->span)),
                     to_str_writer(stream, fprint_span(stream, &type_gen_t->name->span)));
-        if ((func_gen_t != NULL || type_gen_t != NULL) && tval->generics != NULL) spanned_error("Compiler error: Generic generic", tval->generics->span, "Generic parameter should not have generic arguments @ %s", to_str_writer(s, fprint_span(s, &tval->def->name->span)));
+        if ((func_gen_t != NULL || type_gen_t != NULL) && tval->generics != NULL && tval->generics->generics.length > 0) spanned_error("Compiler error: Generic generic", tval->generics->span, "Generic parameter should not have generic arguments");
         if (func_gen_t != NULL) {
             tval->def = func_gen_t;
             tval->ctx = func_generics;
@@ -483,6 +483,7 @@ void assert_types_equal(Program* program, CompilerOptions* options, Module* modu
     }
 }
 void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, GenericValues* type_generics, GenericValues* func_generics);
+FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, TypeValue* tv, Identifier* name, bool do_error);
 static void var_find(Program* program, CompilerOptions* options, Module* module, VarList* vars, Variable* var, GenericKeys* func_generics, GenericKeys* type_generics) {
     Path* path = var->path;
     Identifier* name = path->elements.elements[path->elements.length-1];
@@ -496,13 +497,33 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
             }
         }
     }
-    ModuleItem* item = resolve_item(program, options, module, path, MIT_ANY, func_generics, type_generics, &var->values);
     VarBox* box = malloc(sizeof(VarBox));
     box->id = ~0;
     box->name = NULL;
-    box->mi = item;
     box->values = var->values;
     var->box = box;
+    if (var->method_name != NULL) {
+        TypeValue* tv = malloc(sizeof(TypeValue));
+        tv->name = path;
+        tv->generics = NULL;
+        tv->ctx = NULL;
+        tv->def = NULL;
+        resolve_typevalue(program, options, module, tv, func_generics, type_generics);
+        FuncDef* method = resolve_method_instance(program, options, tv, var->method_name, true);
+        TypeValue* funcptr = gen_typevalue("std::function_ptr<T>", &name->span);
+        resolve_typevalue(program, options, module, method->return_type, NULL, NULL);
+        TypeValue* ret = replace_generic(method->return_type, var->values, var->method_values, method->trait, tv);
+        funcptr->generics->generics.elements[0] = ret;
+        box->resolved = malloc(sizeof(TVBox));
+        box->resolved->type = funcptr;
+        box->mi = malloc(sizeof(ModuleItem));
+        box->mi->item = method;
+        box->ty = tv;
+        register_item(NULL, var->values, NULL, method->generics, method->generics, method);
+        return;
+    }
+    ModuleItem* item = resolve_item(program, options, module, path, MIT_ANY, func_generics, type_generics, &var->values);
+    box->mi = item;
     switch (item->type) {
         case MIT_FUNCTION: {
             FuncDef* func = item->item;
@@ -812,7 +833,7 @@ static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv) {
     return true;
 }
 
-FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, TypeValue* tv, Identifier* name) {
+FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, TypeValue* tv, Identifier* name, bool do_error) {
     Module* mod = tv->def->module;
     if (mod == NULL) { // generic type - search through trait bounds
         FuncDef* chosen = NULL;
@@ -820,13 +841,17 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
             ModuleItem* mi = map_get(t->methods, name->name);
             if (mi == NULL) continue;
             FuncDef* method = mi->item;
-            if (chosen != NULL) spanned_error("Multiple method candiates", tv->name->elements.elements[0]->span, "Multiple candiates found for %s::%s\n#1: %s::%s @ %s\n#2: %s::%s @ %s", 
+            if (chosen != NULL) {
+                if (!do_error) return NULL;
+                spanned_error("Multiple method candiates", tv->name->elements.elements[0]->span, "Multiple candiates found for %s::%s\n#1: %s::%s @ %s\n#2: %s::%s @ %s", 
                 to_str_writer(s, fprint_typevalue(s, tv)), name->name,
                 to_str_writer(s, fprint_typevalue(s, method->impl_type)), method->name->name, to_str_writer(s, fprint_span(s, &method->name->span)),
                 to_str_writer(s, fprint_typevalue(s, chosen->impl_type)), chosen->name->name, to_str_writer(s, fprint_span(s, &chosen->name->span)));
+            }
             chosen = method;
         });
         if (chosen != NULL) return chosen;
+        if (!do_error) return NULL;
         if (tv->def->traits.length > 0) spanned_error("Invalid type", name->span, "Cannot call method `%s` on generic type %s (%s). No trait bounds specify this method.", name->name, to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_type(s, tv->def)));
         else spanned_error("Invalid type", name->span, "Cannot call method `%s` on generic type %s. Try adding a trait bound supplying this method.\nFor example if trait `Foo` supplies method `%s`, you can add the bound in your generic parameter list:\n\t`<T: Foo, ...>`", name->name, to_str_writer(s, fprint_typevalue(s, tv)), name->name);
     }
@@ -844,8 +869,11 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
             chosen = func;
         }
     });
-    if (chosen == NULL) spanned_error("No such method", name->span, "No such method `%s` on type %s @ %s defined in package `%s`.", 
+    if (chosen == NULL) {
+        if (!do_error) return NULL;
+        spanned_error("No such method", name->span, "No such method `%s` on type %s @ %s defined in package `%s`.", 
         name->name, to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->def->name->span)), base->name->name);
+    }
     if (!chosen->head_resolved) {
         resolve_funcdef(program, options, chosen, chosen->type_generics);
     }
@@ -933,7 +961,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 method_type = method_type->generics->generics.elements[0];
                 deref_to_call = true;
             }
-            FuncDef* method = resolve_method_instance(program, options, method_type, call->name);
+            FuncDef* method = resolve_method_instance(program, options, method_type, call->name, true);
             call->def = method;
             if (call->generics != NULL) {
                 if (call->generics->generics.length != method->generics->generics.length) spanned_error("Generic count mismatch", expr->span, "Expected %lld generics, got %lld", call->generics->generics.length, method->generics->generics.length);
@@ -1027,7 +1055,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
         case EXPR_STATIC_METHOD_CALL: {
             StaticMethodCall* call = expr->expr;
             resolve_typevalue(program, options, func->module, call->tv, func->generics, type_generics);
-            FuncDef* method = resolve_method_instance(program, options, call->tv, call->name);
+            FuncDef* method = resolve_method_instance(program, options, call->tv, call->name, true);
             call->def = method;
             if (call->generics != NULL) {
                 if (call->generics->generics.length != method->generics->generics.length) spanned_error("Generic count mismatch", expr->span, "Expected %lld generics, got %lld", call->generics->generics.length, method->generics->generics.length);
@@ -1225,17 +1253,12 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             resolve_expr(program, options, func, type_generics, fa->object, vars, object_type);
             TypeValue* reference = gen_typevalue("::core::types::ptr<_>", &expr->span);
             resolve_typevalue(program, options, func->module, reference, NULL, NULL);
-            if (reference->def == fa->object->resolved->type->def) { // is a reference;
-                Expression* inner = fa->object;
-                fa->object = malloc(sizeof(Expression));
-                fa->object->type = EXPR_DEREF;
-                fa->object->span = inner->span;
-                fa->object->expr = inner;
-                TVBox* object_type = new_tvbox();
-                resolve_expr(program, options, func, type_generics, fa->object, vars, object_type);
+            TypeValue* tv = fa->object->resolved->type;
+            if (reference->def == tv->def) { // is a reference;
+                fa->is_ref = true;
+                tv = tv->generics->generics.elements[0];
             }
             finish_tvbox(object_type, func);
-            TypeValue* tv = fa->object->resolved->type;
             TypeDef* td = tv->def;
             if (td->fields == NULL) {
                 if (td->module != NULL) unreachable("Fields should not be null unless it's a generic");
