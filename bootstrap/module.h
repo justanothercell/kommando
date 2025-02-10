@@ -62,9 +62,6 @@ typedef struct Program {
 typedef struct CompilerOptions CompilerOptions;
 void insert_module(Program* program, CompilerOptions* options, Module* module, Visibility vis);
 
-Module* gen_core_intrinsics();
-Module* gen_core_types();
-
 Identifier* gen_identifier(str name);
 TypeValue* gen_typevalue(str typevalue, Span* span);
 Path* gen_path(str path);

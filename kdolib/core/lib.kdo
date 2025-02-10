@@ -5,8 +5,8 @@ pub mod hash;
 pub mod eq;
 pub mod cmp;
 
-// pub mod intrinsics - synthetically generated
-// pub mod types - synthetically generated
+pub mod types;
+pub mod intrinsics;
 
 pub const true: types::bool = 0 == 0;
 pub const false: types::bool = 0 == 1;

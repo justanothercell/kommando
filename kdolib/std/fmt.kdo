@@ -1,0 +1,16 @@
+use std::*;
+
+pub struct DynFmt {
+    object: raw_ptr,
+    fmt: function_ptr<T>
+}
+
+pub trait T: Fmt {
+    fn as_dyn(self: ptr<T>) -> DynFmt;
+    fn fmt(self: ptr<T>, f: ptr<Formatter>);
+}
+
+#[va_wrapper=Fmt::<>::as_dyn]
+pub fn format(format: c_str, *) -> c_str {
+
+}

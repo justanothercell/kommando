@@ -1,0 +1,7 @@
+use std::*;
+use core::va::*;
+
+
+fn main() {
+
+}

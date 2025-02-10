@@ -170,7 +170,6 @@ typedef struct CIntrinsic {
     Map* type_bindings;
     Map* var_bindings;
     str c_expr;
-    TypeValue* ret_ty;
 } CIntrinsic;
 
 typedef struct StructFieldLit {

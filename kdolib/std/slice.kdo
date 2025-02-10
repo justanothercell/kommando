@@ -73,7 +73,7 @@ impl<T> Slice<T> {
                 b -= 1;
             }
         };
-        if (homogeneous) {
+        if homogeneous {
             return;
         };
         let left = s.slice_range(0, a);

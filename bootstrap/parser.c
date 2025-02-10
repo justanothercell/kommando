@@ -70,30 +70,35 @@ TypeDef* parse_struct(TokenStream* stream) {
         keys = parse_generic_keys(stream);
         t = next_token(stream);
     }
-    if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
-    while (1) {
-        t = next_token(stream);
-        if (token_compare(t, "}", SNOWFLAKE)) break;
-        stream->peek = t;
-        Identifier* field_name = parse_identifier(stream);
-        t = next_token(stream);
-        if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
-        TypeValue* tv = parse_type_value(stream);
-        if (map_contains(fields, field_name->name)) spanned_error("Duplicate field name", field_name->span, "field with name %s already exists in struct %s", field_name->name, name->name);
-        Field* field = malloc(sizeof(Field));
-        field->name = name;
-        field->type = tv;
-        map_put(fields, field_name->name, field);
-        list_append(&flist, field_name);
-        t = next_token(stream);
-        if (token_compare(t, "}", SNOWFLAKE)) break;
-        if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
-    }
     TypeDef* type = malloc(sizeof(TypeDef));
+    if (token_compare(t, ";", SNOWFLAKE)) {
+        type->flist = flist;
+        type->fields = NULL;
+    } else {
+        if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
+        while (1) {
+            t = next_token(stream);
+            if (token_compare(t, "}", SNOWFLAKE)) break;
+            stream->peek = t;
+            Identifier* field_name = parse_identifier(stream);
+            t = next_token(stream);
+            if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
+            TypeValue* tv = parse_type_value(stream);
+            if (map_contains(fields, field_name->name)) spanned_error("Duplicate field name", field_name->span, "field with name %s already exists in struct %s", field_name->name, name->name);
+            Field* field = malloc(sizeof(Field));
+            field->name = name;
+            field->type = tv;
+            map_put(fields, field_name->name, field);
+            list_append(&flist, field_name);
+            t = next_token(stream);
+            if (token_compare(t, "}", SNOWFLAKE)) break;
+            if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+        }
+        type->flist = flist;
+        type->fields = fields;
+    }
     type->extern_ref = NULL;
     type->generics = keys;
-    type->flist = flist;
-    type->fields = fields;
     type->transpile_state = 0;
     type->name = name;
     type->head_resolved = false;
@@ -473,6 +478,15 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         } else {
             stream->peek = t;
         }
+    } else if (token_compare(t, "$", SNOWFLAKE)) {
+        t = next_token(stream);
+        if (t->type != STRING) unexpected_token(t, "expected string for c intrinsic: `$\"<intrinsic>\"`");
+        CIntrinsic* ci = malloc(sizeof(CIntrinsic));
+        ci->c_expr = t->string;
+        ci->type_bindings = map_new();
+        ci->var_bindings = map_new();
+        expression->expr = ci;
+        expression->type = EXPR_C_INTRINSIC;
     } else if (token_compare(t, "let", IDENTIFIER)) {
         Identifier* name = parse_identifier(stream);
         end = name->span.right;

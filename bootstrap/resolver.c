@@ -901,7 +901,6 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             }
             resolve_expr(program, options, func, type_generics, op->lhs, vars, op_arg_box);
             resolve_expr(program, options, func, type_generics, op->rhs, vars, op_arg_box);
-            
         } break;
         case EXPR_BIN_OP_ASSIGN: {
             BinOp* op = expr->expr;
@@ -1312,16 +1311,48 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
         } break;
         case EXPR_C_INTRINSIC: {
             CIntrinsic* ci = expr->expr;
-            map_foreach(ci->var_bindings, str key, Variable* var, {
-                UNUSED(key);
-                var_find(program, options, func->module, vars, var, func->generics, type_generics);
-            });
-            map_foreach(ci->type_bindings, str key, TypeValue* tv, {
-                UNUSED(key);
-                resolve_typevalue(program, options, func->module, tv, func->generics, type_generics);
-            });
-            resolve_typevalue(program, options, func->module, ci->ret_ty, func->generics, type_generics);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, ci->ret_ty);
+            usize i = 0;
+            usize len = strlen(ci->c_expr);
+            char op = '\0';
+            char mode = '\0';
+            while (i < len) {
+                char c = ci->c_expr[i++];
+                if (op != '\0' && mode == '\0') {
+                    mode = c;
+                } else if (op != '\0') {
+                    if (op == '@') {
+                        str key = malloc(2);
+                        key[0] = c;
+                        key[1] = '\0';
+                        TypeValue* tv = gen_typevalue(key, &expr->span);
+                        resolve_typevalue(program, options, func->module, tv, func->generics, type_generics);
+                        map_put(ci->type_bindings, key, tv);
+                        if (mode != '.' && mode != ':' && mode != '!' && mode != '#') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
+                    } else if (op == '$') {
+                        str key = malloc(2);
+                        key[0] = c;
+                        key[1] = '\0';
+                        Variable* v = malloc(sizeof(Variable));
+                        v->box = NULL;
+                        v->global_ref = NULL;
+                        v->method_name = NULL;
+                        v->values = NULL;
+                        v->method_values = NULL;
+                        Identifier* ident = malloc(sizeof(Identifier));
+                        ident->name = key;
+                        ident->span = expr->span;
+                        v->path = path_simple(ident);
+                        var_find(program, options, func->module, vars, v, func->generics, type_generics);
+                        map_put(ci->var_bindings, key, v);
+                        if (mode != ':' && mode != '!') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsic operator `%c%c`", op, mode);
+                    } else spanned_error("Invalid c intrinsic op", expr->span, "No such intrinsic operator `%c`", op);
+                    op = '\0';
+                    mode = '\0';
+                } else if (c == '@' || c == '$') {
+                    op = c;
+                };
+            }
+            if (op != '\0') spanned_error("Invalid c intrinsic", expr->span, "intrinsic ended on operator: `%s`", ci->c_expr);
         } break;
         case EXPR_TAKEREF: {
             Expression* inner = expr->expr;
@@ -1496,10 +1527,28 @@ void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, 
 }
 
 void resolve_typedef(Program* program, CompilerOptions* options, TypeDef* type) {
-    if (type->head_resolved) return;
     if (!type->module->resolved && !type->module->in_resolution) {
         resolve_module(program, options, type->module);
     }
+    if (type->head_resolved) return;
+    bool is_extern = false;
+    list_foreach(&type->annotations, i, Annotation anno, {
+        str name = to_str_writer(s, fprint_path(s, anno.path));
+        if (str_eq(name, "extern")) {
+            if (anno.type != AT_FLAG) spanned_error("Invalid annotation", anno.path->elements.elements[0]->span, "Expected annotation to look like #[extern]");
+            if (is_extern) spanned_error("Duplicate annotation", anno.path->elements.elements[0]->span, "Struct already marked as #[extern]");
+            if (type->fields != NULL) spanned_error("Extern struct", anno.path->elements.elements[0]->span, "Extern struct may not have a body");
+            is_extern = true;
+        } else if (str_eq(name, "c_alias")) {
+            if (anno.type != AT_DEFINE) spanned_error("Invalid annotation", anno.path->elements.elements[0]->span, "Expected annotation to look like #[c_alias=\"alias_t\"]");
+            if (!is_extern) spanned_error("Not extern", anno.path->elements.elements[0]->span, "Struct has to be marked as #[extern]");
+            if (type->extern_ref != NULL) spanned_error("Duplicate annotation", anno.path->elements.elements[0]->span, "C alias already set: #[c_alias=\"%s\"]", type->extern_ref);
+            Token* t = anno.data;
+            if (t->type != STRING) spanned_error("Invalid type", t->span, "Expected c_alias to be a string, got %s", TokenType__NAMES[t->type]);
+            type->extern_ref = t->string;
+        }
+    });
+    if (is_extern && type->extern_ref == NULL) spanned_error("No c alias set", type->name->span, "An #[extern] struct needs a #[c_alias=\"alias_t\"]");
     if (type->extern_ref != NULL) {
         if (options->verbosity >= 3) log("Type %s is extern", type->name->name);
         type->head_resolved = true;

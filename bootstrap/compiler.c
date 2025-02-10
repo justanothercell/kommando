@@ -188,12 +188,6 @@ void compile(CompilerOptions options) {
         Module* package = parse_module_contents(s, modpath);
         package->filepath = file;
         insert_module(program, &options, package, V_PUBLIC);
-        if (str_eq(package->name->name, "core")) {
-            insert_module(program, &options, gen_core_intrinsics(), V_PUBLIC);
-            if (options.verbosity >= 2) log("Added synthetic module ::core::intrinsics");
-            insert_module(program, &options, gen_core_types(), V_PUBLIC);
-            if (options.verbosity >= 2) log("Added synthetic module ::core::types");
-        }
         SubList sublist = list_new(SubList);
         list_foreach(&package->subs, i, ModDef* m, ({
             if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, package->path)));
