@@ -771,7 +771,6 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
             if (take_ref) panic("unsupported: c intrinsic as ref");
             fprintf(code_stream, "    ");
             if (return_var != NULL) fprintf(code_stream, "%s = ", return_var);
-            fprintf(code_stream, "(");
             CIntrinsic* ci = expr->expr;
             usize i = 0;
             usize len = strlen(ci->c_expr);
@@ -823,7 +822,7 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
                 }
             }
             if (op != '\0') spanned_error("Invalid c intrinsic", expr->span, "intrinsic ended on operator: `%s`", ci->c_expr);
-            fprintf(code_stream, ");\n");
+            fprintf(code_stream, ";\n");
         } break;
         case EXPR_DEREF: {
             Expression* inner = expr->expr;

@@ -1,5 +1,6 @@
 pub fn typecast<T, V>(t: T) -> V {
-    $"({ static_assert(sizeof(@!T) == sizeof(@!V), \"Cannot cast from @:T to @:V: Sizes do not match!\"); (*(@!V*)&$!t); })"
+    $"_Static_assert(sizeof(@!T) == sizeof(@!V), \"Cannot cast from @:T to @:V: Sizes do not match!\");";
+    $"*(@!V*)&$!t"
 }
 
 pub fn numcast<T, V>(t: T) -> V {

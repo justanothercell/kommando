@@ -1353,6 +1353,11 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 };
             }
             if (op != '\0') spanned_error("Invalid c intrinsic", expr->span, "intrinsic ended on operator: `%s`", ci->c_expr);
+            if (t_return->type == NULL) {
+                TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
+                resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
+                fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);
+            }
         } break;
         case EXPR_TAKEREF: {
             Expression* inner = expr->expr;
