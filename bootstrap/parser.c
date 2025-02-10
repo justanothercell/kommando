@@ -10,6 +10,7 @@
 #include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
+#include "resolver.h"
 LIB;
 #include "module.h"
 #include "token.h"
@@ -483,8 +484,9 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         if (t->type != STRING) unexpected_token(t, "expected string for c intrinsic: `$\"<intrinsic>\"`");
         CIntrinsic* ci = malloc(sizeof(CIntrinsic));
         ci->c_expr = t->string;
-        ci->type_bindings = map_new();
-        ci->var_bindings = map_new();
+        ci->type_bindings = list_new(TypeValueList);
+        ci->var_bindings = list_new(VariableList);
+        ci->binding_sizes = list_new(UsizeList);
         expression->expr = ci;
         expression->type = EXPR_C_INTRINSIC;
     } else if (token_compare(t, "let", IDENTIFIER)) {
@@ -1051,7 +1053,9 @@ FuncDef* parse_function_definition(TokenStream* stream) {
         stream->peek = t;
         while (true) {
             t = next_token(stream);
-            if (token_compare(t, "*", SNOWFLAKE)) {
+            if (token_compare(t, ".", SNOWFLAKE)) {
+                if (!token_compare(next_token(stream), ".", SNOWFLAKE)) unexpected_token(t, "Expected end of arguments or `...` variadic argument speicifier");
+                if (!token_compare(next_token(stream), ".", SNOWFLAKE)) unexpected_token(t, "Expected end of arguments or `...` variadic argument speicifier");
                 variadic = true;
                 t = next_token(stream);
                 if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);

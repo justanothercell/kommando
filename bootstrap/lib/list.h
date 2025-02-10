@@ -129,5 +129,6 @@
     } Name
 
 LIST(List, void*);
+LIST(UsizeList, usize);
 
 #endif

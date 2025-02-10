@@ -776,17 +776,17 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
             usize len = strlen(ci->c_expr);
             char op = '\0';
             char mode = '\0';
+            usize v_index = 0;
+            usize t_index = 0;
             while (i < len) {
                 char c = ci->c_expr[i++];
                 if (op != '\0' && mode == '\0') {
                     mode = c;
                 } else if (op != '\0') {
                     if (op == '@') {
-                        str key = malloc(2);
-                        key[0] = c;
-                        key[1] = '\0';
-                        TypeValue* tv = map_get(ci->type_bindings, key);
-                        if (tv == NULL) spanned_error("Invalid c intrinsic", expr->span, "intrinsic does not bind type @%s: `%s`", key, ci->c_expr);
+                        TypeValue* tv = ci->type_bindings.elements[t_index];
+                        i += ci->binding_sizes.elements[t_index + v_index];
+                        t_index += 1;
                         if (mode == '.') {
                             fprint_resolved_typevalue(code_stream, tv, type_generics, func_generics, false);
                         } else if (mode == ':') {
@@ -799,11 +799,9 @@ void transpile_expression(Program* program, CompilerOptions* options, FILE* code
                             fprintf(code_stream, "%lu", str_hash(tyname));
                         } else spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
                     } else if (op == '$') {
-                        str key = malloc(2);
-                        key[0] = c;
-                        key[1] = '\0';
-                        Variable* v = map_get(ci->var_bindings, key);
-                        if (v == NULL) spanned_error("Invalid c intrinsic", expr->span, "intrinsic does not bind variale $%s: `%s`", key, ci->c_expr);
+                        Variable* v = ci->var_bindings.elements[v_index];
+                        i += ci->binding_sizes.elements[t_index + v_index];
+                        v_index += 1;
                         if (mode == ':') {
                             if (v->box->name == NULL) panic("Compiler error: Add a check here");
                             str name = v->box->name;

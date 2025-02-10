@@ -25,12 +25,6 @@ pub struct raw_ptr;
 pub struct c_str;
 
 #[extern]
-#[size=24]
-#[align=8]
-#[c_alias="va_list"]
-pub struct VaList;
-
-#[extern]
 #[size=1]
 #[align=1]
 #[c_alias="char"]

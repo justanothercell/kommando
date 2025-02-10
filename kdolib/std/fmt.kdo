@@ -2,7 +2,7 @@ use std::*;
 
 pub struct DynFmt {
     object: raw_ptr,
-    fmt: function_ptr<T>
+    fmt: function_ptr<unit>
 }
 
 pub trait T: Fmt {
@@ -10,7 +10,10 @@ pub trait T: Fmt {
     fn fmt(self: ptr<T>, f: ptr<Formatter>);
 }
 
-#[va_wrapper=Fmt::<>::as_dyn]
-pub fn format(format: c_str, *) -> c_str {
+pub struct Formatter {
 
+}
+
+pub fn format(format: c_str, ...) -> c_str {
+    todo()
 }

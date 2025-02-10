@@ -1321,17 +1321,32 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     mode = c;
                 } else if (op != '\0') {
                     if (op == '@') {
-                        str key = malloc(2);
-                        key[0] = c;
-                        key[1] = '\0';
-                        TypeValue* tv = gen_typevalue(key, &expr->span);
+                        if (c != '[') spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                        usize start_i = i;
+                        String key = list_new(String);
+                        while (true) {
+                            char c = ci->c_expr[i++];
+                            if (c == '\0') spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                            if (c == ']') break;
+                            list_append(&key, c);
+                        }
+                        list_append(&key, '\0');
+                        TypeValue* tv = gen_typevalue(key.elements, &expr->span);
                         resolve_typevalue(program, options, func->module, tv, func->generics, type_generics);
-                        map_put(ci->type_bindings, key, tv);
+                        list_append(&ci->type_bindings, tv);
+                        list_append(&ci->binding_sizes, i - start_i);
                         if (mode != '.' && mode != ':' && mode != '!' && mode != '#') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
                     } else if (op == '$') {
-                        str key = malloc(2);
-                        key[0] = c;
-                        key[1] = '\0';
+                        if (c != '[') spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                        usize start_i = i;
+                        String key = list_new(String);
+                        while (true) {
+                            char c = ci->c_expr[i++];
+                            if (c == '\0') spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                            if (c == ']') break;
+                            list_append(&key, c);
+                        }
+                        list_append(&key, '\0');
                         Variable* v = malloc(sizeof(Variable));
                         v->box = NULL;
                         v->global_ref = NULL;
@@ -1339,11 +1354,15 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                         v->values = NULL;
                         v->method_values = NULL;
                         Identifier* ident = malloc(sizeof(Identifier));
-                        ident->name = key;
+                        log("%s %lld %s", func->name->name, ci->binding_sizes.length, to_str_writer(s, fprint_span(s, &expr->span)));
+                        debug("%s", key.elements);
+                        ident->name = key.elements;
                         ident->span = expr->span;
                         v->path = path_simple(ident);
                         var_find(program, options, func->module, vars, v, func->generics, type_generics);
-                        map_put(ci->var_bindings, key, v);
+                        debug("%p", v->box);
+                        list_append(&ci->var_bindings, v);
+                        list_append(&ci->binding_sizes, i - start_i);
                         if (mode != ':' && mode != '!') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsic operator `%c%c`", op, mode);
                     } else spanned_error("Invalid c intrinsic op", expr->span, "No such intrinsic operator `%c`", op);
                     op = '\0';
@@ -1451,10 +1470,10 @@ void resolve_generic_keys(Program* program, CompilerOptions* options, Module* mo
 
 void resolve_module(Program* program, CompilerOptions* options, Module* module);
 void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, GenericKeys* type_generics) {
-    if (func->head_resolved) return;
     if (!func->module->resolved && !func->module->in_resolution) {
         resolve_module(program, options, func->module);
     }
+    if (func->head_resolved) return;
     if (options->verbosity >= 3) {
         if (func->trait_def) log("Resolving trait method definition %s::%s::%s", to_str_writer(s, fprint_path(s, func->trait->module->path)), func->trait->name->name, func->name->name);
         else if (func->impl_type == NULL) log("Resolving function %s::%s%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name, to_str_writer(s, fprint_generic_keys(s, func->generics)));

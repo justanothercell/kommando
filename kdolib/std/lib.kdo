@@ -11,7 +11,7 @@ pub mod any;
 pub mod trace;
 pub mod error;
 pub mod dl;
-//pub mod fmt;
+pub mod fmt;
 
 pub mod option;
 pub mod result;

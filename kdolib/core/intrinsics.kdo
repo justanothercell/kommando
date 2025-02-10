@@ -1,32 +1,32 @@
 pub fn typecast<T, V>(t: T) -> V {
-    $"_Static_assert(sizeof(@!T) == sizeof(@!V), \"Cannot cast from @:T to @:V: Sizes do not match!\");";
-    $"*(@!V*)&$!t"
+    $"_Static_assert(sizeof(@![T]) == sizeof(@![V]), \"Cannot cast from @:[T] to @:[V]: Sizes do not match!\");";
+    $"*(@![V]*)&$![t]"
 }
 
 pub fn numcast<T, V>(t: T) -> V {
-    $"((@!V)$!t)"
+    $"((@![V])$![t])"
 }
 
 pub fn sizeof<T>() -> ::core::types::usize {
-    $"sizeof(@!T)"
+    $"sizeof(@![T])"
 }
 
 pub fn alignof<T>() -> ::core::types::usize {
-    $"alignof(@!T)"
+    $"alignof(@![T])"
 }
 
 pub fn c_typename<T>() -> ::core::types::c_str { 
-    $"\"@!T\""
+    $"\"@![T]\""
 }
 
 pub fn typename<T>() -> ::core::types::c_str { 
-    $"\"@:T\""
+    $"\"@:[T]\""
 }
 
 pub fn short_typename<T>() -> ::core::types::c_str { 
-    $"\"@.T\""
+    $"\"@.[T]\""
 }
 
 pub fn typeid<T>() -> ::core::types::TypeId { 
-    $"@#Tu"
+    $"@#[T]u"
 }

@@ -166,9 +166,30 @@ typedef struct Expression {
 void fprint_expression(FILE* file, Expression* expression);
 LIST(ExpressionList, Expression*);
 
+ENUM(VarState,
+    VS_UNUSED,
+    VS_COPY,
+    VS_MOVED,
+    VS_DROPPED
+);
+
+typedef struct ModuleItem ModuleItem;
+typedef struct VarBox {
+    str name;
+    usize id;
+    TVBox* resolved;
+    TypeValue* ty;
+    ModuleItem* mi;
+    GenericValues* values;
+    VarState state;
+} VarBox;
+LIST(VarList, VarBox*);
+LIST(VariableList, Variable*);
+
 typedef struct CIntrinsic {
-    Map* type_bindings;
-    Map* var_bindings;
+    TypeValueList type_bindings;
+    VariableList var_bindings;
+    UsizeList binding_sizes;
     str c_expr;
 } CIntrinsic;
 
