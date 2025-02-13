@@ -31,7 +31,7 @@ make br file=examples/hello
 use core::types::*;
 
 #[extern]
-fn printf(fmt: c_str, *) -> i32; 
+fn printf(fmt: c_str, ...) -> i32; 
 
 // this is compilable with 
 // ./kommando -cr examples/misc/no_std.kdo examples/misc/no_std ::core=kdolib/core

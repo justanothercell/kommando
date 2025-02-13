@@ -1354,13 +1354,10 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                         v->values = NULL;
                         v->method_values = NULL;
                         Identifier* ident = malloc(sizeof(Identifier));
-                        log("%s %lld %s", func->name->name, ci->binding_sizes.length, to_str_writer(s, fprint_span(s, &expr->span)));
-                        debug("%s", key.elements);
                         ident->name = key.elements;
                         ident->span = expr->span;
                         v->path = path_simple(ident);
                         var_find(program, options, func->module, vars, v, func->generics, type_generics);
-                        debug("%p", v->box);
                         list_append(&ci->var_bindings, v);
                         list_append(&ci->binding_sizes, i - start_i);
                         if (mode != ':' && mode != '!') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsic operator `%c%c`", op, mode);
@@ -1480,6 +1477,8 @@ void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, 
         else if (func->trait != NULL) log("Resolving method %s::%s%s in trait %s::%s", to_str_writer(s, fprint_typevalue(s, func->impl_type)), func->name->name, to_str_writer(s, fprint_generic_keys(s, func->generics)), to_str_writer(s, fprint_path(s, func->trait->module->path)), func->trait->name->name);
         else log("Resolving method %s::%s%s", to_str_writer(s, fprint_typevalue(s, func->impl_type)), func->name->name, to_str_writer(s, fprint_generic_keys(s, func->generics)));
     }
+    //if (func->in_resolution) panic("Double resolving func (compiler error)");
+    func->in_resolution = true;
     if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
     if (func->return_type == NULL) {
         func->return_type = gen_typevalue("::core::types::unit", &func->name->span);
@@ -1529,6 +1528,7 @@ void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, 
         if (!is_extern) spanned_error("Extern function not marked as such", func->name->span, "Extern function should have the appropiate tag: `#[extern]`");
     }
 
+    if (func->head_resolved) return;
     func->head_resolved = true;
 
     if (func->body != NULL) {
@@ -1627,11 +1627,16 @@ void register_impl(Program* program, CompilerOptions* options, Module* module, I
 }
 
 void resolve_impl(Program* program, CompilerOptions* options, ImplBlock* impl) {
+    if (impl->head_resolved) return;
+    if (options->verbosity >= 4) log("Resolving impl block of %s", to_str_writer(s, fprint_typevalue(s, impl->type)));
+    impl->head_resolved = true;
     map_foreach(impl->methods, str name, ModuleItem* mi, ({
         UNUSED(name);
         switch (mi->type) {
             case MIT_FUNCTION: {
-                resolve_funcdef(program, options, mi->item, ((FuncDef*)mi->item)->type_generics);
+                FuncDef* func = mi->item;
+                if (func->head_resolved) continue;
+                resolve_funcdef(program, options, func, func->type_generics);
             } break;
             default:
                 unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
@@ -1640,10 +1645,10 @@ void resolve_impl(Program* program, CompilerOptions* options, ImplBlock* impl) {
 }
 
 void resolve_trait(Program* program, CompilerOptions* options, TraitDef* trait) {
-    if (trait->head_resolved) return;
     if (!trait->module->resolved && !trait->module->in_resolution) {
         resolve_module(program, options, trait->module);
     }
+    if (trait->head_resolved) return;
     if (options->verbosity >= 3) log("Resolving trait %s::%s", to_str_writer(s, fprint_path(s, trait->module->path)), trait->name->name);
     // needs to be set this early to avoid recursion
     trait->head_resolved = true;
@@ -1683,7 +1688,6 @@ void resolve_trait(Program* program, CompilerOptions* options, TraitDef* trait) 
         map_remove(trait->module->items, trait->self_key->name->name);
     }
 }
-
 
 // ive missed this typo so often that now its become intentional
 void resovle_imports(Program* program, CompilerOptions* options, Module* module, List* mask) {

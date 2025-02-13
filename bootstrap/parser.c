@@ -111,6 +111,7 @@ TypeDef* parse_struct(TokenStream* stream) {
 ImplBlock* parse_impl(TokenStream* stream, Module* module) {
     ImplBlock* impl = malloc(sizeof(ImplBlock));
     impl->methods = map_new();
+    impl->head_resolved = false;
     Token* t = next_token(stream);
     if (!token_compare(t, "impl", IDENTIFIER)) unexpected_token(t);
     t = peek_next_token(stream);
@@ -1104,6 +1105,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->is_variadic = variadic;
     func->generics = keys;
     func->head_resolved = false;
+    func->in_resolution = false;
     func->impl_type = NULL;
     func->trait = NULL;
     func->annotations = list_new(AnnoList);

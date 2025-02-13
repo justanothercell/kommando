@@ -247,7 +247,7 @@ void compile(CompilerOptions options) {
 
     if (options.compile) {
         if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch -lm %s -o %s %s", 
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch %s -lm -o %s %s", 
             options.c_compiler, code_file_name, options.outname, options.static_links ? "-static" : ""));
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));

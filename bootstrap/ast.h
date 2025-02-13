@@ -295,6 +295,7 @@ typedef struct FuncDef {
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
+    bool in_resolution;
     bool untraced;
 } FuncDef;
 
@@ -320,6 +321,7 @@ typedef struct ImplBlock {
     GenericKeys* generics;
     TypeValue* trait_ref;
     TraitDef* trait;
+    bool head_resolved;
 } ImplBlock;
 LIST(ImplList, ImplBlock*);
 
