@@ -76,6 +76,20 @@ impl<T> function_ptr<T>: Fmt {
     }
 }
 
+impl f32: Fmt { 
+    pub fn dyn_fmt(self: ptr<f32>) -> DynFmt { _ { object: typecast(self), fmt: f32::<>::fmt } }
+    pub fn fmt(self: ptr<f32>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write("%f", *self);
+    }
+}
+
+impl f64: Fmt { 
+    pub fn dyn_fmt(self: ptr<f64>) -> DynFmt { _ { object: typecast(self), fmt: f64::<>::fmt } }
+    pub fn fmt(self: ptr<f64>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write("%f", *self);
+    }
+}
+
 impl i8: Fmt { 
     pub fn dyn_fmt(self: ptr<i8>) -> DynFmt { _ { object: typecast(self), fmt: i8::<>::fmt } }
     pub fn fmt(self: ptr<i8>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
@@ -100,12 +114,7 @@ impl i64: Fmt {
         stream.write("%lld", *self);
     }
 }
-impl i128: Fmt { 
-    pub fn dyn_fmt(self: ptr<i128>) -> DynFmt { _ { object: typecast(self), fmt: i128::<>::fmt } }
-    pub fn fmt(self: ptr<i128>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
-        stream.write("%lld", *self);
-    }
-}
+
 impl isize: Fmt { 
     pub fn dyn_fmt(self: ptr<isize>) -> DynFmt { _ { object: typecast(self), fmt: isize::<>::fmt } }
     pub fn fmt(self: ptr<isize>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
@@ -134,12 +143,6 @@ impl u32: Fmt {
 impl u64: Fmt { 
     pub fn dyn_fmt(self: ptr<u64>) -> DynFmt { _ { object: typecast(self), fmt: u64::<>::fmt } }
     pub fn fmt(self: ptr<u64>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
-        stream.write("%llu", *self);
-    }
-}
-impl u128: Fmt { 
-    pub fn dyn_fmt(self: ptr<u128>) -> DynFmt { _ { object: typecast(self), fmt: u128::<>::fmt } }
-    pub fn fmt(self: ptr<u128>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
         stream.write("%llu", *self);
     }
 }

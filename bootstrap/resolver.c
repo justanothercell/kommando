@@ -675,12 +675,12 @@ TypeValue* replace_generic(TypeValue* tv, GenericValues* type_ctx, GenericValues
             to_str_writer(s, fprint_typevalue(s, type_candidate)), to_str_writer(s, fprint_span(s, &type_candidate->name->elements.elements[0]->span)),
             to_str_writer(s, fprint_typevalue(s, func_candidate)), to_str_writer(s, fprint_span(s, &func_candidate->name->elements.elements[0]->span)));
     }
-    if (type_candidate != NULL && trait_candidate != NULL) {
+    if (false && type_candidate != NULL && trait_candidate != NULL) {
         spanned_error("Multiple generic candidates (Ty/Tr)", tv->name->elements.elements[0]->span, "Generic `%s` could be replaced by %s @ %s or %s @ %s", name,
             to_str_writer(s, fprint_typevalue(s, type_candidate)), to_str_writer(s, fprint_span(s, &type_candidate->name->elements.elements[0]->span)),
             to_str_writer(s, fprint_typevalue(s, trait_candidate)), to_str_writer(s, fprint_span(s, &trait_candidate->name->elements.elements[0]->span)));
     }
-    if (trait_candidate != NULL && func_candidate != NULL) {
+    if (false && trait_candidate != NULL && func_candidate != NULL) {
         spanned_error("Multiple generic candidates (Tr/Fn)", tv->name->elements.elements[0]->span, "Generic `%s` could be replaced by %s @ %s or %s @ %s", name,
             to_str_writer(s, fprint_typevalue(s, trait_candidate)), to_str_writer(s, fprint_span(s, &trait_candidate->name->elements.elements[0]->span)),
             to_str_writer(s, fprint_typevalue(s, func_candidate)), to_str_writer(s, fprint_span(s, &func_candidate->name->elements.elements[0]->span)));

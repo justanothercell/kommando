@@ -1,4 +1,5 @@
 use std::*;
+use std::vec::Vec;
 use core::cmp::Cmp;
 
 pub struct Slice<T> {
@@ -43,6 +44,14 @@ impl<T> Slice<T> {
         if to < from { panic("Slice range negative") };
         if s.length < to { panic("Slice out of range for vector") };
         _ { buffer: std::mem::arr_offset(s.buffer, from), length: to - from }
+    }
+
+    pub fn to_vec(s: ptr<Slice<T>>) -> Vec<T> {
+        let v = Vec::<T>::new_with(s.length + 1); // reserving +1 for zero terminator when we convert the vec to string
+        while v.length < s.length {
+            v.push(s.get(v.length).unwrap());
+        };
+        v
     }
 }
 
@@ -90,5 +99,23 @@ impl Slice<char> {
             length: length,
             buffer: typecast(str)
         }
+    }
+}
+
+use std::fmt::*;
+
+impl<T: Fmt> Slice<T>: Fmt {
+    fn dyn_fmt(s: ptr<Slice<T>>) -> DynFmt {
+        _ { object: typecast(s), fmt: Slice::<T>::fmt }
+    }
+    fn fmt(s: ptr<Slice<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write_str("[");
+        let i = 0usize;
+        while i < s.length {
+            if i > 0 { stream.write_str(", "); };
+            s.get(i).unwrap().fmt(fmt, stream);
+            i += 1;
+        };
+        stream.write_str("]");
     }
 }

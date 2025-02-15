@@ -12,16 +12,16 @@ fn main() {
     map.put(81, "nine times nine");
     map.put(100, "too big of a number");
 
-    printf("map contains %ld items\n", map.length);
-    printf("map doesn't contain 5: %u\n", map.contains(5) == false);
-    printf("value of key 11: %s\n", map.get(11).unwrap());
+    println("map contains $ items", map.length.dyn_fmt());
+    println("map contains 5: $", map.contains(5).dyn_fmt());
+    println("value of key 11: $", map.get(11).unwrap().dyn_fmt());
 
-    printf("Iterating entries:\n");
+    println("Iterating entries:");
     let iter = map.iter();
     let next = iter.next();
     while next.is_some() {
         let entry = next.unwrap();
-        printf("  %u: %s\n", entry.key, entry.value);
+        println("  $: $", entry.key.dyn_fmt(), entry.value.dyn_fmt());
         next = iter.next();
     }
 }

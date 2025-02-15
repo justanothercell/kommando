@@ -29,11 +29,7 @@ fn main() {
     printf("New with capacity:\n");
     let pies = Vec::<f32>::new_with(10);
     while pies.length < pies.capacity {
-        pies.push(math::PIf32);
+        pies.push(math::PIf32 * numcast(pies.length));
     };
-    while pies.length > 0 {
-        let item = pies.pop().unwrap();
-        printf("%f ", item);
-    };
-    printf("\n");
+    println("$", pies.dyn_fmt());    
 }

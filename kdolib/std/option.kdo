@@ -105,3 +105,20 @@ impl<T> Option<T> {
         }
     }
 }
+
+use std::fmt::*;
+
+impl<T: Fmt> Option<T>: Fmt {
+    fn dyn_fmt(self: ptr<Option<T>>) -> DynFmt {
+        _ { object: typecast(self), fmt: Option::<T>::fmt }
+    }
+    fn fmt(self: ptr<Option<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        if self.exists {
+            stream.write_str("some(");
+            self.value.fmt(fmt, stream);
+            stream.write_str(")");
+        } else {
+            stream.write_str("none");
+        }
+    }
+}

@@ -1,5 +1,6 @@
 use std::*;
 use std::vec::Vec;
+use std::slice::Slice;
 
 // This is a stack based calculator
 // Examples:
@@ -39,19 +40,14 @@ fn main() {
             c_api::printf("\n");
             break;
         };
-        let len = c_api::str::strlen(input);
-        let text: ptr<char> = typecast(input);
+        let text = Slice::<char>::from_c_str(input);
         let i = 0usize;
         let numstate = 0;
         let num: f64 = 0.0;
         let fdigits = 0;
 
-        while i <= len {
-            let c = if i < len {
-                *mem::arr_offset(text, i)
-            } else {
-                32 // ' ' append a single whitespace
-            };
+        while i <= text.length {
+            let c = text.get(i).unwrap_or(32); // 32 == ' '
             i += 1;
             if c >= 48 && c <= 57 { // 0 - 9
                 if numstate == 0 {
@@ -115,7 +111,7 @@ fn main() {
                 let a = stack.get(stack.length - 2).unwrap();
                 let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
+                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) > numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 60 { // <
@@ -123,7 +119,7 @@ fn main() {
                 let a = stack.get(stack.length - 2).unwrap();
                 let b = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
-                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) == numcast::<_, i64>(b * PRECISION));
+                *stack.get_ref(stack.length - 1).unwrap() = numcast(numcast::<_, i64>(a * PRECISION) < numcast::<_, i64>(b * PRECISION));
                 continue;
             };
             if c == 61 { // =
@@ -139,8 +135,8 @@ fn main() {
                 let x = stack.get(stack.length - 1).unwrap();
                 stack.length = stack.length - 1;
                 if numcast::<_, i64>(x * PRECISION) == 0 {
-                    while i < len {
-                        let c = *mem::arr_offset(text, i);
+                    while i < text.length {
+                        let c = text.get(i).unwrap_or(32); // 32 == ' '
                         i += 1; // we end up AFTER the ]
                         if c == 93 { break; }; // ]
                     };
@@ -153,7 +149,7 @@ fn main() {
                 stack.length = stack.length - 1;
                 if numcast::<_, i64>(x * PRECISION) != 0 {
                     while i > 0 {
-                        let c = *mem::arr_offset(text, i-1);
+                        let c = text.get(i-1).unwrap_or(32); // 32 == ' '
                         if c == 91 { break; }; // [
                         i -= 1; // we end up AFTER the [
                     };

@@ -120,3 +120,31 @@ impl<T> Vec<T> {
         _ { buffer: std::mem::arr_offset(v.buffer, from), length: to - from }
     }
 }
+
+impl Vec<char> {
+    // Appends a zero terminator but does not increase length.
+    // That way the teminator can be overridden on future appends.
+    pub fn as_str(v: ptr<Vec<char>>) -> c_str {
+        v.reserve_armortized(v.length + 1); // zero terminator
+        *std::mem::arr_offset(v.buffer, v.length) = 0; // we append zero terminator but we do not increase length
+        typecast(v.buffer)
+    }
+}
+
+use std::fmt::*;
+
+impl<T: Fmt> Vec<T>: Fmt {
+    fn dyn_fmt(v: ptr<Vec<T>>) -> DynFmt {
+        _ { object: typecast(v), fmt: Vec::<T>::fmt }
+    }
+    fn fmt(v: ptr<Vec<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write_str("[");
+        let i = 0usize;
+        while i < v.length {
+            if i > 0 { stream.write_str(", "); };
+            v.get(i).unwrap().fmt(fmt, stream);
+            i += 1;
+        };
+        stream.write_str("]");
+    }
+}

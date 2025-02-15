@@ -1,6 +1,5 @@
 use std::*;
 use std::queue::Queue;
-use c_api::printf;
 
 fn main() {
     let queue: _<u8> = Queue::<_>::new();
@@ -9,9 +8,9 @@ fn main() {
     queue.push(2);
     queue.push(4);
 
-    printf("length=%ld, capacity=%ld\n", queue.length, queue.capacity);
-    while queue.length > 0 { printf(" %u", queue.pop().unwrap()); };
-    printf("\n");
+    println("length=$, capacity=$", queue.length.dyn_fmt(), queue.capacity.dyn_fmt());
+    while queue.length > 0 { print("$ ", queue.pop().unwrap().dyn_fmt()); };
+    print("\n");
 
     queue.push(1);
     queue.push(2);
@@ -24,8 +23,7 @@ fn main() {
     queue.push(9);
     queue.push(10);
     
-    printf("length=%ld, capacity=%ld\n", queue.length, queue.capacity);
-    while queue.length > 0 { printf(" %u", queue.pop().unwrap()); };
-    printf("\n");
-
+    println("length=$, capacity=$", queue.length.dyn_fmt(), queue.capacity.dyn_fmt());
+    while queue.length > 0 { print("$ ", queue.pop().unwrap().dyn_fmt()); };
+    print("\n");
 }

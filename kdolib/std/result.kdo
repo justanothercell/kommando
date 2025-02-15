@@ -92,3 +92,22 @@ impl<T> Result<T> {
         }
     }
 }
+
+use std::fmt::*;
+
+impl<T: Fmt> Result<T>: Fmt {
+    fn dyn_fmt(self: ptr<Result<T>>) -> DynFmt {
+        _ { object: typecast(self), fmt: Result::<T>::fmt }
+    }
+    fn fmt(self: ptr<Result<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        if self.is_ok {
+            stream.write_str("ok(");
+            self.value.fmt(fmt, stream);
+            stream.write_str(")");
+        } else {
+            stream.write_str("err(");
+            self.error.fmt(fmt, stream);
+            stream.write_str(")");
+        }
+    }
+}
