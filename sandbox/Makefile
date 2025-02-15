@@ -1,3 +1,5 @@
+SHELL = /bin/bash
+
 delete_image:
 	-sudo docker rmi kommando-sandbox-runner
 
