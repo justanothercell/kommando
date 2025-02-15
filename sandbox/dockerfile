@@ -12,14 +12,14 @@ COPY include/kdolib/ kdolib/
 COPY runner.py runner.py
 
 # directory for all temp files
-RUN mkdir /app/runs
+RUN mkdir /runs
 
 # making runner.py&co immutable - however much or little that may help
 RUN chmod 555 runner.py
 RUN chmod 555 Makefile
 RUN chmod 555 kdolib
 RUN chmod 555 /app
-RUN chmod 777 runs
+RUN chmod 777 /runs
 
 RUN useradd -m appuser && chown -R appuser /app
 USER appuser

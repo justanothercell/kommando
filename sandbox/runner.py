@@ -14,20 +14,21 @@ def execute():
         data = request.json
         if data is None:
             return abort(400)
-        with open(f'runs/sandbox{runner_id}.kdo', 'w') as sandfile:
+        print(data)
+        with open(f'/runs/sandbox{runner_id}.kdo', 'w') as sandfile:
             sandfile.write(data['code'])
         try:
-            process = subprocess.run(f'make compile file=runs/sandbox{runner_id}.kdo flags="{data.get('compiler_flags', '')}"', shell=True, capture_output=True, timeout=TIMEOUT)
+            process = subprocess.run(f'make compile file=/runs/sandbox{runner_id}.kdo flags="{data.get('compiler_flags', '')}"', shell=True, capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Compilation timed out after {TIMEOUT}s', 'exit_code': -1 }
         exit_code = process.returncode
         output = '\n\n'.join([process.stdout.decode() + process.stderr.decode()]).strip().split('\n')
         if exit_code != 0:
             return { 'success': False, 'output': '\n'.join(output[-1000:]), 'exit_code': exit_code }
-        if not os.path.isfile(f'runs/sandbox{runner_id}'):
+        if not os.path.isfile(f'/runs/sandbox{runner_id}'):
             return { 'success': True, 'output': '\n'.join(output[-1000:]), 'exit_code': exit_code }
         try:
-            run_process = subprocess.run(f'runs/sandbox{runner_id}', shell=True, cwd='.', capture_output=True, timeout=TIMEOUT)
+            run_process = subprocess.run(f'/runs/sandbox{runner_id}', shell=True, cwd='.', capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Execution timed out after {TIMEOUT}s', 'exit_code': -1 }
         run_exit_code = run_process.returncode
@@ -38,19 +39,19 @@ def execute():
             return { 'success': True, 'output': '\n'.join(run_output[-1000:]), 'exit_code': run_exit_code }
     finally:
         try:
-            os.remove(f'runs/sandbox{runner_id}')
+            os.remove(f'/runs/sandbox{runner_id}')
         except OSError:
             pass
         try:
-            os.remove(f'runs/sandbox{runner_id}.kdo')
+            os.remove(f'/runs/sandbox{runner_id}.kdo')
         except OSError:
             pass
         try:
-            os.remove(f'runs/sandbox{runner_id}.c')
+            os.remove(f'/runs/sandbox{runner_id}.c')
         except OSError:
             pass
         try:
-            os.remove(f'runs/sandbox{runner_id}.h')
+            os.remove(f'/runs/sandbox{runner_id}.h')
         except OSError:
             pass
 
