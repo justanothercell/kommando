@@ -2,6 +2,7 @@ from flask import Flask, request, abort
 from random import randint
 import subprocess
 import os
+import shlex
 
 TIMEOUT = 10
 
@@ -14,11 +15,10 @@ def execute():
         data = request.json
         if data is None:
             return abort(400)
-        print(data)
         with open(f'/runs/sandbox{runner_id}.kdo', 'w') as sandfile:
             sandfile.write(data['code'])
         try:
-            process = subprocess.run(f'make compile file=/runs/sandbox{runner_id}.kdo flags="{data.get('compiler_flags', '')}"', shell=True, capture_output=True, timeout=TIMEOUT)
+            process = subprocess.run(f'make compile file=/runs/sandbox{runner_id}.kdo flags="{shlex.quote(data.get('compiler_flags', ''))}"', shell=True, capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Compilation timed out after {TIMEOUT}s', 'exit_code': -1 }
         exit_code = process.returncode

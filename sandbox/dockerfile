@@ -15,6 +15,7 @@ COPY runner.py runner.py
 RUN mkdir /runs
 
 # making runner.py&co immutable - however much or little that may help
+RUN chmod 555 /
 RUN chmod 555 runner.py
 RUN chmod 555 Makefile
 RUN chmod 555 kdolib
@@ -23,6 +24,7 @@ RUN chmod 777 /runs
 
 RUN useradd -m appuser && chown -R appuser /app
 USER appuser
+RUN usermod -p '!!' root
 
 # communication port
 EXPOSE 7878
