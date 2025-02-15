@@ -18,7 +18,7 @@ def execute():
         with open(f'/runs/sandbox{runner_id}.kdo', 'w') as sandfile:
             sandfile.write(data['code'])
         try:
-            process = subprocess.run(f'./kommando $(./kdolib/link) /runs/sandbox{runner_id}.kdo /runs/sandbox{runner_id} {shlex.quote(data.get('compiler_flags', ''))}', shell=True, capture_output=True, timeout=TIMEOUT)
+            process = subprocess.run(f'./kommando $(./kdolib/link) /runs/sandbox{runner_id}.kdo /runs/sandbox{runner_id} -c {shlex.quote(data.get('compiler_flags', ''))}', shell=True, capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Compilation timed out after {TIMEOUT}s', 'exit_code': -1 }
         exit_code = process.returncode
