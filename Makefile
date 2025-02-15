@@ -7,10 +7,12 @@ build: clean
 build_release: clean
 	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
 
-clean:
+clean: clean_examples
 	@rm -f kommando
 	@rm -f CACHELOG.txt
 	@rm -f MEMTRACE.txt
+	@rm -f log.txt
+	@rm -f out.txt
 
 br: build run
 
