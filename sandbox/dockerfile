@@ -18,6 +18,7 @@ RUN chmod 444 /
 RUN chmod 444 Makefile
 RUN chmod 444 kdolib
 RUN chmod 444 /app
+RUN chmod 555 /bin
 RUN chmod 555 runner.py
 RUN chmod 555 kommando
 RUN chmod 777 /runs
