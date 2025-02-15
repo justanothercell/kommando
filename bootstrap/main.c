@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
 
     if (options.run) {
         if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RUN" ANSI_RESET_SEQUENCE, "Running " ANSI(ANSI_WHITE_FG) "%s" ANSI_RESET_SEQUENCE " ...", options.source);
-        i32 code = system(to_str_writer(stream, fprintf(stream, "./%s", options.outname)));
+        i32 code = system(options.outname);
         if (code == -1) {
             if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_RED_FG) "RUN" ANSI_RESET_SEQUENCE, "Could not start execution");
         } else {
