@@ -104,6 +104,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     type->name = name;
     type->head_resolved = false;
     type->traits = list_new(TraitList);
+    type->key = NULL;
     return type;
 }
 
@@ -155,7 +156,8 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         func->impl_block = impl;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
-            func->generics->generic_use_keys = list_new(StrList);
+            func->generics->generic_use_keys = malloc(sizeof(StrList));
+            *func->generics->generic_use_keys = list_new(StrList);
             func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
             func->generics->generics = list_new(GKeyList);
@@ -164,7 +166,8 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         if (impl->generics != NULL) {
             func->type_generics = malloc(sizeof(GenericKeys));
             func->type_generics->span = impl->generics->span;
-            func->type_generics->generic_use_keys = list_new(StrList);
+            func->type_generics->generic_use_keys = malloc(sizeof(StrList));
+            *func->type_generics->generic_use_keys = list_new(StrList);
             func->type_generics->generic_uses = map_new();
             func->type_generics->resolved = map_new();
             func->type_generics->generics = list_new(GKeyList);
@@ -205,6 +208,7 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     TraitBound* bound = malloc(sizeof(TraitBound));
     bound->bound = selfbound;
     bound->resolved = NULL;
+    bound->func_val_instances = map_new();
     list_append(&trait->self_key->bounds, bound);
     t = peek_next_token(stream);
     trait->keys = NULL;
@@ -212,7 +216,8 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
         trait->keys = parse_generic_keys(stream);
     } else {
         trait->keys = malloc(sizeof(GenericKeys));
-        trait->keys->generic_use_keys = list_new(StrList);
+        trait->keys->generic_use_keys = malloc(sizeof(StrList));
+        *trait->keys->generic_use_keys = list_new(StrList);
         trait->keys->generic_uses = map_new();
         trait->keys->resolved = map_new();
         trait->keys->generics = list_new(GKeyList);
@@ -220,6 +225,7 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     }
 
     trait->self_type = malloc(sizeof(TypeDef));
+    trait->self_type->key = NULL;
     trait->self_type->annotations = list_new(AnnoList);
     trait->self_type->flist = list_new(IdentList);
     trait->self_type->name = trait->self_key->name;
@@ -260,7 +266,8 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
         func->impl_block = NULL;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
-            func->generics->generic_use_keys = list_new(StrList);
+            func->generics->generic_use_keys = malloc(sizeof(StrList));
+            *func->generics->generic_use_keys = list_new(StrList);
             func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
             func->generics->generics = list_new(GKeyList);
@@ -670,7 +677,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 }
             }
             StructLiteral* slit = malloc(sizeof(StructLiteral));
-            TypeValue* tv =malloc(sizeof(TypeValue));
+            TypeValue* tv = malloc(sizeof(TypeValue));
             tv->name = path;
             tv->generics = generics;
             tv->def = NULL;
@@ -992,6 +999,7 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
                     TraitBound* tb = malloc(sizeof(TraitBound));
                     tb->bound = bound;
                     tb->resolved = NULL;
+                    tb->func_val_instances = map_new();
                     list_append(&gkey->bounds, tb);
                     t = next_token(stream);
                     if (!token_compare(t, "+", SNOWFLAKE)) {
@@ -1010,7 +1018,8 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
     keys->span = from_points(&left, &right);
     keys->resolved = map_new();
     keys->generic_uses = map_new();
-    keys->generic_use_keys = list_new(StrList);
+    keys->generic_use_keys = malloc(sizeof(StrList));
+    *keys->generic_use_keys = list_new(StrList);
     return keys;
 }
 

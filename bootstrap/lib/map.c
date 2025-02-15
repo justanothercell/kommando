@@ -7,12 +7,12 @@ LIB;
 Map* map_new() {
     Map* map = malloc(sizeof(Map));
     map->buckets = list_new(BucketList);
-    for (usize i = 0;i < 256;i++) list_append(&map->buckets, list_new(Bucket));
     map->random = rand();
     return map;
 }
 
 void* map_get(Map* map, str key) {
+    if (map->buckets.length == 0) return NULL;
     u32 hash = str_hash_seed(key, map->random);
     Bucket* bucket = &map->buckets.elements[hash % map->buckets.length];
     for (usize i = 0;i < bucket->length;i++) {
@@ -34,6 +34,9 @@ bool map_contains(Map* map, str key) {
 }
 
 static void map_double_buckets(Map* map) {
+    if (map->buckets.length == 0) {
+        for (usize i = 0;i < 256;i++) list_append(&map->buckets, list_new(Bucket));
+    }
     BucketList old = map->buckets;
     map->buckets = list_new(BucketList);
     map->random = rand();
@@ -47,6 +50,7 @@ static void map_double_buckets(Map* map) {
 }
 
 void* map_remove(Map* map, str key) {
+    if (map->buckets.length == 0) return NULL;
     u32 hash = str_hash_seed(key, map->random);
     Bucket* bucket = &map->buckets.elements[hash % map->buckets.length];
     for (usize i = 0;i < bucket->length;i++) {
@@ -58,6 +62,9 @@ void* map_remove(Map* map, str key) {
 }
 
 void* map_put(Map* map, str key, void* value) {
+    if (map->buckets.length == 0) {
+        for (usize i = 0;i < 256;i++) list_append(&map->buckets, list_new(Bucket));
+    }
     u32 hash = str_hash_seed(key, map->random);
     Bucket* bucket = &map->buckets.elements[hash % map->buckets.length];
     for (usize i = 0;i < bucket->length;i++) {

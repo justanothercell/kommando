@@ -87,6 +87,7 @@ TypeValue* gen_typevalue(str typevalue, Span* span) {
 TypeDef* gen_simple_type(str name) {
     Identifier* ident = gen_identifier(name);
     TypeDef* td = malloc(sizeof(TypeDef));
+    td->key = NULL;
     td->name = ident;
     td->generics = NULL;
     td->extern_ref = NULL;

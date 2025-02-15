@@ -11,11 +11,14 @@ pub mod any;
 pub mod trace;
 pub mod error;
 pub mod dl;
-pub mod fmt;
 
+pub mod fmt;
 pub mod option;
 pub mod result;
 
+pub use fmt::format;
+pub use fmt::print;
+pub use fmt::println;
 pub use option::Option;
 pub use result::Result;
 
@@ -24,7 +27,6 @@ pub use error::unreachable;
 pub use error::todo;
 
 pub use core::types::*;
-pub use u8 as char;
 pub use core::true;
 pub use core::false;
 

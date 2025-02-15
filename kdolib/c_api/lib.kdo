@@ -19,6 +19,12 @@ pub fn fclose(stream: CFileStream) -> i32;
 pub fn fflush(stream: CFileStream) -> i32;
 #[extern]
 pub fn feof(stream: CFileStream) -> i32;
+#[extern]
+pub fn puts(string: c_str) -> i32;
+#[extern]
+pub fn fputs(string: c_str, stream: CFileStream) -> i32;
+#[extern]
+pub fn fputc(c: char, stream: CFileStream) -> i32;
 
 #[extern]
 pub fn open_memstream(stream: ptr<c_str>, size: ptr<usize>) -> CFileStream;
@@ -84,3 +90,15 @@ pub fn srand(seed: u32);
 
 #[extern]
 pub fn time(tloc: raw_ptr) -> u64;
+
+/// This type is barely useable because c is weird
+#[extern]
+#[size=24]
+#[align=8]
+#[c_alias="va_list"]
+pub struct va_list;
+
+/// VA wrapper type
+pub struct VaBox {
+    va: va_list
+}

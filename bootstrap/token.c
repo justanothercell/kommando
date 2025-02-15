@@ -127,12 +127,14 @@ Token* try_next_token(TokenStream* stream) {
         }
     } else if (is_alphabetic(next) || is_numeric(next) || next == '_') {
         list_append(&tok, next);
+        bool dotted = false;
         if (is_numeric(next)) type = NUMERAL;
         else type = IDENTIFIER;
         while (true) {
             next = next_char(stream);
             if (next == '\0') goto eof;
-            if (is_alphabetic(next) || is_numeric(next) || next == '_' || (next == '.' && type == NUMERAL)) {
+            if (is_alphabetic(next) || is_numeric(next) || next == '_' || (next == '.' && type == NUMERAL && !dotted && (stream->point.index >= stream->length || is_numeric(stream->point.source[stream->point.index])))) {
+                if (next == '.') dotted = true;
                 if (type == IDENTIFIER || next != '_') list_append(&tok, next);
             } else break;
         }

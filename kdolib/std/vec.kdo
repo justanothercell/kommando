@@ -120,25 +120,3 @@ impl<T> Vec<T> {
         _ { buffer: std::mem::arr_offset(v.buffer, from), length: to - from }
     }
 }
-
-impl Vec<char> {
-    // assumes str owned if  the vector is to be modified or free'd
-    pub fn from_str(str: c_str) -> Vec<char> {
-        let length = c_api::str::strlen(str);
-        _ {
-            length: length,
-            capacity: length,
-            buffer: typecast(str)
-        }
-    }
-
-    // returns a reference to the itnernal buffer as a c string.
-    // may move internal buffer to ensure proper \0 termination.
-    // repeated calls without modification of the vector in between will not move again.
-    pub fn as_c_str(v: Vec<char>) -> c_str {
-        // make buffer end in '\0' without actually inserting it or affecting the string.
-        v.reserve_armortized(v.length + 1);
-        *std::mem::arr_offset(v.buffer, v.length) = 0;
-        typecast(v.buffer)
-    }
-}

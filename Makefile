@@ -35,7 +35,7 @@ test: build clean_examples
 	all_files=$$(find ./examples -name "*.kdo"); \
 	count=$$(echo $$all_files | wc -w); \
 	index=0; \
-	printf "Running tests...\n"; \
+	printf "\x1b[1mRunning tests...\x1b[0m\n"; \
 	for file in $$all_files; do \
 		index=$$((index + 1)); \
 		if make compile file=$$file > /dev/null 2>&1; then \
@@ -46,7 +46,7 @@ test: build clean_examples
 			fail=$$((fail + 1)); \
 		fi; \
 	done; \
-	printf "Tests complete.\n"; \
+	printf "\x1b[1mTests complete.\x1b[0m\n"; \
 	printf "\x1b[1;32msuccess: $$success\x1b[0m\t\x1b[1;31mfail: $$fail\x1b[0m\n"; \
 	if (test $$fail -ne 0); then \
 		(exit 1); \

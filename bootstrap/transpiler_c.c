@@ -313,14 +313,14 @@ str gen_c_var_name(Variable* v, GenericValues* type_generics, GenericValues* fun
         return gen_c_static_name(v->global_ref);
     }
     if (v->box->name != NULL) {
-        return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, (usize)v->box));
+        return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, v->box->id));
     } else {
         if (v->method_name != NULL) {
             FuncDef* func = v->box->mi->item;
             if (func->trait != NULL) {
                 TypeValue* actual = replace_generic(v->box->ty, func_generics, type_generics, NULL, NULL);
                 ImplBlock* trait_impl = map_get(actual->trait_impls, to_str_writer(s, fprintf(s, "%p", func->trait)));
-                if (trait_impl == NULL) panic("No trait impl found");
+                if (trait_impl == NULL) panic("No trait impl for %s on %s found", func->trait->name->name, to_str_writer(s, fprint_typevalue(s, actual)));
                 ModuleItem* method = map_get(trait_impl->methods, func->name->name);
                 if (method == NULL) panic("No method in trait impl found");
                 if (method->type != MIT_FUNCTION) panic("is not a method");
@@ -917,7 +917,7 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
                 new_use->in_func = ctx;
                 map_put(instance_host->generic_uses, expanded_key, new_use);
                 // we are iterating over this but in this case we can safely append, even if realloc
-                list_append(&instance_host->generic_use_keys, expanded_key);
+                list_append(instance_host->generic_use_keys, expanded_key);
             }
         });
         return false;
@@ -947,7 +947,7 @@ bool monomorphize(GenericValues* type_instance, GenericValues* func_instance, Ge
                 new_use->in_func = use->in_func;
                 map_put(instance_host->generic_uses, expanded_key, new_use);
                 // we are iterating over this but in this case we can safely append, even if realloc
-                list_append(&instance_host->generic_use_keys, expanded_key);
+                list_append(instance_host->generic_use_keys, expanded_key);
             }
         });
         return false;
@@ -1055,7 +1055,7 @@ void transpile_function(Program* program, CompilerOptions* options, FILE* header
     if (func->generics != NULL) {
         Map* dupls = map_new();
         // we can safely append to that list, even if it reallocates it should be fine as long as its the last thing we do with the item before refetching
-        list_foreach(&func->generics->generic_use_keys, i, str key, {
+        list_foreach(func->generics->generic_use_keys, i, str key, {
             GenericUse* use = map_get(func->generics->generic_uses, key);
             GenericValues* type_generics = use->type_context;
             GenericValues* func_generics = use->func_context;
@@ -1068,12 +1068,12 @@ void transpile_function(Program* program, CompilerOptions* options, FILE* header
                 }
             }
         });
-        if (func->trait != NULL) {
+        if (func->trait != NULL && false) {
             fprintf(code_stream, "// FROM TRAIT\n");
             ModuleItem* tf = map_get(func->trait->methods, func->name->name);
             FuncDef* traitfunc = tf->item;
             // we can safely append to that list, even if it reallocates it should be fine as long as its the last thing we do with the item before refetching
-            list_foreach(&traitfunc->generics->generic_use_keys, i, str key, {
+            list_foreach(traitfunc->generics->generic_use_keys, i, str key, {
                 GenericUse* use = map_get(traitfunc->generics->generic_uses, key);
                 GenericValues* type_generics = use->type_context;
                 GenericValues* func_generics = use->func_context;
@@ -1081,6 +1081,7 @@ void transpile_function(Program* program, CompilerOptions* options, FILE* header
                 if (monomorphize(type_generics, func_generics, traitfunc->generics, use->in_func)) {
                     str fn_c_name = gen_c_fn_name(func, type_generics, func_generics);
                     if (!map_contains(dupls, fn_c_name)) {
+                        log("transpiling (!)");
                         transpile_function_generic_variant(program, options, header_stream, code_stream, func, type_generics, func_generics);
                         map_put(dupls, fn_c_name, malloc(1));
                     }
@@ -1131,7 +1132,7 @@ void transpile_typedef(Program* program, CompilerOptions* options, FILE* header_
     ty->transpile_state = 1;
     if (ty->generics != NULL) {
         // we can safely append to that list as long as its the last thing we do with the item sbefore refetching
-        list_foreach(&ty->generics->generic_use_keys, i, str key, {
+        list_foreach(ty->generics->generic_use_keys, i, str key, {
             GenericUse* use = map_get(ty->generics->generic_uses, key);
             GenericValues* type_generics = use->type_context;
             GenericValues* func_generics = use->func_context;

@@ -82,3 +82,13 @@ impl<T> Slice<T> {
         right.sort_with(comparator);
     }
 }
+
+impl Slice<char> {
+    pub fn from_c_str(str: c_str) -> Slice<char> {
+        let length = c_api::str::strlen(str);
+        _ {
+            length: length,
+            buffer: typecast(str)
+        }
+    }
+}
