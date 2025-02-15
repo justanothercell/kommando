@@ -24,7 +24,6 @@ RUN chmod 777 /runs
 
 RUN useradd -m appuser && chown -R appuser /app
 USER appuser
-RUN usermod -p '!!' root
 
 # communication port
 EXPOSE 7878
