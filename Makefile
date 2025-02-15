@@ -2,36 +2,35 @@ GCC_RELEASE_FLAGS = -O3 -Wno-array-bounds
 GCC_WARNINGS = -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=unused-parameter
 
 build: clean
-	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS)
+	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS)
 
 build_release: clean
-	gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
+	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
 
-clean: clean_examples
+clean:
 	@rm -f kommando
 	@rm -f CACHELOG.txt
 	@rm -f MEMTRACE.txt
-	@rm -f log.txt
 	@rm -f out.txt
 
 br: build run
 
 run:
-	name=$(basename $(file) .kdo); \
+	@name=$(basename $(file) .kdo); \
 	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr $(flags)
 
 compile:
-	name=$(basename $(file) .kdo); \
+	@name=$(basename $(file) .kdo); \
 	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c $(flags)
 
 help:
-	./kommando --help
+	@./kommando --help
 
 clean_examples:
 	@git clean -fX examples >/dev/null
 
 test: build clean_examples
-	flags="--silent"
+	@flags="--silent"
 	@success=0; \
 	fail=0; \
 	all_files=$$(find ./examples -name "*.kdo"); \

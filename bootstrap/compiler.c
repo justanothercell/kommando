@@ -39,6 +39,7 @@ CompilerOptions build_args(StrList* args) {
         printf("The following options are compiler diagnostics:\n");
         printf("    --trace-compiler - trace the compiler on panic\n");
         printf("    --emit-spans     - Write source references as comments in generated c\n");
+        printf("    --log-lines      - Include [source.c:line] in console logs\n");
         printf("Using `make` with sensibe defaults:\n");
         printf("make run file=<infile> flags=\"<optional compiler flags>\"\n");
         quit(0);
@@ -69,6 +70,8 @@ CompilerOptions build_args(StrList* args) {
                 options.run = true;
             } else if (str_eq(arg, "trace-compiler")) {
                 TRACE_ON_PANIC = true;
+            } else if (str_eq(arg, "log-lines")) {
+                LOG_LINES = true;
             } else if (str_eq(arg, "emit-spans")) {
                 options.emit_spans = true;
             } else if (str_eq(arg, "compile")) {

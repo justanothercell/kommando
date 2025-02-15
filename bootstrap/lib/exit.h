@@ -4,6 +4,7 @@
 #include "defines.h"
 
 extern bool TRACE_ON_PANIC;
+extern bool LOG_LINES;
 
 void init_exit_handler(void (*exit_func)(str file, usize line, int code));
 

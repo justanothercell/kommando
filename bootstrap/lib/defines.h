@@ -73,7 +73,7 @@
 
 #define __FILENAME__ (strrchr(__FILE__, __PATH_SEP__) ? strrchr(__FILE__, __PATH_SEP__) + 1 : __FILE__)
 
-#define fprint_prefix_raw(file, srcfile, line) fprintf(file, "[" ANSI(ANSI_BOLD,ANSI_MAGENTA_FG)"%s:%i" ANSI_RESET_SEQUENCE"] ", srcfile, line)
+#define fprint_prefix_raw(file, srcfile, line) do { if (LOG_LINES) fprintf(file, "[" ANSI(ANSI_BOLD,ANSI_MAGENTA_FG)"%s:%i" ANSI_RESET_SEQUENCE"] ", srcfile, line); } while (0)
 #define fprint_prefix(file) fprint_prefix_raw(file, __FILENAME__, __LINE__)
 #define print_prefix() fprint_prefix(stdout)
 #define flog(file, fmt, ...) do { fprint_prefix(file); fprintf(file, fmt, ## __VA_ARGS__); fprintf(file, "\n"); } while(0)

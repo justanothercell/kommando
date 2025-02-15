@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+        <script src="https://cdn.jsdelivr.net/npm/ansi_up@4.0.4/ansi_up.js"></script>
+		<link rel="stylesheet" data-name="vs/editor/editor.main" href="https://unpkg.com/monaco-editor/min/vs/editor/editor.main.css"/>
+		<link rel="stylesheet" href="./editor.css"/>
+	</head>
+	<body>
+        <h1>
+            <a href="https://github.com/justanothercell/kommando/tree/dev" style="color:white">Kommando sandbox</a>
+        </h1>
+        <div id="header">
+            <button id="button-run">Run</button>
+            <input type="checkbox" id="show-compiler-output"><label id="show-compiler-output-label">Compiler<br>Output</label>
+            <input id="compiler-flags" placeholder="compiler flags | try --help for a list of options">
+        </div>
+        <div id="main">
+            <div id="editor"></div>
+            <div id="draggable-divider"></div>
+            <div id="output"></div>
+        </div>
+
+        <script>
+            var divider = document.getElementById('draggable-divider');
+
+            divider.onmousedown = (e) => {
+                document.onmouseup = (e) => {
+                    document.onmouseup = null;
+                    document.onmousemove = null;
+                };
+                document.onmousemove = (e) => {
+                    var editor = document.getElementById('editor');
+                    editor.style.width = e.clientX - editor.offsetLeft - 8 + "px";
+                };
+            };
+        </script>
+
+		<script>
+			var require = { paths: { vs: 'https://unpkg.com/monaco-editor/min/vs' } };
+		</script>
+		<script src="https://unpkg.com/monaco-editor/min/vs/loader.js"></script>
+		<script src="https://unpkg.com/monaco-editor/min/vs/editor/editor.main.js"></script>
+		<script>
+			var editor = monaco.editor.create(document.getElementById('editor'), {
+				value: 'use std::*;\n\nfn main() {\n    println("Hello, world!");\n}',
+				language: 'rust',
+                theme: 'vs-dark',
+                automaticLayout: true
+			});
+
+            document.onkeydown = (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    run();
+                }
+            };
+            const run_button = document.getElementById('button-run');
+            const compiler_flags = document.getElementById('compiler-flags');
+            const compiler_output = document.getElementById('show-compiler-output')
+            run_button.onclick = (e) => run();
+            const output = document.getElementById('output');
+            const ansi_up = new AnsiUp();
+            
+            var exec_state = 'idle';
+
+            function run() {
+                save();
+                if (exec_state != 'idle') return;
+                exec_state = 'running';
+                output.innerHTML = 'Executing...';
+                let flags = compiler_flags.value;
+                let show_output = compiler_output.checked;
+                let code = editor.getValue();
+                let i = 0;
+                let handler = setInterval(() => {
+                    i += 1;
+                    run_button.innerHTML = '.'.repeat(i % 3 + 1);
+                    if (exec_state == 'idle') {
+                        clearInterval(handler);
+                        run_button.innerHTML = 'Run';
+                    }
+                }, 350);
+                fetch('execute', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ compiler_flags: flags, show_compiler_output: show_output, code: code })
+                })
+                .then((response) => {
+                    if (response.status != 200) {
+                        output.innerHTML = ansi_up.ansi_to_html('\x1b[1;37mError executing:\n' + response.statusText + '\x1b[0m');
+                        exec_state = 'idle';
+                        return;
+                    }
+                    return response.json()
+                }).then((json) => {
+                    if (!json) return;
+                    if (json['success']) {
+                        output.innerHTML = ansi_up.ansi_to_html(json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
+                    } else {
+                        output.innerHTML = ansi_up.ansi_to_html('\x1b[1;37mCompilation error:\x1b[0m\n' + json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
+                    }
+                    exec_state = 'idle';
+                }).catch((error) => {
+                    output.innerHTML = 'Error executing:\n' + error;
+                    exec_state = 'idle';
+                }).finally(() => {
+                    exec_state = 'idle'; // just in case 
+                    output.scrollTop = output.scrollHeight;
+                });
+            }
+
+            function load() {
+                let flags = localStorage.getItem('editor.flags');
+                let show_output = localStorage.getItem('editor.show_output');
+                let code = localStorage.getItem('editor.code');
+                if (flags != null) compiler_flags.value = flags;
+                if (show_output != null) compiler_output.checked = show_output == 'true';
+                if (code != null) editor.setValue(code);
+            }
+
+            function save() {
+                let flags = compiler_flags.value;
+                let show_output = compiler_output.checked;
+                let code = editor.getValue();
+                localStorage.setItem('editor.flags', flags);
+                localStorage.setItem('editor.show_output', show_output);
+                localStorage.setItem('editor.code', code);
+            }
+
+            window.onunload = save;
+            load();
+            run();
+		</script>
+	</body>
+</html>

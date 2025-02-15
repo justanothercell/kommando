@@ -15,6 +15,7 @@
 #include "signal.h"
 
 bool TRACE_ON_PANIC = false;
+bool LOG_LINES = false;
 
 static void (*EXIT_FUNC)(str file, usize line, int code) = NULL;
 #define INTERRUPT_MODULE ANSI(ANSI_BOLD, ANSI_RED_FG) "INTERRUPT" ANSI_RESET_SEQUENCE
