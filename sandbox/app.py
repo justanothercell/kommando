@@ -13,6 +13,7 @@ def style():
 
 @app.route('/execute', methods = [ 'POST' ])
 def execute():
+    print(request.json)
     r = requests.post('http://localhost:7878/execute', json=request.json)
     return r.json()
 
