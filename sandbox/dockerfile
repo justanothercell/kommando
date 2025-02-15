@@ -4,22 +4,19 @@ WORKDIR /app
 
 # include compiler
 COPY include/kommando kommando
-# include makefile
-COPY include/Makefile Makefile
 # include libs
 COPY include/kdolib/ kdolib/
-
+# include runner
 COPY runner.py runner.py
 
 # directory for all temp files
 RUN mkdir /runs
 
 RUN chmod 444 /
-RUN chmod 444 Makefile
 RUN chmod 555 kdolib
 RUN chmod 555 /app
 RUN chmod 555 /bin
-RUN chmod 555 runner.py
+RUN chmod 444 runner.py
 RUN chmod 555 kommando
 RUN chmod 777 /runs
 
