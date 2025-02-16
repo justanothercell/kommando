@@ -18,7 +18,7 @@ def rmdir(directory):
     directory.rmdir()
 
 def delete_old_files():
-    for item in Path('/runs').iterdir():
+    for item in Path('/tempdata').iterdir():
         if item.is_dir(): # invalid, delete either way
             rmdir(item)
         else: # delete if older than 1 minute
@@ -43,21 +43,21 @@ def execute():
         data = request.json
         if data is None:
             return abort(400)
-        with open(f'/runs/sandbox{runner_id}.kdo', 'w') as sandfile:
+        with open(f'/tempdata/sandbox{runner_id}.kdo', 'w') as sandfile:
             sandfile.write(data['code'])
         try:
             args = [shlex.quote(arg) for arg in data.get('compiler_flags', '').split()]
-            process = subprocess.run(f'./kommando $(./kdolib/link) /runs/sandbox{runner_id}.kdo /runs/sandbox{runner_id} -c {' '.join(args)}', shell=True, capture_output=True, timeout=TIMEOUT)
+            process = subprocess.run(f'./kommando $(./kdolib/link) /tempdata/sandbox{runner_id}.kdo /tempdata/sandbox{runner_id} -c {' '.join(args)}', shell=True, capture_output=True, timeout=TIMEOUT, vars={'TMPDIR': '/tempdata'})
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Compilation timed out after {TIMEOUT}s', 'exit_code': -1 }
         exit_code = process.returncode
         output = '\n\n'.join([process.stdout.decode() + process.stderr.decode()]).strip().split('\n')
         if exit_code != 0:
             return { 'success': False, 'output': '\n'.join(output[-1000:]), 'exit_code': exit_code }
-        if not os.path.isfile(f'/runs/sandbox{runner_id}'):
+        if not os.path.isfile(f'/tempdata/sandbox{runner_id}'):
             return { 'success': True, 'output': '\n'.join(output[-1000:]), 'exit_code': exit_code }
         try:
-            run_process = subprocess.run(f'/runs/sandbox{runner_id}', shell=True, cwd='.', capture_output=True, timeout=TIMEOUT)
+            run_process = subprocess.run(f'./sandbox{runner_id}', shell=True, cwd='/tempdata', capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Execution timed out after {TIMEOUT}s', 'exit_code': -1 }
         run_exit_code = run_process.returncode
@@ -68,19 +68,19 @@ def execute():
             return { 'success': True, 'output': '\n'.join(run_output[-1000:]), 'exit_code': run_exit_code }
     finally:
         try:
-            os.remove(f'/runs/sandbox{runner_id}')
+            os.remove(f'/tempdata/sandbox{runner_id}')
         except OSError:
             pass
         try:
-            os.remove(f'/runs/sandbox{runner_id}.kdo')
+            os.remove(f'/tempdata/sandbox{runner_id}.kdo')
         except OSError:
             pass
         try:
-            os.remove(f'/runs/sandbox{runner_id}.c')
+            os.remove(f'/tempdata/sandbox{runner_id}.c')
         except OSError:
             pass
         try:
-            os.remove(f'/runs/sandbox{runner_id}.h')
+            os.remove(f'/tempdata/sandbox{runner_id}.h')
         except OSError:
             pass
 
