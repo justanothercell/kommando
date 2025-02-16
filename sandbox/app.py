@@ -11,7 +11,7 @@ def index():
 def guide():
     return redirect('/docs/guide/introduction.html')
 
-@app.route('/docs/guide/<item:path>')
+@app.route('/docs/guide/<path:item>')
 def guide_item(item):
     return send_from_directory('../docs/guide/book/', item)
 
