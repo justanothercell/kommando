@@ -1345,6 +1345,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             if (td->module == NULL) spanned_error("Trying to access field of generic", fa->field->span, "%s @ %s is generic and as such has no visible fields",  to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(stream, fprint_span(stream, &td->name->span)));
             if (td->fields == NULL) unreachable("Fields should not be null unless it's a generic");
             Field* field = map_get(td->fields, fa->field->name);
+            if (field->type->def == NULL) resolve_typevalue(program, options, func->module, field->type, NULL, td->generics);
             if (field == NULL) {
                 if (td->module == NULL) unreachable("Module should not be null unless it's a generic");
                 str path = to_str_writer(stream, {
