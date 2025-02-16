@@ -1,7 +1,8 @@
 # Summary
 
 [Introduction](./introduction.md)
-- [First steps](./first_steps/first_steps.md)
+- [First steps](./first_steps/hello_world.md)
+    - [Hello, world](./first_steps/hello_world.md)
     - [No-std](./first_steps/no_std.md)
     - [Variables](./first_steps/variables.md)
     - [Expressions](./first_steps/expressions/expressions.md)
@@ -12,7 +13,6 @@
     - [Pointers](./first_steps/pointers.md)
     - [Structs](./first_steps/structs/structs.md)
         - [Methods](./first_steps/structs/methods.md)
-        - [Traits](./first_steps/structs/traits.md)
         - [Printable](./first_steps/structs/printable.md)
     - [Generics](./first_steps/generics/generics.md)
         - [Traits](./first_steps/generics/traits.md)

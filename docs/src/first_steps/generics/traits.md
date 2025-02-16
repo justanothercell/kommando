@@ -2,7 +2,10 @@
 Unlike with concrete types, we do not have a lot information to work with for our `T`.
 
 This is where traits come to shine! Let's say we want to print some information about a box.
-We just need to tell the compiler that `T` should itself implement `Fmt`, by introducing a so-called _trait bound_:
+We just need to tell the compiler that `T` should itself implement `Fmt`, by introducing a so-called _trait bound_.
+
+This ensures a contract that `T` is guaranteed to implement certain methods, in this case `Fmt::fmt` and `Fmt::dyn_fmt`:
+
 ```rs
 !use std::*;
 !use std::fmt::Fmt;
@@ -22,7 +25,6 @@ We just need to tell the compiler that `T` should itself implement `Fmt`, by int
 !    }
 !}
 !
-// trait bound!
 impl<T: Fmt> Box<T> {
     fn print_info(self: ptr<Box<T>>) {
         println("Box contains $ [$]", short_typename::<T>().dyn_fmt(), self.item.dyn_fmt());

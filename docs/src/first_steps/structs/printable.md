@@ -26,8 +26,12 @@ To advertise its printablility, we need to implement the `Fmt` trait:
 !}
 !
 impl Color: Fmt {
-    fn dyn_fmt(self: ptr<Color>) -> DynFmt { todo() }
-    fn fmt(self: ptr<Vehicle>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) { todo() }
+    fn dyn_fmt(self: ptr<Color>) -> DynFmt { 
+        todo()
+    }
+    fn fmt(self: ptr<Vehicle>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        todo()
+    }
 }
 ```
 

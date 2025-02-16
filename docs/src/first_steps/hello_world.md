@@ -1,4 +1,4 @@
-# First steps
+# hello, world
 
 Let's start by writing a hello world program:
 ```rs

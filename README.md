@@ -11,6 +11,8 @@
 |  | \\_/\_|| \| || || |_|_| |\_|   |__| || |\_||_|| |\_||__     \___[_[_]__]___|
 ```
 
+Take a look at the online [Sandbox](callie.cat) and the [docs](callie.cat/docs)
+
 ## Quickstart
 ```sh
 make build
