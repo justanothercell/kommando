@@ -12,6 +12,8 @@ pub fn printf(fmt: c_str, ...) -> i32;
 #[extern]
 pub fn fprintf(stream: CFileStream, fmt: c_str, ...) -> i32;
 #[extern]
+pub fn vfprintf(stream: CFileStream, fmt: c_str, args: va_list) -> i32;
+#[extern]
 pub fn fopen(path: c_str, mode: c_str) -> CFileStream;
 #[extern]
 pub fn fclose(stream: CFileStream) -> i32;
@@ -25,6 +27,21 @@ pub fn puts(string: c_str) -> i32;
 pub fn fputs(string: c_str, stream: CFileStream) -> i32;
 #[extern]
 pub fn fputc(c: char, stream: CFileStream) -> i32;
+
+pub fn formatf(format: c_str, ...) -> c_str {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+
+    let msg = c_api::nullstr;
+    let size = 0usize;
+    let stream = c_api::open_memstream(&msg, &size);
+    $"vfprintf($![stream], $![format], $![args].va)";
+    c_api::fclose(stream);
+    
+    $"va_end($![args].va)";
+
+    msg
+}
 
 #[extern]
 pub fn open_memstream(stream: ptr<c_str>, size: ptr<usize>) -> CFileStream;

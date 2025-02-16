@@ -39,3 +39,4 @@ let b: usize = 5;
 let c: u8 = 5i8; // This does not work as the two types conflict!
 !}
 ```
+>**Note:** Goto [numbers](./numbers.md) for more information about different usecases for different types 
