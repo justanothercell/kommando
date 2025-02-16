@@ -1,15 +1,14 @@
 use std::*;
 use std::any::Any;
-use c_api::printf;
 
 fn main() {
     let x = "hello";
     let a = Any::<>::from(&x);
-    printf("a is i32? %d\n", a.is::<i32>());
-    printf("a is c_str? %d\n", a.is::<c_str>());
+    println("a is i32? $", a.is::<i32>().dyn_fmt());
+    println("a is c_str? $", a.is::<c_str>().dyn_fmt());
     let s: c_str = *a.as::<c_str>();
-    printf("c_str value of a: %s\n", s);
+    println("c_str value of a: $", s.dyn_fmt());
     if a.try_as::<i32>().is_some() { unreachable::<unit>(); };
     let i: i32 = *a.as::<i32>(); // crashes at runtime
-    printf("unreachable!\n");
+    unreachable()
 }

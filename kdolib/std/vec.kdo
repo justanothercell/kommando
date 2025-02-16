@@ -1,4 +1,5 @@
 use std::*;
+use std::slice::Slice;
 
 pub struct Vec<T> {
     length: usize,
@@ -108,26 +109,42 @@ impl<T> Vec<T> {
         v.length = 0;
         v.capacity = 0;
     }
+
+    pub fn slice(v: ptr<Vec<T>>) -> Slice<T> {
+        v.slice_range(0, v.length)
+    }
+
+    pub fn slice_range(v: ptr<Vec<T>>, from: usize, to: usize) -> Slice<T> {
+        if to < from { panic("Slice range negative") };
+        if v.length < to { panic("Slice out of range for vector") };
+        _ { buffer: std::mem::arr_offset(v.buffer, from), length: to - from }
+    }
 }
 
 impl Vec<char> {
-    // assumes str owned if  the vector is to be modified or free'd
-    pub fn from_str(str: c_str) -> Vec<char> {
-        let length = c_api::str::strlen(str);
-        _ {
-            length: length,
-            capacity: length,
-            buffer: typecast(str)
-        }
-    }
-
-    // returns a reference to the itnernal buffer as a c string.
-    // may move internal buffer to ensure proper \0 termination.
-    // repeated calls without modification of the vector in between will not move again.
-    pub fn as_c_str(v: Vec<char>) -> c_str {
-        // make buffer end in '\0' without actually inserting it or affecting the string.
-        v.reserve_armortized(v.length + 1);
-        *std::mem::arr_offset(v.buffer, v.length) = 0;
+    // Appends a zero terminator but does not increase length.
+    // That way the teminator can be overridden on future appends.
+    pub fn as_str(v: ptr<Vec<char>>) -> c_str {
+        v.reserve_armortized(v.length + 1); // zero terminator
+        *std::mem::arr_offset(v.buffer, v.length) = 0; // we append zero terminator but we do not increase length
         typecast(v.buffer)
+    }
+}
+
+use std::fmt::*;
+
+impl<T: Fmt> Vec<T>: Fmt {
+    fn dyn_fmt(v: ptr<Vec<T>>) -> DynFmt {
+        _ { object: typecast(v), fmt: Vec::<T>::fmt }
+    }
+    fn fmt(v: ptr<Vec<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write_str("[");
+        let i = 0usize;
+        while i < v.length {
+            if i > 0 { stream.write_str(", "); };
+            v.get(i).unwrap().fmt(fmt, stream);
+            i += 1;
+        };
+        stream.write_str("]");
     }
 }

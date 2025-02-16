@@ -24,6 +24,17 @@ pub fn input(message: std::c_str) -> std::c_str {
     out_line
 }
 
+struct Getch {}
+
+impl Getch {
+    pub fn new() -> Getch {
+        _ {}
+    }
+
+    pub fn reset(getch: Getch) {
+
+    }
+}
 
 //struct termios orig_termios;
 //

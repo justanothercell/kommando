@@ -1,5 +1,6 @@
 
 use std::*;
+use std::fmt::*;
 
 pub struct Option<T> {
     value: T,
@@ -23,11 +24,11 @@ impl<T> Option<T> {
         self.exists == false
     }
 
-    pub fn to_result(self: Option<T>, error: c_str) -> Result<T> {
+    pub fn to_result<E>(self: Option<T>, error: E) -> Result<T, E> {
         if self.exists {
-            Result::<_>::ok(self.value)
+            Result::<_, _>::ok(self.value)
         } else {
-            Result::<_>::err(error)
+            Result::<_, _>::err(error)
         }
     }
 
@@ -51,12 +52,7 @@ impl<T> Option<T> {
         if self.exists {
             self.value
         } else {
-            let msg = c_api::nullstr;
-            let size = 0usize;
-            let stream = c_api::open_memstream(&msg, &size);
-            c_api::fprintf(stream, "Unwrapping empty option: %s", error);
-            c_api::fclose(stream);
-            panic(msg)
+            panic(format("Unwrapping empty option: $", error.dyn_fmt()))
         }
     }
 
@@ -102,6 +98,19 @@ impl<T> Option<T> {
             Option::<_>::some(*self.value)
         } else {
             Option::<_>::none()
+        }
+    }
+}
+
+impl<T: Fmt> Option<T>: Fmt {
+    fn dyn_fmt(self: ptr<Option<T>>) -> DynFmt {
+        _ { object: typecast(self), fmt: Option::<T>::fmt }
+    }
+    fn fmt(self: ptr<Option<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        if self.exists {
+            stream.write_str("some(").write(fmt, self.value).write_str(")");
+        } else {
+            stream.write_str("none");
         }
     }
 }

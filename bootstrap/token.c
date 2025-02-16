@@ -2,8 +2,10 @@
 #include "lib.h"
 #include "lib/exit.h"
 #include "lib/str.h"
+#include "parser.h"
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 bool is_alphabetic(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -56,7 +58,10 @@ Token* try_next_token(TokenStream* stream) {
         start = stream->point;
         next = next_char(stream);
         if (next == '\0') goto eof;
-        if (is_whitespace(next)) continue;
+        if (is_whitespace(next)) { 
+            start = stream->point;
+            continue;
+        }
         if (next == '/') {
             next = next_char(stream);
             if (next == '\0') goto eof;
@@ -90,19 +95,46 @@ Token* try_next_token(TokenStream* stream) {
         while (true) {
             next = next_char(stream);
             if (next == '\0') goto eof;
-            if (next == '"') {
-                break;
-            } 
-            list_append(&tok, next);
+            if (next == '\\') {
+                next = next_char(stream);
+                if (next == '"') list_append(&tok, '"');
+                else if (next == '\\') list_append(&tok, '\\');
+                else if (next == 'n') list_append(&tok, '\n');
+                else if (next == 'r') list_append(&tok, '\r');
+                else if (next == 't') list_append(&tok, '\t');
+                else if (next == 'x') {
+                    char a = next_char(stream);
+                    if (!str_contains_char("1234567890abcdefABCDEF", a)) {
+                        Span here = from_points(&stream->point, &stream->point);
+                        spanned_error("Invalid hex digit", here, "Invalid hex digit for string escape \\x%c%c", a, next_char(stream));
+                    }
+                    char b = next_char(stream);
+                    if (!str_contains_char("1234567890abcdefABCDEF", b)) {
+                        Span here = from_points(&stream->point, &stream->point);
+                        spanned_error("Invalid hex digit", here, "Invalid hex digit for string escape \\x%c%c", a, b);
+                    }
+                    char str[] = { a, b, '\0' };
+                    unsigned char from_hex = strtoul(str, NULL, 16);
+                    list_append(&tok, *(char*)&from_hex);
+                } else {
+                    Span here = from_points(&stream->point, &stream->point);
+                    spanned_error("Invalid string escape", here, "No such escape sequence \\%c", next);
+                }
+            } else {
+                if (next == '"') break;
+                list_append(&tok, next);
+            }
         }
     } else if (is_alphabetic(next) || is_numeric(next) || next == '_') {
         list_append(&tok, next);
+        bool dotted = false;
         if (is_numeric(next)) type = NUMERAL;
         else type = IDENTIFIER;
         while (true) {
             next = next_char(stream);
             if (next == '\0') goto eof;
-            if (is_alphabetic(next) || is_numeric(next) || next == '_' || (next == '.' && type == NUMERAL)) {
+            if (is_alphabetic(next) || is_numeric(next) || next == '_' || (next == '.' && type == NUMERAL && !dotted && (stream->point.index >= stream->length || is_numeric(stream->point.source[stream->point.index])))) {
+                if (next == '.') dotted = true;
                 if (type == IDENTIFIER || next != '_') list_append(&tok, next);
             } else break;
         }

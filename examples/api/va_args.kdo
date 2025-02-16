@@ -1,0 +1,18 @@
+use std::*;
+
+fn print_strings(n: i32, ...) {
+    $"va_list list";
+    $"va_start(list, $![n])";
+    while n > 0 {
+        let s: c_str = $"va_arg(list, @![c_str])";
+        c_api::printf("%s", s);
+        n -= 1;
+        if n > 0 { c_api::printf(" "); };
+    };
+    $"va_end(list)";
+    c_api::printf("\n");
+}
+
+fn main() {
+    print_strings(6, "Hello", "world", "with", "varying", "argument", "count");
+}

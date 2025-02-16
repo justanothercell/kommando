@@ -71,6 +71,7 @@ typedef struct TypeDef {
     Module* module;
     AnnoList annotations;
     TraitList traits;
+    GKey* key;
     bool head_resolved;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
@@ -80,6 +81,7 @@ void fprint_type(FILE* file, TypeDef* def);
 typedef struct TraitBound {
     TypeValue* bound;
     TraitDef* resolved;
+    Map* func_val_instances;
 } TraitBound;
 LIST(TraitBoundList, TraitBound*);
 typedef struct GKey {
@@ -91,7 +93,7 @@ typedef struct GenericKeys {
     Span span;
     GKeyList generics;
     Map* resolved;
-    StrList generic_use_keys;
+    StrList* generic_use_keys;
     Map* generic_uses;
 } GenericKeys;
 void fprint_generic_keys(FILE* file, GenericKeys* keys);
@@ -166,11 +168,30 @@ typedef struct Expression {
 void fprint_expression(FILE* file, Expression* expression);
 LIST(ExpressionList, Expression*);
 
+ENUM(VarState,
+    VS_UNUSED,
+    VS_COPY,
+    VS_MOVED,
+    VS_DROPPED
+);
+
+typedef struct ModuleItem ModuleItem;
+typedef struct VarBox {
+    str name;
+    usize id;
+    TVBox* resolved;
+    TypeValue* ty;
+    ModuleItem* mi;
+    GenericValues* values;
+    VarState state;
+} VarBox;
+LIST(VariableList, Variable*);
+
 typedef struct CIntrinsic {
-    Map* type_bindings;
-    Map* var_bindings;
+    TypeValueList type_bindings;
+    VariableList var_bindings;
+    UsizeList binding_sizes;
     str c_expr;
-    TypeValue* ret_ty;
 } CIntrinsic;
 
 typedef struct StructFieldLit {
@@ -228,6 +249,7 @@ typedef struct Block {
 typedef struct FieldAccess {
     Expression* object;
     Identifier* field;
+    bool is_ref;
 } FieldAccess;
 
 typedef struct LetExpr {
@@ -274,6 +296,7 @@ typedef struct FuncDef {
     bool no_mangle;
     bool is_variadic;
     bool head_resolved;
+    bool in_resolution;
     bool untraced;
 } FuncDef;
 
@@ -299,6 +322,8 @@ typedef struct ImplBlock {
     GenericKeys* generics;
     TypeValue* trait_ref;
     TraitDef* trait;
+    bool head_resolved;
+    bool registered;
 } ImplBlock;
 LIST(ImplList, ImplBlock*);
 

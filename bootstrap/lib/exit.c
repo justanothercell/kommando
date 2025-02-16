@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include "defines.h"
 #include "gc.h"
@@ -12,6 +13,9 @@
 #define __USE_GNU
 #include <dlfcn.h>
 #include "signal.h"
+
+bool TRACE_ON_PANIC = false;
+bool LOG_LINES = false;
 
 static void (*EXIT_FUNC)(str file, usize line, int code) = NULL;
 #define INTERRUPT_MODULE ANSI(ANSI_BOLD, ANSI_RED_FG) "INTERRUPT" ANSI_RESET_SEQUENCE
@@ -64,7 +68,9 @@ __attribute__((__noreturn__)) void __panic(str file, usize line, str fmt, ...) {
     vfprintf(stderr, fmt, args);
     va_end(args);
     fprintf(stderr, "\n");
-    fprint_stacktrace(stderr);
+    if (TRACE_ON_PANIC) {
+        fprint_stacktrace(stderr);
+    }
     __quit(file, line, 1);
 }
 

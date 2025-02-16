@@ -1,0 +1,20 @@
+FROM python:3.13
+
+WORKDIR /app
+
+# include compiler
+COPY include/kommando kommando
+# include libs
+COPY include/kdolib/ kdolib/
+# include runner
+COPY runner.py runner.py
+
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+# communication port
+EXPOSE 7878
+
+RUN pip install flask apscheduler
+
+CMD ["python", "runner.py"]

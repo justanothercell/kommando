@@ -2,14 +2,17 @@ use core::types::*;
 
 pub mod math;
 pub mod str;
+pub mod dl;
 pub mod ucontext;
 
 pub use core::types::raw_ptr as CFileStream;
 
 #[extern]
-pub fn printf(fmt: c_str, *) -> i32;
+pub fn printf(fmt: c_str, ...) -> i32;
 #[extern]
-pub fn fprintf(stream: CFileStream, fmt: c_str, *) -> i32;
+pub fn fprintf(stream: CFileStream, fmt: c_str, ...) -> i32;
+#[extern]
+pub fn vfprintf(stream: CFileStream, fmt: c_str, args: va_list) -> i32;
 #[extern]
 pub fn fopen(path: c_str, mode: c_str) -> CFileStream;
 #[extern]
@@ -18,12 +21,33 @@ pub fn fclose(stream: CFileStream) -> i32;
 pub fn fflush(stream: CFileStream) -> i32;
 #[extern]
 pub fn feof(stream: CFileStream) -> i32;
+#[extern]
+pub fn puts(string: c_str) -> i32;
+#[extern]
+pub fn fputs(string: c_str, stream: CFileStream) -> i32;
+#[extern]
+pub fn fputc(c: char, stream: CFileStream) -> i32;
+
+pub fn formatf(format: c_str, ...) -> c_str {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+
+    let msg = c_api::nullstr;
+    let size = 0usize;
+    let stream = c_api::open_memstream(&msg, &size);
+    $"vfprintf($![stream], $![format], $![args].va)";
+    c_api::fclose(stream);
+    
+    $"va_end($![args].va)";
+
+    msg
+}
 
 #[extern]
 pub fn open_memstream(stream: ptr<c_str>, size: ptr<usize>) -> CFileStream;
 
 #[extern]
-pub fn exit(code: i32) -> c_void;
+pub fn exit(code: i32);
 
 #[extern]
 pub fn malloc(size: usize) -> raw_ptr;
@@ -32,7 +56,7 @@ pub fn alloca(size: usize) -> raw_ptr;
 #[extern]
 pub fn realloc(ptr: raw_ptr, size: usize) -> raw_ptr;
 #[extern]
-pub fn free(ptr: raw_ptr) -> c_void;
+pub fn free(ptr: raw_ptr);
 #[extern]
 pub fn calloc(count: usize, size: usize) -> raw_ptr;
 #[extern]
@@ -49,7 +73,7 @@ pub fn getpagesize() -> usize;
 pub const null: raw_ptr = 0;
 pub const nullstr: c_str = 0;
 
-pub fn freestr(str: c_str) -> c_void {
+pub fn freestr(str: c_str) {
     free(core::intrinsics::typecast(str))
 }
 
@@ -83,3 +107,15 @@ pub fn srand(seed: u32);
 
 #[extern]
 pub fn time(tloc: raw_ptr) -> u64;
+
+/// This type is barely useable because c is weird
+#[extern]
+#[size=24]
+#[align=8]
+#[c_alias="va_list"]
+pub struct va_list;
+
+/// VA wrapper type
+pub struct VaBox {
+    va: va_list
+}

@@ -10,6 +10,7 @@
 #include "lib/list.h"
 #include "lib/map.h"
 #include "lib/str.h"
+#include "resolver.h"
 LIB;
 #include "module.h"
 #include "token.h"
@@ -70,34 +71,40 @@ TypeDef* parse_struct(TokenStream* stream) {
         keys = parse_generic_keys(stream);
         t = next_token(stream);
     }
-    if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
-    while (1) {
-        t = next_token(stream);
-        if (token_compare(t, "}", SNOWFLAKE)) break;
-        stream->peek = t;
-        Identifier* field_name = parse_identifier(stream);
-        t = next_token(stream);
-        if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
-        TypeValue* tv = parse_type_value(stream);
-        if (map_contains(fields, field_name->name)) spanned_error("Duplicate field name", field_name->span, "field with name %s already exists in struct %s", field_name->name, name->name);
-        Field* field = malloc(sizeof(Field));
-        field->name = name;
-        field->type = tv;
-        map_put(fields, field_name->name, field);
-        list_append(&flist, field_name);
-        t = next_token(stream);
-        if (token_compare(t, "}", SNOWFLAKE)) break;
-        if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
-    }
     TypeDef* type = malloc(sizeof(TypeDef));
+    if (token_compare(t, ";", SNOWFLAKE)) {
+        type->flist = flist;
+        type->fields = NULL;
+    } else {
+        if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);
+        while (1) {
+            t = next_token(stream);
+            if (token_compare(t, "}", SNOWFLAKE)) break;
+            stream->peek = t;
+            Identifier* field_name = parse_identifier(stream);
+            t = next_token(stream);
+            if (!token_compare(t, ":", SNOWFLAKE)) unexpected_token(t);
+            TypeValue* tv = parse_type_value(stream);
+            if (map_contains(fields, field_name->name)) spanned_error("Duplicate field name", field_name->span, "field with name %s already exists in struct %s", field_name->name, name->name);
+            Field* field = malloc(sizeof(Field));
+            field->name = name;
+            field->type = tv;
+            map_put(fields, field_name->name, field);
+            list_append(&flist, field_name);
+            t = next_token(stream);
+            if (token_compare(t, "}", SNOWFLAKE)) break;
+            if (!token_compare(t, ",", SNOWFLAKE)) unexpected_token(t);
+        }
+        type->flist = flist;
+        type->fields = fields;
+    }
     type->extern_ref = NULL;
     type->generics = keys;
-    type->flist = flist;
-    type->fields = fields;
     type->transpile_state = 0;
     type->name = name;
     type->head_resolved = false;
     type->traits = list_new(TraitList);
+    type->key = NULL;
     return type;
 }
 
@@ -105,6 +112,8 @@ TypeDef* parse_struct(TokenStream* stream) {
 ImplBlock* parse_impl(TokenStream* stream, Module* module) {
     ImplBlock* impl = malloc(sizeof(ImplBlock));
     impl->methods = map_new();
+    impl->head_resolved = false;
+    impl->registered = false;
     Token* t = next_token(stream);
     if (!token_compare(t, "impl", IDENTIFIER)) unexpected_token(t);
     t = peek_next_token(stream);
@@ -148,7 +157,8 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         func->impl_block = impl;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
-            func->generics->generic_use_keys = list_new(StrList);
+            func->generics->generic_use_keys = malloc(sizeof(StrList));
+            *func->generics->generic_use_keys = list_new(StrList);
             func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
             func->generics->generics = list_new(GKeyList);
@@ -157,7 +167,8 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         if (impl->generics != NULL) {
             func->type_generics = malloc(sizeof(GenericKeys));
             func->type_generics->span = impl->generics->span;
-            func->type_generics->generic_use_keys = list_new(StrList);
+            func->type_generics->generic_use_keys = malloc(sizeof(StrList));
+            *func->type_generics->generic_use_keys = list_new(StrList);
             func->type_generics->generic_uses = map_new();
             func->type_generics->resolved = map_new();
             func->type_generics->generics = list_new(GKeyList);
@@ -198,6 +209,7 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     TraitBound* bound = malloc(sizeof(TraitBound));
     bound->bound = selfbound;
     bound->resolved = NULL;
+    bound->func_val_instances = map_new();
     list_append(&trait->self_key->bounds, bound);
     t = peek_next_token(stream);
     trait->keys = NULL;
@@ -205,7 +217,8 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
         trait->keys = parse_generic_keys(stream);
     } else {
         trait->keys = malloc(sizeof(GenericKeys));
-        trait->keys->generic_use_keys = list_new(StrList);
+        trait->keys->generic_use_keys = malloc(sizeof(StrList));
+        *trait->keys->generic_use_keys = list_new(StrList);
         trait->keys->generic_uses = map_new();
         trait->keys->resolved = map_new();
         trait->keys->generics = list_new(GKeyList);
@@ -213,6 +226,7 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     }
 
     trait->self_type = malloc(sizeof(TypeDef));
+    trait->self_type->key = NULL;
     trait->self_type->annotations = list_new(AnnoList);
     trait->self_type->flist = list_new(IdentList);
     trait->self_type->name = trait->self_key->name;
@@ -253,7 +267,8 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
         func->impl_block = NULL;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
-            func->generics->generic_use_keys = list_new(StrList);
+            func->generics->generic_use_keys = malloc(sizeof(StrList));
+            *func->generics->generic_use_keys = list_new(StrList);
             func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
             func->generics->generics = list_new(GKeyList);
@@ -310,7 +325,9 @@ Module* parse_module_contents(TokenStream* stream, Path* path) {
             t = next_token(stream); // setting new peek
             stream->peek = t;
         }
-        if (token_compare(t, "fn", IDENTIFIER)) {
+        if (token_compare(t, "pun", IDENTIFIER) || token_compare(t, "pn", IDENTIFIER)) {
+            spanned_error("Invalid declaration", t->span, "punction cannot be declared here");
+        } else if (token_compare(t, "fn", IDENTIFIER)) {
             FuncDef* function = parse_function_definition(stream);
             function->annotations = annos;
             function->module = module;
@@ -471,6 +488,16 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         } else {
             stream->peek = t;
         }
+    } else if (token_compare(t, "$", SNOWFLAKE)) {
+        t = next_token(stream);
+        if (t->type != STRING) unexpected_token(t, "expected string for c intrinsic: `$\"<intrinsic>\"`");
+        CIntrinsic* ci = malloc(sizeof(CIntrinsic));
+        ci->c_expr = t->string;
+        ci->type_bindings = list_new(TypeValueList);
+        ci->var_bindings = list_new(VariableList);
+        ci->binding_sizes = list_new(UsizeList);
+        expression->expr = ci;
+        expression->type = EXPR_C_INTRINSIC;
     } else if (token_compare(t, "let", IDENTIFIER)) {
         Identifier* name = parse_identifier(stream);
         end = name->span.right;
@@ -651,7 +678,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 }
             }
             StructLiteral* slit = malloc(sizeof(StructLiteral));
-            TypeValue* tv =malloc(sizeof(TypeValue));
+            TypeValue* tv = malloc(sizeof(TypeValue));
             tv->name = path;
             tv->generics = generics;
             tv->def = NULL;
@@ -725,6 +752,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 FieldAccess* fa = malloc(sizeof(FieldAccess));
                 fa->object = expression;
                 fa->field = field;
+                fa->is_ref = false;
                 expression = malloc(sizeof(Expression));
                 expression->span = from_points(&fa->object->span.left, &fa->field->span.right);
                 expression->expr = fa;
@@ -972,6 +1000,7 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
                     TraitBound* tb = malloc(sizeof(TraitBound));
                     tb->bound = bound;
                     tb->resolved = NULL;
+                    tb->func_val_instances = map_new();
                     list_append(&gkey->bounds, tb);
                     t = next_token(stream);
                     if (!token_compare(t, "+", SNOWFLAKE)) {
@@ -990,7 +1019,8 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
     keys->span = from_points(&left, &right);
     keys->resolved = map_new();
     keys->generic_uses = map_new();
-    keys->generic_use_keys = list_new(StrList);
+    keys->generic_use_keys = malloc(sizeof(StrList));
+    *keys->generic_use_keys = list_new(StrList);
     return keys;
 }
 
@@ -1034,7 +1064,9 @@ FuncDef* parse_function_definition(TokenStream* stream) {
         stream->peek = t;
         while (true) {
             t = next_token(stream);
-            if (token_compare(t, "*", SNOWFLAKE)) {
+            if (token_compare(t, ".", SNOWFLAKE)) {
+                if (!token_compare(next_token(stream), ".", SNOWFLAKE)) unexpected_token(t, "Expected end of arguments or `...` variadic argument speicifier");
+                if (!token_compare(next_token(stream), ".", SNOWFLAKE)) unexpected_token(t, "Expected end of arguments or `...` variadic argument speicifier");
                 variadic = true;
                 t = next_token(stream);
                 if (!token_compare(t, ")", SNOWFLAKE)) unexpected_token(t);
@@ -1083,6 +1115,7 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->is_variadic = variadic;
     func->generics = keys;
     func->head_resolved = false;
+    func->in_resolution = false;
     func->impl_type = NULL;
     func->trait = NULL;
     func->annotations = list_new(AnnoList);

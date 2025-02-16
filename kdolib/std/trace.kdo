@@ -14,19 +14,19 @@ pub struct Traceback {
 }
 
 pub impl Traceback {
-    fn here(depth: usize) -> Result<Location> {
+    fn here(depth: usize) -> Result<Location, c_str> {
         let frame = TOP_FRAME;
         if frame == std::mem::null() || frame.callflags & CF_ROOT != 0 {
-            return Result::<_>::err("Cannot get location at this depth");
+            return Result::<_, _>::err("Cannot get location at this depth");
         };
         while depth > 0 {
             frame = frame.parent;
             depth -= 1;
             if frame == std::mem::null() || frame.callflags & CF_ROOT != 0 {
-                return Result::<_>::err("Cannot get location at this depth");
+                return Result::<_, _>::err("Cannot get location at this depth");
             };
         };
-        Result::<_>::ok(frame.loc)
+        Result::<_, _>::ok(frame.loc)
     }
 
     #[no_trace]

@@ -1,7 +1,7 @@
 use core::types::*;
 
 #[extern]
-fn printf(fmt: c_str, *) -> i32; 
+fn printf(fmt: c_str, ...) -> i32; 
 
 fn noop<N>() {
     foop::<N>();

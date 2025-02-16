@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "lib.h"
+#include "lib/exit.h"
 #include "lib/list.h"
 #include "lib/str.h"
 LIB;
@@ -26,15 +27,19 @@ CompilerOptions build_args(StrList* args) {
         printf("    --compile -c - compile generated c to executable\n");
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --silent     - verbosity = 0\n");
-        printf("    --static     - statically link libraries\n");
+        printf("    --static     - staticmay link libraries\n");
         printf("    --verbose -v - verbosity += 1 (default = 1)\n");
         printf("    --trace=[none|main|all]\n");
         printf("             none - do not generate traceback info\n");
-        printf("             main - (default) generate traceback info for the main package\n");
-        printf("             all  - also generate traceback info for libraries\n");
+        printf("             this - (default) generate traceback info for the main package\n");
+        printf("             full - also generate traceback info for libraries\n");
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
         printf("    ::package=<path/to/package> (multiple possible)\n");
+        printf("The following options are compiler diagnostics:\n");
+        printf("    --trace-compiler - trace the compiler on panic\n");
+        printf("    --emit-spans     - Write source references as comments in generated c\n");
+        printf("    --log-lines      - Include [source.c:line] in console logs\n");
         printf("Using `make` with sensibe defaults:\n");
         printf("make run file=<infile> flags=\"<optional compiler flags>\"\n");
         quit(0);
@@ -48,6 +53,7 @@ CompilerOptions build_args(StrList* args) {
     options.raw = false;
     options.compile = false;
     options.run = false;
+    options.emit_spans = false;
     options.package_names = list_new(StrList);
     options.packages = map_new();
     options.verbosity = 1;
@@ -62,6 +68,12 @@ CompilerOptions build_args(StrList* args) {
                 goto print_help;
             } else if (str_eq(arg, "run")) {
                 options.run = true;
+            } else if (str_eq(arg, "trace-compiler")) {
+                TRACE_ON_PANIC = true;
+            } else if (str_eq(arg, "log-lines")) {
+                LOG_LINES = true;
+            } else if (str_eq(arg, "emit-spans")) {
+                options.emit_spans = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
             } else if (str_eq(arg, "silent")) {
@@ -72,9 +84,9 @@ CompilerOptions build_args(StrList* args) {
                 arg += 6;
                 if (str_eq(arg, "none")) {
                     options.tracelevel = 0;
-                } else if (str_eq(arg, "main")) {
+                } else if (str_eq(arg, "this")) {
                     options.tracelevel = 1;
-                } else if (str_eq(arg, "all")) {
+                } else if (str_eq(arg, "full")) {
                     options.tracelevel = 2;
                 } else {
                     log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid trace level `--trace=%s`", arg);
@@ -179,12 +191,6 @@ void compile(CompilerOptions options) {
         Module* package = parse_module_contents(s, modpath);
         package->filepath = file;
         insert_module(program, &options, package, V_PUBLIC);
-        if (str_eq(package->name->name, "core")) {
-            insert_module(program, &options, gen_core_intrinsics(), V_PUBLIC);
-            if (options.verbosity >= 2) log("Added synthetic module ::core::intrinsics");
-            insert_module(program, &options, gen_core_types(), V_PUBLIC);
-            if (options.verbosity >= 2) log("Added synthetic module ::core::types");
-        }
         SubList sublist = list_new(SubList);
         list_foreach(&package->subs, i, ModDef* m, ({
             if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, package->path)));
@@ -244,7 +250,7 @@ void compile(CompilerOptions options) {
 
     if (options.compile) {
         if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
-        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch -lm %s -o %s %s", 
+        str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch %s -lm -o %s %s", 
             options.c_compiler, code_file_name, options.outname, options.static_links ? "-static" : ""));
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));

@@ -1,0 +1,17 @@
+[book]
+authors = ["dragoπ"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Kommando Docs"
+
+[output.html]
+mathjax-support = true
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+
+[output.html.code.hidelines]
+rs = "!"
+
+[output.html.fold]
+enable = true

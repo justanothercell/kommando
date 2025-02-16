@@ -1,0 +1,24 @@
+use std::*;
+
+fn fibonacci_rec(n: u32) -> u32 {
+    if n < 2 {
+        n
+    } else {
+        fibonacci_rec(n - 1) + fibonacci_rec(n - 2)
+    }
+}
+
+fn fibonacci_it(n: u32) -> u32 {
+    let a: u32 = 1;
+    let b: u32 = 0;
+    while n > 0 {
+        a = std::mem::replace(&b, a + b);
+        n -= 1;
+    };
+    b
+}
+
+fn main() {
+    c_api::printf("20th fibomacci number: %lu (recursive)\n", fibonacci_rec(20));
+    c_api::printf("20th fibomacci number: %lu (iterative)\n", fibonacci_it(20));
+}

@@ -1,7 +1,7 @@
 use std::*;
 
 #[extern]
-fn printf(fmt: c_str, *) -> i32;
+fn printf(fmt: c_str, ...) -> i32;
 
 fn main() {
     let number = 42u32;

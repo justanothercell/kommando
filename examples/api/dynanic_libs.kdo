@@ -1,0 +1,12 @@
+use std::*;
+use std::dl::Dl;
+
+fn main() {
+    std::error::init_handler();
+
+    let dl = Dl::<>::open("/usr/lib/libm.so.6");
+    let cosine: function_ptr<f64> = dl.get_fn("cos");
+    let x: f64 = 1.0;
+    c_api::printf("cos(1.0) = %f\n", (cosine)(x));
+    dl.close();
+}

@@ -1,0 +1,24 @@
+use std::*;
+use std::fmt::*;
+
+struct Vehicle {
+    wheels: usize
+}
+
+impl Vehicle: Fmt {
+    fn dyn_fmt(self: ptr<Vehicle>) -> DynFmt {
+        _ { object: typecast(self), fmt: Vehicle::<>::fmt }
+    }
+
+    fn fmt(self: ptr<Vehicle>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write(fmt, self.wheels).write_str(" wheeler");
+    }
+}
+
+fn main() {
+    std::error::init_handler();
+
+    println("Hello $! Your lucky number is: $", "world".dyn_fmt(), 12.dyn_fmt());
+
+    println("Wroom wroom: $ on the go!", Vehicle { wheels: 13 }.dyn_fmt());
+}

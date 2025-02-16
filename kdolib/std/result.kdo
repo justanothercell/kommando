@@ -1,32 +1,30 @@
 use std::*;
+use std::fmt::*;
 
-// Generics are a bit meh currently, so let's start with these primitive results for now.
-pub struct Result<T> {
-    // layout is probably okay for most applications
-    // Also we do not have any unions.
-    error: c_str,
+pub struct Result<T, E> {
     value: T,
+    error: E,
     is_ok: bool
 }
 
-impl<T> Result<T> {
-    pub fn ok(value: T) -> Result<T> {
-        _ { value: value, error: c_api::nullstr, is_ok: true }
+impl<T, E> Result<T, E> {
+    pub fn ok(value: T) -> Result<T, E> {
+        _ { value: value, error: std::mem::uninit(), is_ok: true }
     }
 
-    pub fn err(error: c_str) -> Result<T> {
+    pub fn err(error: E) -> Result<T, E> {
         _ { value: std::mem::uninit(), error: error, is_ok: false }
     }
 
-    pub fn is_ok(self: Result<T>) -> bool {
+    pub fn is_ok(self: Result<T, E>) -> bool {
         self.is_ok
     }
 
-    pub fn is_err(self: Result<T>) -> bool {
+    pub fn is_err(self: Result<T, E>) -> bool {
         self.is_ok == false
     }
 
-    pub fn to_ok_option(self: Result<T>) -> Option<T> {
+    pub fn to_ok_option(self: Result<T, E>) -> Option<T> {
         if self.is_ok {
             Option::<_>::some(self.value)
         } else {
@@ -34,7 +32,7 @@ impl<T> Result<T> {
         }
     }
 
-    pub fn to_err_option(self: Result<T>) -> Option<c_str> {
+    pub fn to_err_option(self: Result<T, E>) -> Option<E> {
         if self.is_ok {
             Option::<_>::none()
         } else {
@@ -42,33 +40,7 @@ impl<T> Result<T> {
         }
     }
 
-    pub fn unwrap(self: Result<T>) -> T {
-        if self.is_ok {
-            self.value
-        } else {
-            let msg = c_api::nullstr;
-            let size = 0usize;
-            let stream = c_api::open_memstream(&msg, &size);
-            c_api::fprintf(stream, "Unwrapping erroneous result: %s", self.error);
-            c_api::fclose(stream);
-            panic(msg)
-        }
-    }
-
-    pub fn expect(self: Result<T>, error: c_str) -> T {
-        if self.is_ok {
-            self.value
-        } else {
-            let msg = c_api::nullstr;
-            let size = 0usize;
-            let stream = c_api::open_memstream(&msg, &size);
-            c_api::fprintf(stream, "Unwrapping erroneous result: %s: %s", self.error, error);
-            c_api::fclose(stream);
-            panic(msg)
-        }
-    }
-
-    pub fn unwrap_or(self: Result<T>, fallback: T) -> T {
+    pub fn unwrap_or(self: Result<T, E>, fallback: T) -> T {
         if self.is_ok {
             self.value
         } else {
@@ -76,19 +48,67 @@ impl<T> Result<T> {
         }
     }
 
-    pub fn as_ref(self: ptr<Result<T>>) -> Result<ptr<T>> {
+    pub fn as_ref(self: ptr<Result<T, E>>) -> Result<ptr<T>, E> {
         if self.is_ok {
-            Result::<_>::ok(&self.value)
+            Result::<_, _>::ok(&self.value)
         } else {
-            Result::<_>::err(self.error)
+            Result::<_, _>::err(self.error)
         }
     }
 
-    pub fn deref(self: Result<ptr<T>>) -> Result<T> {
+    pub fn deref(self: Result<ptr<T>, E>) -> Result<T, E> {
         if self.is_ok {
-            Result::<_>::ok(*self.value)
+            Result::<_, _>::ok(*self.value)
         } else {
-            Result::<_>::err(self.error)
+            Result::<_, _>::err(self.error)
+        }
+    }
+
+    pub fn err_as_ref(self: ptr<Result<T, E>>) -> Result<T, ptr<E>> {
+        if self.is_ok {
+            Result::<_, _>::ok(self.value)
+        } else {
+            Result::<_, _>::err(&self.error)
+        }
+    }
+
+    pub fn err_deref(self: ptr<Result<T, ptr<E>>>) -> Result<T, E> {
+        if self.is_ok {
+            Result::<_, _>::ok(self.value)
+        } else {
+            Result::<_, _>::err(*self.error)
+        }
+    }
+}
+
+impl<T, E: Fmt> Result<T, E> {
+    pub fn unwrap(self: Result<T, E>) -> T {
+        if self.is_ok {
+            self.value
+        } else {
+            panic(format("Unwrapping erroneous result $", self.error.dyn_fmt()))
+        }
+    }
+
+    pub fn expect(self: Result<T, E>, error: c_str) -> T {
+        if self.is_ok {
+            self.value
+        } else {
+            panic(format("Unwrapping erroneous result: $: $", error.dyn_fmt(), self.error.dyn_fmt()))
+        }
+    }
+}
+
+impl<T: Fmt, E: Fmt> Result<T, E>: Fmt {
+    fn dyn_fmt(self: ptr<Result<T, E>>) -> DynFmt {
+        _ { object: typecast(self), fmt: Result::<T, E>::fmt }
+    }
+    fn fmt(self: ptr<Result<T, E>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        if self.is_ok {
+            stream.write_str("some(").write(fmt, self.value).write_str(")");
+            stream.write_str(")");
+        } else {
+            stream.write_str("err(").write(fmt, self.error).write_str(")");
         }
     }
 }

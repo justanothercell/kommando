@@ -50,7 +50,6 @@ typedef struct TraceGen {
     str frame_type_c_name;
     TypeValue* function_type;
     str function_type_c_name;
-    str local_frame_name;
     bool trace_this;
 } TraceGen;
 
@@ -62,9 +61,6 @@ typedef struct Program {
 
 typedef struct CompilerOptions CompilerOptions;
 void insert_module(Program* program, CompilerOptions* options, Module* module, Visibility vis);
-
-Module* gen_core_intrinsics();
-Module* gen_core_types();
 
 Identifier* gen_identifier(str name);
 TypeValue* gen_typevalue(str typevalue, Span* span);
