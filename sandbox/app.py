@@ -17,7 +17,7 @@ def guide():
 @app.route('/docs/<path:item>')
 def guide_item(item):
     if item.endswith('.html'):
-        print(f' [\x1b[1;33mEXEC\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {item}')
+        print(f'[\x1b[1;33mEXEC\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {item}')
     return send_from_directory('../docs/book/', item)
 
 @app.route('/editor.css')
@@ -26,7 +26,7 @@ def style():
 
 @app.route('/execute', methods = [ 'POST' ])
 def execute():
-    print(f' [\x1b[1;33mEXEC\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {request.json}')
+    print(f'[\x1b[1;33mEXEC\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {request.json}')
     try:
         r = requests.post('http://localhost:7878/execute', json=request.json)
     except Exception:
