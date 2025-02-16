@@ -50,10 +50,10 @@ impl Color: Fmt {
         _ { object: typecast(self), fmt: Color::<>::fmt }
     }
     fn fmt(self: ptr<Color>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) { 
-        stream.write_str("Color { r: ").write(self.r, fmt)
-                    .write_str(", g: ").write(self.g, fmt)
-                    .write_str(", b: ").write(self.b, fmt)
-                    .write_str(", a: ").write(self.a, fmt)
+        stream.write_str("Color { r: ").write(fmt, self.r)
+                    .write_str(", g: ").write(fmt, self.g)
+                    .write_str(", b: ").write(fmt, self.b)
+                    .write_str(", a: ").write(fmt, self.a)
         .write_str(" }");
     }
 }
@@ -82,10 +82,10 @@ Now we can comfortably print our `Color` anywhere:
 !        _ { object: typecast(self), fmt: Color::<>::fmt }
 !    }
 !    fn fmt(self: ptr<Color>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) { 
-!        stream.write_str("Color { r: ").write(self.r, fmt)
-!                    .write_str(", g: ").write(self.g, fmt)
-!                    .write_str(", b: ").write(self.b, fmt)
-!                    .write_str(", a: ").write(self.a, fmt)
+!        stream.write_str("Color { r: ").write(fmt, self.r)
+!                    .write_str(", g: ").write(fmt, self.g)
+!                    .write_str(", b: ").write(fmt, self.b)
+!                    .write_str(", a: ").write(fmt, self.a)
 !        .write_str(" }");
 !    }
 !}
