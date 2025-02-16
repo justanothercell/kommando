@@ -53,7 +53,7 @@ def execute():
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Compilation timed out after {TIMEOUT}s', 'exit_code': -1 }
         exit_code = process.returncode
-        output = '\n\n'.join([process.stdout.decode() + process.stderr.decode()]).strip().split('\n')
+        output = '\n\n'.join([process.stdout.decode(encoding='utf-8', errors='ignore') + process.stderr.decode(encoding='utf-8', errors='ignore')]).strip().split('\n')
         if exit_code != 0:
             return { 'success': False, 'output': '\n'.join(output[-1000:]), 'exit_code': exit_code }
         if not os.path.isfile(f'/tempdata/sandbox{runner_id}'):
@@ -63,7 +63,7 @@ def execute():
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Execution timed out after {TIMEOUT}s', 'exit_code': -1 }
         run_exit_code = run_process.returncode
-        run_output = '\n\n'.join([run_process.stdout.decode() + run_process.stderr.decode()]).strip().split('\n')
+        run_output = '\n\n'.join([run_process.stdout.decode(encoding='utf-8', errors='ignore') + run_process.stderr.decode(encoding='utf-8', errors='ignore')]).strip().split('\n')
         if data.get('show_compiler_output', False):
             return { 'success': True, 'output': '\n'.join((output + [''] + run_output)[-1000:]), 'exit_code': run_exit_code }
         else:
