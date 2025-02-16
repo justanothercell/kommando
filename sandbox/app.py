@@ -17,7 +17,7 @@ def guide():
 @app.route('/docs/<path:item>')
 def guide_item(item):
     if item.endswith('.html'):
-        print(f'[\x1b[1;33mEXEC\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {item}')
+        print(f'[\x1b[1;34mDOCS\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {item}')
     return send_from_directory('../docs/book/', item)
 
 @app.route('/editor.css')
