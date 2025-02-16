@@ -40,7 +40,9 @@ h1 {
 }
 
 #editor {
-    min-width: 500px;
+    min-width: 50%;
+    width: 50%;
+    max-width: 50%;
     border: 3px solid var(--main-border-color);
     border-radius: 1px;
     padding: 3px 0;
