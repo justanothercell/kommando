@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory,request
+from flask import Flask, send_from_directory, request, redirect
 import requests
 
 app = Flask(__name__)
@@ -6,6 +6,14 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+@app.route('/docs/guide')
+def guide():
+    return redirect('/docs/guide/introduction.html')
+
+@app.route('/docs/guide/<item:path>')
+def guide_item(item):
+    return send_from_directory('../docs/guide/book/', item)
 
 @app.route('/editor.css')
 def style():
