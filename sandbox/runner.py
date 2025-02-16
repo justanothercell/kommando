@@ -8,6 +8,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from pathlib import Path
 import time
 
+os.environ['TMPDIR'] = '/tempdata'
+
 def rmdir(directory):
     directory = Path(directory)
     for item in directory.iterdir():
@@ -47,7 +49,7 @@ def execute():
             sandfile.write(data['code'])
         try:
             args = [shlex.quote(arg) for arg in data.get('compiler_flags', '').split()]
-            process = subprocess.run(f'./kommando $(./kdolib/link) /tempdata/sandbox{runner_id}.kdo /tempdata/sandbox{runner_id} -c {' '.join(args)}', shell=True, capture_output=True, timeout=TIMEOUT, vars={'TMPDIR': '/tempdata'})
+            process = subprocess.run(f'./kommando $(./kdolib/link) /tempdata/sandbox{runner_id}.kdo /tempdata/sandbox{runner_id} -c {' '.join(args)}', shell=True, capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Compilation timed out after {TIMEOUT}s', 'exit_code': -1 }
         exit_code = process.returncode
