@@ -29,7 +29,7 @@ def delete_old_files():
                 item.unlink()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=delete_old_files, trigger='interval', seconds=60 * 5)
+scheduler.add_job(func=delete_old_files, trigger='interval', seconds=60)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
