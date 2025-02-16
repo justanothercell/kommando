@@ -12,6 +12,8 @@ delete_container: stop_container
 build_image:
 	pushd .. && make build_release && popd
 
+	rm -rf include/
+	mkdir include
 	cp ../kommando include/kommando
 	cp -r ../kdolib include/kdolib
 

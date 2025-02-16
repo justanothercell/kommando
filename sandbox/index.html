@@ -31,8 +31,12 @@
                     document.onmousemove = null;
                 };
                 document.onmousemove = (e) => {
-                    var editor = document.getElementById('editor');
-                    editor.style.width = e.clientX - editor.offsetLeft - 8 + "px";
+                    let main = document.getElementById('main');
+                    let editor = document.getElementById('editor');
+                    let w = Math.min(e.clientX - editor.offsetLeft - 8, main.clientWidth - 11);
+                    editor.style.minWidth = w + "px";
+                    editor.style.width = w + "px";
+                    editor.style.maxWidth = w + "px";
                 };
             };
         </script>

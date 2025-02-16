@@ -1368,9 +1368,11 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             slit->type = t_return->type;
             if (t_return->type->def == NULL) spanned_error("Type could not be inferred", expr->span, "%s is not a complete type", to_str_writer(s, fprint_typevalue(s, t_return->type)));
             TypeDef* type = slit->type->def;
+            if (!type->head_resolved) resolve_typedef(program, options, type);
 
             Map* temp_fields = map_new();
             map_foreach(type->fields, str key, Field* field, {
+                resolve_typevalue(program, options, type->module, field->type, NULL, type->generics);
                 map_put(temp_fields, key, field);
             });
             map_foreach(slit->fields, str key, StructFieldLit* field, {

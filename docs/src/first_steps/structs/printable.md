@@ -59,7 +59,7 @@ impl Color: Fmt {
 }
 !
 !fn main() {
-!    let c = Color { r: 255, g: 150, b: 100 };
+!    let c = Color { r: 255, g: 150, b: 100, a: 255 };
 !    println("We have the color $", c.dyn_fmt());
 !}
 ```
@@ -91,7 +91,7 @@ Now we can comfortably print our `Color` anywhere:
 !}
 !
 fn main() {
-    let c = Color { r: 255, g: 150, b: 100 };
+    let c = Color { r: 255, g: 150, b: 100, a: 255 };
     println("We have the color $", c.dyn_fmt());
 }
 ```
