@@ -105,13 +105,10 @@ impl<T: Fmt, E: Fmt> Result<T, E>: Fmt {
     }
     fn fmt(self: ptr<Result<T, E>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
         if self.is_ok {
-            stream.write_str("ok(");
-            self.value.fmt(fmt, stream);
+            stream.write_str("some(").write(fmt, self.value).write_str(")");
             stream.write_str(")");
         } else {
-            stream.write_str("err(");
-            self.error.fmt(fmt, stream);
-            stream.write_str(")");
+            stream.write_str("err(").write(fmt, self.error).write_str(")");
         }
     }
 }

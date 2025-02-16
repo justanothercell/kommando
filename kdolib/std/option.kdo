@@ -108,9 +108,7 @@ impl<T: Fmt> Option<T>: Fmt {
     }
     fn fmt(self: ptr<Option<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
         if self.exists {
-            stream.write_str("some(");
-            self.value.fmt(fmt, stream);
-            stream.write_str(")");
+            stream.write_str("some(").write(fmt, self.value).write_str(")");
         } else {
             stream.write_str("none");
         }

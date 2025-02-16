@@ -43,7 +43,7 @@ c_api::printf("Color { r: %u, g: %u, b: %u, a: %u }\n", c.r, c.g, c.b, c.a);
 !}
 ```
 
->**Note:** Later we will use the `Fmt` trait to automatically format the color for printing
+>**Note:** [Later](./printable.md) we will use the `Fmt` trait to automatically format the color for printing
 
 Pointers to structs automatically dereference on field access:
 ```rs

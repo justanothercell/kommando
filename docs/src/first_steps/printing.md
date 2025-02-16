@@ -1,4 +1,4 @@
-# Printing
+# Printing I
 
 There are two main ways of formatting and printing, depending on your needs.
 
@@ -56,3 +56,5 @@ let text: c_str = formatln("Hello, $", "world".dyn_fmt());
 println(text);
 !}
 ```
+
+>**Note:** In [part II](./structs/printable.md) we will take a look at how we can make a custom struct printable

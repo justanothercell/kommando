@@ -51,4 +51,5 @@ fn main() {
     let p = create_pointer();
 }
 ```
-`p` may now have any and all states, or may even crash the program when used
+`p` may now have any and all states, or may even crash the program when used.
+Even if the original object is still around but was moved, `p` is still invalid

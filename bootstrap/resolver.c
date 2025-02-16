@@ -252,8 +252,9 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
             to_str_writer(s, fprint_generic_values(s, func_values)), to_str_writer(s, fprint_span(s, &func_values->span)));
         list_foreach(&func_values->generics, i, TypeValue* v, {
             GKey* key = fvs_keys->generics.elements[i];
-            list_foreach(&key->bounds, i, TraitBound* bound, {
-                if (!map_contains(v->trait_impls, to_str_writer(s, fprintf(s, "%p", bound->resolved)))) {
+            list_foreach(&key->bounds, j, TraitBound* bound, {
+                if (!map_contains(v->trait_impls, to_str_writer(s, fprintf(s, "%p", bound->resolved)))
+                 && !list_contains(&v->def->traits, k, TraitDef* trait, trait == bound->resolved)) {
                     spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
                         "Type %s does not satisfy trait bound %s::%s.\nConsider implementing this trait for this type", 
                         to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
@@ -1341,10 +1342,8 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             }
             finish_tvbox(program, options, object_type, func);
             TypeDef* td = tv->def;
-            if (td->fields == NULL) {
-                if (td->module != NULL) unreachable("Fields should not be null unless it's a generic");
-                spanned_error("Invalid struct field", fa->field->span, "%s @ %s has no such field '%s'. You are possibly trying to access a field from a generic parameter",  to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(stream, fprint_span(stream, &td->name->span)), fa->field->name);
-            }
+            if (td->module == NULL) spanned_error("Trying to access field of generic", fa->field->span, "%s @ %s is generic and as such has no visible fields",  to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(stream, fprint_span(stream, &td->name->span)));
+            if (td->fields == NULL) unreachable("Fields should not be null unless it's a generic");
             Field* field = map_get(td->fields, fa->field->name);
             if (field == NULL) {
                 if (td->module == NULL) unreachable("Module should not be null unless it's a generic");
