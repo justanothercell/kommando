@@ -5,7 +5,7 @@ Multiple pointer types exist and are each used in different circumstances
 
 - `ptr<T>` The most common pointer type
     - The unary `&` prefix operator turns a type `T` into a `ptr<T>` (read: pointer of type T)
-    - The unary `*&*` prefix operator dereferences a `ptr<T>` into the pointed-to data of type T
+    - The unary `&` prefix operator dereferences a `ptr<T>` into the pointed-to data of type T
 ```rs
 !use std::*;
 !

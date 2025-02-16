@@ -323,6 +323,7 @@ typedef struct ImplBlock {
     TypeValue* trait_ref;
     TraitDef* trait;
     bool head_resolved;
+    bool registered;
 } ImplBlock;
 LIST(ImplList, ImplBlock*);
 

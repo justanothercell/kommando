@@ -113,6 +113,7 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
     ImplBlock* impl = malloc(sizeof(ImplBlock));
     impl->methods = map_new();
     impl->head_resolved = false;
+    impl->registered = false;
     Token* t = next_token(stream);
     if (!token_compare(t, "impl", IDENTIFIER)) unexpected_token(t);
     t = peek_next_token(stream);

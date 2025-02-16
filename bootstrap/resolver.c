@@ -886,6 +886,7 @@ static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv) {
     return true;
 }
 
+void register_impl(Program* program, CompilerOptions* options, Module* module, ImplBlock* impl);
 FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, TypeValue* tv, Identifier* name, bool do_error) {
     Module* mod = tv->def->module;
     if (mod == NULL) { // generic type - search through trait bounds
@@ -917,6 +918,7 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
     if (list == NULL || list->length == 0) spanned_error("No such method", name->span, "No such method `%s` defined on any type in package `%s` (on %s).", name->name, base->name->name,  to_str_writer(s, fprint_typevalue(s, tv)));
     FuncDef* chosen = NULL;
     list_foreach(list, i, FuncDef* func, {
+        if (func->impl_block != NULL && !func->impl_block->registered) register_impl(program, options, func->module, func->impl_block);
         if (satisfies_impl_bounds(tv, func->impl_type)) {
             if (chosen != NULL) spanned_error("Multiple method candiates", tv->name->elements.elements[0]->span, "Multiple candiates found for %s::%s\n#1: %s::%s @ %s\n#2: %s::%s @ %s", 
                 to_str_writer(s, fprint_typevalue(s, tv)), name->name,
@@ -1551,6 +1553,7 @@ void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, 
     if (!func->module->resolved && !func->module->in_resolution) {
         resolve_module(program, options, func->module);
     }
+    if (func->impl_block != NULL && !func->impl_block->registered) register_impl(program, options, func->module, func->impl_block);
     if (func->head_resolved) return;
     if (options->verbosity >= 3) {
         if (func->trait_def) log("Resolving trait method definition %s::%s::%s", to_str_writer(s, fprint_path(s, func->trait->module->path)), func->trait->name->name, func->name->name);
@@ -1669,7 +1672,40 @@ void resolve_typedef(Program* program, CompilerOptions* options, TypeDef* type) 
     });
 }
 
+void register_module_impl_names_rec(Program* program, CompilerOptions* options, Module* module) {
+    list_foreach(&module->impls, i, ImplBlock* impl, {
+        map_foreach(impl->methods, str name, ModuleItem* mi, ({
+            switch (mi->type) {
+                case MIT_FUNCTION: {
+                    FuncDef* method = mi->item;
+                    FuncList* list;
+                    if (map_contains(module->package_method_map, name)) {
+                        list = map_get(module->package_method_map, name);
+                    } else {
+                        list = malloc(sizeof(FuncList));
+                        *list = list_new(FuncList);
+                        map_put(module->package_method_map, name, list);
+                    }
+                    list_append(list, method);
+                } break;
+                default:
+                    unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
+            }
+        }));
+    });
+    map_foreach(module->items, str name, ModuleItem* mi, {
+        switch(mi->type) {
+            case MIT_MODULE:
+                register_module_impl_names_rec(program, options, mi->item);
+                break;
+            default:
+                break;
+        }
+    });
+}
+
 void register_impl(Program* program, CompilerOptions* options, Module* module, ImplBlock* impl) {
+    if (impl->registered) return;
     resolve_generic_keys(program, options, module, impl->generics, NULL, NULL, NULL);
     resolve_typevalue(program, options, module, impl->type, NULL, impl->generics);
     Module* def_root = impl->type->def->module;
@@ -1691,20 +1727,12 @@ void register_impl(Program* program, CompilerOptions* options, Module* module, I
                     method->trait = impl->trait;
                 }
                 resolve_generic_keys(program, options, module, method->type_generics, NULL, NULL, NULL);
-                FuncList* list;
-                if (map_contains(module->package_method_map, name)) {
-                    list = map_get(module->package_method_map, name);
-                } else {
-                    list = malloc(sizeof(FuncList));
-                    *list = list_new(FuncList);
-                    map_put(module->package_method_map, name, list);
-                }
-                list_append(list, method);
             } break;
             default:
                 unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
         }
     }));
+    impl->registered = true;
 }
 
 void resolve_impl(Program* program, CompilerOptions* options, ImplBlock* impl) {
@@ -1991,6 +2019,10 @@ void resolve_module(Program* program, CompilerOptions* options, Module* module) 
 
 void resolve(Program* program, CompilerOptions* options) {
     if (options->verbosity >= 2) log("Resolving imports");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        register_module_impl_names_rec(program, options, mod);
+    });
     map_foreach(program->packages, str key, Module* mod, {
         UNUSED(key);
         resolve_module_imports(program, options, mod);

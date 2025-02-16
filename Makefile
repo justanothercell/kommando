@@ -52,3 +52,9 @@ test: build clean_examples
 	if (test $$fail -ne 0); then \
 		(exit 1); \
 	fi \
+
+stats:
+	@echo "bootstrap: $(shell cat $(shell find ./bootstrap -type f \( -name '*.c' -o -name '*.h' \)) | wc -l) lines (*.c, *.h)"
+	@echo "examples:  $(shell cat $(shell find ./examples -type f \( -name '*.kdo' \)) | wc -l) lines (*.kdo)"
+	@echo "kdolib:    $(shell cat $(shell find ./kdolib -type f \( -name '*.kdo' \)) | wc -l) lines (*.kdo)"
+	@echo "docs:      $(shell cat $(shell find ./docs/src -type f \( -name '*.md' \)) | wc -l) lines (*.md)"
