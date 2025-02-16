@@ -3,6 +3,34 @@ from random import randint
 import subprocess
 import os
 import shlex
+import atexit
+from apscheduler.schedulers.background import BackgroundScheduler
+from pathlib import Path
+import time
+
+def rmdir(directory):
+    directory = Path(directory)
+    for item in directory.iterdir():
+        if item.is_dir():
+            rmdir(item)
+        else:
+            item.unlink()
+    directory.rmdir()
+
+def delete_old_files():
+    for item in Path('/runs').iterdir():
+        if item.is_dir(): # invalid, delete either way
+            rmdir(item)
+        else: # delete if older than 1 minute
+            file_age = time.time() - item.stat().st_mtime
+            if file_age > 60:
+                item.unlink()
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=delete_old_files, trigger='interval', seconds=60 * 5)
+scheduler.start()
+
+atexit.register(lambda: scheduler.shutdown())
 
 TIMEOUT = 10
 
