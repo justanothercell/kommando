@@ -3,7 +3,7 @@ authors = ["dragoπ"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Kommando Guide"
+title = "Kommando Docs"
 
 [output.html]
 mathjax-support = true

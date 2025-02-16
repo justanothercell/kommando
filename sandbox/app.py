@@ -7,13 +7,13 @@ app = Flask(__name__)
 def index():
     return send_from_directory('.', 'index.html')
 
-@app.route('/docs/guide')
+@app.route('/docs')
 def guide():
-    return redirect('/docs/guide/introduction.html')
+    return redirect('/docs/index.html')
 
-@app.route('/docs/guide/<path:item>')
+@app.route('/docs/<path:item>')
 def guide_item(item):
-    return send_from_directory('../docs/guide/book/', item)
+    return send_from_directory('../docs/book/', item)
 
 @app.route('/editor.css')
 def style():

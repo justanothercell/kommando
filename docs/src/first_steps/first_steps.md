@@ -1,5 +1,4 @@
 # First steps
->**Note:** Use `make help` or `./kommando --help` to get a complete list of options 
 
 Let's start by writing a hello world program:
 ```rs
@@ -16,7 +15,9 @@ Although this seems like not much, it already uses a bunch of language features 
 - [std](https://github.com/justanothercell/kommando/tree/dev/kdolib/std) library: this library defines `println` and a bunch of other useful functions and structures
 - [c_api](https://github.com/justanothercell/kommando/tree/dev/kdolib/c_api) library: used in-proxy by `std`, it defines many c ffi functions.
 
-To compile this example we need to provide path to these libraries, located in the [kdolib/](https://github.com/justanothercell/kommando/tree/dev/kdolib) directory. 
+To compile this example we need to provide path to these libraries, located in the [kdolib/](https://github.com/justanothercell/kommando/tree/dev/kdolib) directory.
+
+>**Note:** Use `make help` or `./kommando --help` to get a complete list of options 
 
 Here we assume we are in the root directory of the [kommando](https://github.com/justanothercell/kommando/tree/dev) compiler, otherwise you need to adjust the paths in the command.
 
