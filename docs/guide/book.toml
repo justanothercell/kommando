@@ -1,0 +1,11 @@
+[book]
+authors = ["dragoπ"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Kommando Guide"
+
+[output.html]
+mathjax-support = true
+[output.html.code.hidelines]
+rs = "!"
