@@ -1,3 +1,0 @@
-#!/bin/sh
-
-echo ::core=$(dirname "$0")/core

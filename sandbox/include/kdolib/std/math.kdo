@@ -1,4 +1,0 @@
-use std::*;
-
-pub const PIf32: f32 = 3.1415927;
-pub const PIf64: f64 = 3.141592653589793;
