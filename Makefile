@@ -1,11 +1,12 @@
+GCC_FLAGS = -fdebug-prefix-map=$(shell pwd)=.
 GCC_RELEASE_FLAGS = -O3 -Wno-array-bounds
 GCC_WARNINGS = -Wall -Wextra -Werror -Wpointer-arith -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=unused-parameter -Wno-error=unused-result
 
 build: clean
-	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS)
+	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_FLAGS) $(GCC_WARNINGS)
 
 build_release: clean
-	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
+	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_FLAGS) $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
 
 clean:
 	@rm -f kommando
