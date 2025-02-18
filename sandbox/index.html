@@ -75,16 +75,18 @@
 
             function editor_jump_to(loc) {
                 const range = editor.getModel().getFullModelRange();
-                if (loc.length == 1) { // line
-                    editor.setPosition( { lineNumber: loc[0], column: 0 });
+                if (loc.length > 0) { 
+                    if (loc.length == 1) { // line
+                        editor.setPosition( { lineNumber: loc[0], column: 0 });
+                    }
+                    if (loc.length == 2) { // line+col
+                        editor.setPosition( { lineNumber: loc[0], column: loc[1] });
+                    }
+                    if (loc.length == 3) { // line+range
+                        editor.setSelection({ startLineNumber: loc[0], endLineNumber: loc[0], startColumn: loc[1], endColumn: loc[2] });
+                    }
+                    editor.revealLine(loc[0]);
                 }
-                if (loc.length == 2) { // line+col
-                    editor.setPosition( { lineNumber: loc[0], column: loc[1] });
-                }
-                if (loc.length == 3) { // line+range
-                    editor.setSelection({ startLineNumber: loc[0], endLineNumber: loc[0], startColumn: loc[1], endColumn: loc[2] });
-                }
-                editor.revealLine(loc[0]);
                 editor.focus();
             }
 
@@ -96,11 +98,12 @@
                         let [_empty, file, suffix] = part.split(/^(\.?\/?\w+(?:\/\w+)*\.\w+)/);
                         let loc = suffix.match(/(\d+)/g);
                         if (/^\/tempdata\/sandbox[0-9a-f]+.kdo$/.test(file)) { // main kdo file
-                            parts.push('<a href="#" onclick="editor_jump_to([' + loc + ']);event.preventDefault();" style="color: inherit">' + html_escape(part) + '</a>');
+                            parts.push('<a href="#" onclick="event.preventDefault();editor_jump_to([' + loc + ']);" style="color: inherit">' + html_escape(part) + '</a>');
                         } else {
                             let href = '';
                             let github_prefix = 'https://github.com/justanothercell/kommando/blob/dev/';
-                            let github_suffix = '#L' + loc[0];
+                            let github_suffix = '';
+                            if (loc.length > 0) github_suffix = '#L' + loc[0];
                             if (/^\/tempdata\/sandbox[0-9a-f]+.c$/.test(file)) { // generated c file, inaccessible
                                 parts.push(html_escape(part));
                             } else if (/^\/tempdata\/sandbox[0-9a-f]+.h$/.test(file)) { // generated c header file, inaccessible
