@@ -1,7 +1,7 @@
 from flask import Flask, send_from_directory, request, redirect, abort
 import requests
 import logging
-import datetime
+from datetime import datetime
 
 logging.basicConfig(filename='log/latest.log', level=logging.INFO)
 
