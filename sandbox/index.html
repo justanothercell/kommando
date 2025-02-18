@@ -75,7 +75,7 @@
 
             function editor_jump_to(loc) {
                 const range = editor.getModel().getFullModelRange();
-                if (loc.length > 0) { 
+                if (loc.length > 0 && loc[0]) { 
                     if (loc.length == 1) { // line
                         editor.setPosition( { lineNumber: loc[0], column: 0 });
                     }
@@ -103,7 +103,7 @@
                             let href = '';
                             let github_prefix = 'https://github.com/justanothercell/kommando/blob/dev/';
                             let github_suffix = '';
-                            if (loc.length > 0) github_suffix = '#L' + loc[0];
+                            if (loc.length > 0 && loc[0]) github_suffix = '#L' + loc[0];
                             if (/^\/tempdata\/sandbox[0-9a-f]+.c$/.test(file)) { // generated c file, inaccessible
                                 parts.push(html_escape(part));
                             } else if (/^\/tempdata\/sandbox[0-9a-f]+.h$/.test(file)) { // generated c header file, inaccessible

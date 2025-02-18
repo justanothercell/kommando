@@ -1,0 +1,88 @@
+use std::*;
+use std::slice::Slice;
+use c_api::VaBox;
+pub use core::fmt::*;
+
+pub fn format(format: c_str, ...) -> c_str {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+
+    let msg = c_api::nullstr;
+    let size = 0usize;
+    let stream = c_api::open_memstream(&msg, &size);
+    fprint_va(stream, format, args);
+    c_api::fclose(stream);
+    
+    $"va_end($![args].va)";
+
+    msg
+}
+
+pub fn formatln(format: c_str, ...) -> c_str {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+
+    let msg = c_api::nullstr;
+    let size = 0usize;
+    let stream = c_api::open_memstream(&msg, &size);
+    fprint_va(stream, format, args);
+    c_api::fputs("\n", stream);
+    c_api::fclose(stream);
+    
+    $"va_end($![args].va)";
+
+    msg
+}
+
+pub fn print(format: c_str, ...) {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+    fprint_va(std::io::stdout, format, args);
+    $"va_end($![args].va)";
+}
+
+pub fn println(format: c_str, ...) {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+    fprint_va(std::io::stdout, format, args);
+    c_api::fputs("\n", std::io::stdout);
+    $"va_end($![args].va)";
+}
+
+pub fn fprint(stream: std::io::CFileStream, format: c_str, ...) {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+    fprint_va(stream, format, args);
+    $"va_end($![args].va)";
+}
+
+pub fn fprintln(stream: std::io::CFileStream, format: c_str, ...) {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+    fprint_va(stream, format, args);
+    c_api::fputs("\n", stream);
+    $"va_end($![args].va)";
+}
+
+pub fn fprint_va(stream: std::io::CFileStream, format: c_str, args: VaBox) {
+    let stream = FormatStream { inner: stream };
+    let chars = Slice::<char>::from_c_str(format);
+    let i = 0usize;
+    while i < chars.length {
+        let c = chars.get(i).unwrap();
+        i += 1;
+        if c == 36 { // '$'
+            let c = chars.get(i).unwrap_or(0);
+            if c == 36 { // '$'
+                stream.write_char(c);
+                i += 1;
+                continue;
+            };
+            let fmt = Formatter::<>::default();
+            let next: DynFmt = $"va_arg($![args].va, @![DynFmt])";
+            (next.fmt)(next.object, &fmt, &stream);
+        } else {
+            stream.write_char(c);
+        };
+    }
+}

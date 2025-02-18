@@ -1,0 +1,121 @@
+use core::types::*;
+
+pub mod math;
+pub mod str;
+pub mod dl;
+pub mod ucontext;
+
+pub use core::types::raw_ptr as CFileStream;
+
+#[extern]
+pub fn printf(fmt: c_str, ...) -> i32;
+#[extern]
+pub fn fprintf(stream: CFileStream, fmt: c_str, ...) -> i32;
+#[extern]
+pub fn vfprintf(stream: CFileStream, fmt: c_str, args: va_list) -> i32;
+#[extern]
+pub fn fopen(path: c_str, mode: c_str) -> CFileStream;
+#[extern]
+pub fn fclose(stream: CFileStream) -> i32;
+#[extern]
+pub fn fflush(stream: CFileStream) -> i32;
+#[extern]
+pub fn feof(stream: CFileStream) -> i32;
+#[extern]
+pub fn puts(string: c_str) -> i32;
+#[extern]
+pub fn fputs(string: c_str, stream: CFileStream) -> i32;
+#[extern]
+pub fn fputc(c: char, stream: CFileStream) -> i32;
+
+pub fn formatf(format: c_str, ...) -> c_str {
+    let args: VaBox = std::mem::uninit();
+    $"va_start($![args].va, $![format])";
+
+    let msg = c_api::nullstr;
+    let size = 0usize;
+    let stream = c_api::open_memstream(&msg, &size);
+    $"vfprintf($![stream], $![format], $![args].va)";
+    c_api::fclose(stream);
+    
+    $"va_end($![args].va)";
+
+    msg
+}
+
+#[extern]
+pub fn open_memstream(stream: ptr<c_str>, size: ptr<usize>) -> CFileStream;
+
+#[extern]
+pub fn exit(code: i32);
+
+#[extern]
+pub fn malloc(size: usize) -> raw_ptr;
+#[extern]
+pub fn alloca(size: usize) -> raw_ptr;
+#[extern]
+pub fn realloc(ptr: raw_ptr, size: usize) -> raw_ptr;
+#[extern]
+pub fn free(ptr: raw_ptr);
+#[extern]
+pub fn calloc(count: usize, size: usize) -> raw_ptr;
+#[extern]
+pub fn reallocarray(ptr: raw_ptr, count: usize, size: usize) -> raw_ptr;
+
+#[extern]
+pub fn memset(ptr: raw_ptr, char_value: i32, count: usize) -> raw_ptr;
+
+#[extern]
+pub fn aligned_alloc(alignment: usize, size: usize) -> raw_ptr;
+#[extern]
+pub fn getpagesize() -> usize;
+
+pub const null: raw_ptr = 0;
+pub const nullstr: c_str = 0;
+
+pub fn freestr(str: c_str) {
+    free(core::intrinsics::typecast(str))
+}
+
+// gnu-c
+#[extern]
+pub fn getline(out_line: ptr<c_str>, out_size: ptr<usize>, stream: raw_ptr) -> i32;
+
+#[extern]
+pub fn raise(signal: i32) -> i32;
+#[extern]
+pub fn kill(pid: i32, signal: i32) -> i32;
+#[extern]
+pub fn signal(signal: i32, handler: function_ptr<i32>) -> function_ptr<i32>;
+
+#[extern]
+pub fn system(cmd: c_str) -> i32;
+
+pub fn is_shell() -> bool {
+    system(nullstr) != 0
+}
+
+#[extern]
+pub fn fork() -> i32;
+
+#[extern]
+pub fn rand() -> i32;
+pub fn rand32() -> u32 { core::intrinsics::typecast(rand()) }
+pub fn rand64() -> u64 { core::intrinsics::numcast::<_, u64>(rand32()) << 32 | core::intrinsics::numcast::<_, u64>(rand32()) }
+#[extern]
+pub fn srand(seed: u32);
+
+#[extern]
+pub fn time(tloc: raw_ptr) -> u64;
+
+/// This type is barely useable because c is weird
+#[extern]
+#[size=24]
+#[align=8]
+#[c_alias="va_list"]
+pub struct va_list;
+
+/// VA wrapper type
+pub struct VaBox {
+    va: va_list
+}

@@ -1,0 +1,180 @@
+use std::*;
+use std::vec::Vec;
+use core::eq::Eq;
+use core::hash::Hash;
+use core::hash::DefaultHasher;
+
+pub struct Entry<K, V> {
+    key: K, 
+    value: V
+}
+
+pub struct HashMap<K, V> {
+    buckets: Vec<Vec<Entry<K, V>>>,
+    random: u64,
+    load_factor: f32,
+    length: usize
+}
+
+impl<K: Hash + Eq, V> HashMap<K, V> {
+    pub fn new() -> HashMap<K, V> {
+        HashMap::<_, _>::new_with(0.75)
+    }
+
+    pub fn new_with(load_factor: f32) -> HashMap<K, V> {
+        let buckets = Vec::<Vec<Entry<K, V>>>::new_with(256);
+        while buckets.length < buckets.capacity {
+            buckets.push(Vec::<_>::new());
+        };
+        _ {
+            buckets: buckets,
+            random: c_api::rand64(),
+            load_factor: load_factor,
+            length: 0
+        }
+    }
+
+    pub fn put(self: ptr<HashMap<K, V>>, key: K, value: V) -> Option<Entry<K, V>> {
+        let hasher = DefaultHasher::<>::new_with_key(self.random);
+        key.hash(&hasher);
+        let hash: u64 = hasher.finish();
+        let bucket = self.buckets.get_ref(numcast(hash % numcast(self.buckets.length))).unwrap();
+        let entry = Entry { key: key, value: value };
+        let i = 0usize;
+        while i < bucket.length {
+            let old_entry = bucket.get_ref(i).unwrap();
+            if old_entry.key.eq(&key) {
+                return Option::<_>::some(std::mem::replace(old_entry, entry));
+            };
+            i += 1;
+        };
+        bucket.push(entry);
+        self.length += 1;
+        // rehash?
+        if numcast::<_, f32>(self.length) / numcast::<_, f32>(self.buckets.length) > self.load_factor {
+            let old_buckets = self.buckets;
+            self.buckets = Vec::<Vec<Entry<K, V>>>::new_with(old_buckets.length * 2);
+            while self.buckets.length < self.buckets.capacity {
+                self.buckets.push(Vec::<_>::new());
+            };
+            self.random = c_api::rand64();
+            while old_buckets.length > 0 {
+                let old_bucket = old_buckets.pop().unwrap();
+                while old_bucket.length > 0 {
+                    let old_entry = old_bucket.pop().unwrap();
+                    self.put(old_entry.key, old_entry.value);
+                };
+                old_bucket.free();
+            };
+            old_buckets.free();
+        };
+        Option::<_>::none()
+    }
+
+    pub fn remove(self: ptr<HashMap<K, V>>, key: K) -> Option<Entry<K, V>> {
+        let hasher = DefaultHasher::<>::new_with_key(self.random);
+        key.hash(&hasher);
+        let hash: u64 = hasher.finish();
+        let bucket = self.buckets.get_ref(numcast(hash % numcast(self.buckets.length))).unwrap();
+        let i = 0usize;
+        while i < bucket.length {
+            if bucket.get(i).unwrap().key.eq(&key) {
+                self.length -= 1;
+                return bucket.swap_remove(i);
+            };
+            i += 1;
+        };
+        Option::<_>::none()
+    }
+
+    pub fn get(self: ptr<HashMap<K, V>>, key: K) -> Option<V> {
+        let hasher = DefaultHasher::<>::new_with_key(self.random);
+        key.hash(&hasher);
+        let hash: u64 = hasher.finish();
+        let bucket = self.buckets.get_ref(numcast(hash % numcast(self.buckets.length))).unwrap();
+        let i = 0usize;
+        while i < bucket.length {
+            let entry = bucket.get(i).unwrap();
+            if entry.key.eq(&key) {
+                return Option::<_>::some(entry.value);
+            };
+            i += 1;
+        };
+        Option::<_>::none()
+    }
+
+    pub fn get_ref(self: ptr<HashMap<K, V>>, key: K) -> Option<ptr<V>> {
+        let hasher = DefaultHasher::<>::new_with_key(self.random);
+        key.hash(&hasher);
+        let hash: u64 = hasher.finish();
+        let bucket = self.buckets.get_ref(numcast(hash % numcast(self.buckets.length))).unwrap();
+        let i = 0usize;
+        while i < bucket.length {
+            let entry = bucket.get(i).unwrap();
+            if entry.key.eq(&key) {
+                return Option::<_>::some(&entry.value);
+            };
+            i += 1;
+        };
+        Option::<_>::none()
+    }
+
+    pub fn contains(self: ptr<HashMap<K, V>>, key: K) -> bool {
+        let hasher = DefaultHasher::<>::new_with_key(self.random);
+        key.hash(&hasher);
+        let hash: u64 = hasher.finish();
+        let bucket = self.buckets.get_ref(numcast(hash % numcast(self.buckets.length))).unwrap();
+        let i = 0usize;
+        while i < bucket.length {
+            let entry = bucket.get(i).unwrap();
+            if entry.key.eq(&key) {
+                return true;
+            };
+            i += 1;
+        };
+        false
+    }
+
+    pub fn iter(self: ptr<HashMap<K, V>>) -> Iter<K, V> {
+        _ {
+            map: self,
+            i: 0,
+            j: 0
+        }
+    }
+
+    pub fn free(self: ptr<HashMap<K, V>>) {
+        let i = 0usize;
+        while i < self.buckets.length {
+            self.buckets.get(i).unwrap().free();
+            i += 1;
+        };
+        self.buckets.free();
+    }
+}
+
+pub struct Iter<K, V> {
+    map: ptr<HashMap<K, V>>,
+    i: usize, 
+    j: usize
+}
+
+impl<K, V> Iter<K, V> {
+    pub fn next(self: ptr<Iter<K, V>>) -> Option<Entry<K, V>> {
+        if self.i >= self.map.buckets.length {
+            return Option::<_>::none();
+        };
+        while self.i < self.map.buckets.length {
+            let bucket = self.map.buckets.get(self.i).unwrap();
+            if self.j >= bucket.length {
+                self.i += 1;
+                self.j = 0;
+            } else {
+                let entry = bucket.get(self.j).unwrap();
+                self.j += 1;
+                return Option::<_>::some(entry);
+            }
+        };
+        Option::<_>::none()
+    }
+}

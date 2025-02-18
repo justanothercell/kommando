@@ -1,0 +1,121 @@
+use std::*;
+use std::vec::Vec;
+use core::cmp::Cmp;
+
+pub struct Slice<T> {
+    buffer: ptr<T>,
+    length: usize
+}
+
+impl<T> Slice<T> {
+    pub fn get(s: ptr<Slice<T>>, i: usize) -> Option<T> {
+        if i < s.length {
+            Option::<_>::some(*std::mem::arr_offset(s.buffer, i))
+        } else {
+            Option::<_>::none()
+        }
+    }
+
+    pub fn get_ref(s: ptr<Slice<T>>, i: usize) -> Option<ptr<T>> {
+        if i < s.length {
+            Option::<_>::some(std::mem::arr_offset(s.buffer, i))
+        } else {
+            Option::<_>::none()
+        }
+    }
+    pub fn last(s: ptr<Slice<T>>) -> Option<T> {
+        if s.length == 0 {
+            return Option::<_>::none();
+        };
+        s.get(s.length - 1)
+    }
+    pub fn last_ref(s: ptr<Slice<T>>) -> Option<ptr<T>> {
+        if s.length == 0 {
+            return Option::<_>::none();
+        };
+        s.get_ref(s.length - 1)
+    }
+
+    pub fn slice(s: ptr<Slice<T>>) -> Slice<T> {
+        s.slice_range(0, s.length)
+    }
+
+    pub fn slice_range(s: ptr<Slice<T>>, from: usize, to: usize) -> Slice<T> {
+        if to < from { panic("Slice range negative") };
+        if s.length < to { panic("Slice out of range for vector") };
+        _ { buffer: std::mem::arr_offset(s.buffer, from), length: to - from }
+    }
+
+    pub fn to_vec(s: ptr<Slice<T>>) -> Vec<T> {
+        let v = Vec::<T>::new_with(s.length + 1); // reserving +1 for zero terminator when we convert the vec to string
+        while v.length < s.length {
+            v.push(s.get(v.length).unwrap());
+        };
+        v
+    }
+}
+
+impl<T: Cmp> Slice<T> {
+    pub fn sort(s: ptr<Slice<T>>) {
+        s.sort_with(T::<>::cmp);
+    }
+}
+
+impl<T> Slice<T> {
+    pub fn sort_with(s: ptr<Slice<T>>, comparator: function_ptr<i32>) {
+        if s.length <= 1 {
+            return;
+        };
+        let pivot = s.get(numcast(c_api::rand64()) % s.length).unwrap();
+        let a = 0usize;
+        let b = s.length - 1;
+        let homogeneous = true;
+        while a != b {
+            let item = s.get_ref(a).unwrap();
+            // item is smaller than pivot
+            let r = (comparator)(item, &pivot);
+            homogeneous &= r == 0;
+            if r <= 0 {
+                a += 1;
+            } else { // item is bigger or equal to pivot
+                std::mem::swap(item, s.get_ref(b).unwrap());
+                b -= 1;
+            }
+        };
+        if homogeneous {
+            return;
+        };
+        let left = s.slice_range(0, a);
+        let right = s.slice_range(a, s.length);
+        left.sort_with(comparator);
+        right.sort_with(comparator);
+    }
+}
+
+impl Slice<char> {
+    pub fn from_c_str(str: c_str) -> Slice<char> {
+        let length = c_api::str::strlen(str);
+        _ {
+            length: length,
+            buffer: typecast(str)
+        }
+    }
+}
+
+use std::fmt::*;
+
+impl<T: Fmt> Slice<T>: Fmt {
+    fn dyn_fmt(s: ptr<Slice<T>>) -> DynFmt {
+        _ { object: typecast(s), fmt: Slice::<T>::fmt }
+    }
+    fn fmt(s: ptr<Slice<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write_str("[");
+        let i = 0usize;
+        while i < s.length {
+            if i > 0 { stream.write_str(", "); };
+            s.get(i).unwrap().fmt(fmt, stream);
+            i += 1;
+        };
+        stream.write_str("]");
+    }
+}
