@@ -22,6 +22,7 @@
         - [Unit](./lang/primitives/unit.md)
         - [Ints](./lang/primitives/integers.md)
         - [Floats](./lang/primitives/floats.md)
+        - [Booleans](./lang/primitives/bool.md)
         - [Strings](./lang/primitives/strings.md)
         - [Pointers](./lang/primitives/pointers.md)
     - [Structs](./lang/structs.md)

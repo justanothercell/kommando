@@ -36,6 +36,7 @@ CompilerOptions build_args(StrList* args) {
         printf("    --cc=<c_compiler_path>\n");
         printf("    --dir=<output_directory>\n");
         printf("    ::package=<path/to/package> (multiple possible)\n");
+        printf("    --include=path/to/c_header.h (multiple possible)\n");
         printf("The following options are compiler diagnostics:\n");
         printf("    --trace-compiler - trace the compiler on panic\n");
         printf("    --emit-spans     - Write source references as comments in generated c\n");
@@ -55,6 +56,7 @@ CompilerOptions build_args(StrList* args) {
     options.run = false;
     options.emit_spans = false;
     options.package_names = list_new(StrList);
+    options.c_headers = list_new(StrList);
     options.packages = map_new();
     options.verbosity = 1;
     options.tracelevel = 1;
@@ -92,6 +94,8 @@ CompilerOptions build_args(StrList* args) {
                     log(ANSI(ANSI_RED_FG, ANSI_BOLD) "Error: " ANSI_RESET_SEQUENCE "Invalid trace level `--trace=%s`", arg);
                     goto print_help;
                 }
+            } else if (str_startswith(arg, "include=")){
+                list_append(&options.c_headers, arg+8);
             } else if (str_startswith(arg, "dir=")){
                 arg += 4;
                 if (options.out_dir != NULL) panic("dir already supplied as `%s` but was supplied again: `--dir=%s`", options.out_dir, arg);
@@ -252,6 +256,7 @@ void compile(CompilerOptions options) {
         if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
         str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch %s -lm -o %s %s", 
             options.c_compiler, code_file_name, options.outname, options.static_links ? "-static" : ""));
+        fflush(stdout);
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
     }

@@ -1,10 +1,11 @@
-# Numbers | Docs [[ints](../lang/primitives/integers.md), [floats](../lang/primitives/floats.md)]
+# Numbers | Docs [[ints](../lang/primitives/integers.md), [floats](../lang/primitives/floats.md), [bools](../lang/primitives/bool.md)]
 There are many different numeric types, but usually small subset suffices for most applications:
 - `u8` or `char` (alias of the same type) when dealing with strings and raw byte sttreams
 - `i32` for most standard numeric uses
 - `usize` for counters, indicies and pointer arithmetic
 - `f32` or `f64` depending on precision needs
 - `u8`, `u32` or `u64` for bit masks or enumerations, depending on variant count
+- `bool` for flags and conditions
 
 You should try staying within a specific numeric type for a usecase, however sometimes you will need to convert between two different types.
 

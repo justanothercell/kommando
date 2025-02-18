@@ -20,6 +20,7 @@ typedef struct CompilerOptions {
     Map* packages;
     int verbosity;
     int tracelevel;
+    StrList c_headers;
 } CompilerOptions;
 
 CompilerOptions build_args(StrList* args);

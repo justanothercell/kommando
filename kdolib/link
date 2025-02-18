@@ -2,4 +2,5 @@
 
 echo $($(dirname "$0")/link_core) \
      ::c_api=$(dirname "$0")/c_api \
-     ::std=$(dirname "$0")/std
+     ::std=$(dirname "$0")/std \
+     --include=stdarg.h

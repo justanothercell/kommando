@@ -12,8 +12,9 @@ Save this into a file called `hello.kdo`
 
 Although this seems like not much, it already uses a bunch of language features and with it a bunch of libraries:
 - [core](https://github.com/justanothercell/kommando/tree/dev/kdolib/core) library: every project needs this library as it defines core language primitives
-- [std](https://github.com/justanothercell/kommando/tree/dev/kdolib/std) library: this library defines `println` and a bunch of other useful functions and structures
 - [c_api](https://github.com/justanothercell/kommando/tree/dev/kdolib/c_api) library: used in-proxy by `std`, it defines many c ffi functions.
+- [std](https://github.com/justanothercell/kommando/tree/dev/kdolib/std) library: this library defines `println` and a bunch of other useful functions and structures
+    - std requires the c header `stdarg.h`
 
 To compile this example we need to provide path to these libraries, located in the [kdolib/](https://github.com/justanothercell/kommando/tree/dev/kdolib) directory.
 
@@ -22,7 +23,9 @@ To compile this example we need to provide path to these libraries, located in t
 Here we assume we are in the root directory of the [kommando](https://github.com/justanothercell/kommando/tree/dev) compiler, otherwise you need to adjust the paths in the command.
 
 ```sh
-./kommando hello.kdo hello -cr ::core=kdolib/core ::core=kdolib/c_api ::core=kdolib/std 
+./kommando hello.kdo hello -cr \ # compile + run
+    ::core=kdolib/core ::core=kdolib/c_api ::core=kdolib/std \
+    --include=stdarg.h
 ```
 
 >**Note:** Command line arguments are generally order-independant

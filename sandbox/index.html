@@ -8,8 +8,8 @@
 	</head>
 	<body>
         <h1>
-            <a href="https://github.com/justanothercell/kommando/tree/dev" style="color:white">Kommando sandbox</a> |
-            <a href="/docs" style="color:white">Docs[WIP]</a>
+            <a href="https://github.com/justanothercell/kommando/tree/dev" target="_blank" rel="noopener noreferrer" style="color:white">Kommando sandbox</a> |
+            <a href="/docs" target="_blank" rel="noopener noreferrer" style="color:white">Docs[WIP]</a>
         </h1>
         <div id="header">
             <button id="button-run">Run</button>
@@ -69,6 +69,75 @@
             
             var exec_state = 'idle';
 
+            function html_escape(text) {
+                return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/\\/g, "&#92;");
+            }
+
+            function editor_jump_to(loc) {
+                const range = editor.getModel().getFullModelRange();
+                if (loc.length == 1) { // line
+                    editor.setPosition( { lineNumber: loc[0], column: 0 });
+                }
+                if (loc.length == 2) { // line+col
+                    editor.setPosition( { lineNumber: loc[0], column: loc[1] });
+                }
+                if (loc.length == 3) { // line+range
+                    editor.setSelection({ startLineNumber: loc[0], endLineNumber: loc[0], startColumn: loc[1], endColumn: loc[2] });
+                }
+                editor.revealLine(loc[0]);
+                editor.focus();
+            }
+
+            function linkify_output_text(text) {
+                let parts = []
+                for (let part of text.split(/(\.?\/?\w+(?:\/\w+)*\.\w+(?::\d+(?::\d+)?(?:-\d+)?)?)/g)) {
+                    if (!part) continue;
+                    if (/^\.?\/?\w+(?:\/\w+)*\.\w+(?::\d+(?::\d+)?(?:-\d+)?)?$/.test(part)) {
+                        let [_empty, file, suffix] = part.split(/^(\.?\/?\w+(?:\/\w+)*\.\w+)/);
+                        let loc = suffix.match(/(\d+)/g);
+                        if (/^\/tempdata\/sandbox[0-9a-f]+.kdo$/.test(file)) { // main kdo file
+                            parts.push('<a href="#" onclick="editor_jump_to([' + loc + ']);event.preventDefault();" style="color: inherit">' + html_escape(part) + '</a>');
+                        } else {
+                            let href = '';
+                            let github_prefix = 'https://github.com/justanothercell/kommando/blob/dev/';
+                            let github_suffix = '#L' + loc[0];
+                            if (/^\/tempdata\/sandbox[0-9a-f]+.c$/.test(file)) { // generated c file, inaccessible
+                                parts.push(html_escape(part));
+                            } else if (/^\/tempdata\/sandbox[0-9a-f]+.h$/.test(file)) { // generated c header file, inaccessible
+                                continue;
+                                parts.push(html_escape(part));
+                                continue;
+                            } else if (/^\.?\/kdolib.*.kdo$/.test(file)) { // library file
+                                href = github_prefix + file + github_suffix;
+                            } else if (/^\w+(\/\w+)*.c$/.test(file)) { // bootstrap source file
+                                href = github_prefix + 'bootstrap/' + file + github_suffix;
+                            } else { // unknown, raw link
+                                parts.push(html_escape(part));
+                                continue;
+                            }
+                            // clickable link
+                            parts.push('<a href="' + href + '" target="_blank" rel="noopener noreferrer" style="color: inherit">' + html_escape(part) + '</a>');
+                        }
+                    } else {
+                        parts.push(html_escape(part));
+                    }
+                }
+                return parts.join('');
+            }
+
+            function set_output(text){
+                output.innerHTML = ansi_up.ansi_to_html(text);
+                for (const node of output.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== "") {
+                        let span = document.createElement("span");
+                        span.innerHTML = linkify_output_text(node.textContent);
+                        output.replaceChild(span, node);
+                    } else {
+                        node.innerHTML = linkify_output_text(node.textContent);
+                    }
+                }
+            }
+
             function run() {
                 save();
                 if (exec_state != 'idle') return;
@@ -96,7 +165,7 @@
                 })
                 .then((response) => {
                     if (response.status != 200) {
-                        output.innerHTML = ansi_up.ansi_to_html('\x1b[1;37mError executing:\n' + response.statusText + '\x1b[0m');
+                        set_output('\x1b[1;37mError executing:\n' + response.statusText + '\x1b[0m');
                         exec_state = 'idle';
                         return;
                     }
@@ -104,13 +173,10 @@
                 }).then((json) => {
                     if (!json) return;
                     if (json['success']) {
-                        output.innerHTML = ansi_up.ansi_to_html(json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
+                        set_output(json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
                     } else {
-                        output.innerHTML = ansi_up.ansi_to_html('\x1b[1;37mCompilation error:\x1b[0m\n' + json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
+                        set_output('\x1b[1;37mCompilation error:\x1b[0m\n' + json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
                     }
-                    exec_state = 'idle';
-                }).catch((error) => {
-                    output.innerHTML = 'Error executing:\n' + error;
                     exec_state = 'idle';
                 }).finally(() => {
                     exec_state = 'idle'; // just in case 
