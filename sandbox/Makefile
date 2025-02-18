@@ -12,10 +12,9 @@ delete_container: stop_container
 build_image:
 	pushd .. && make build_release && popd
 
-	rm -rf include/
-	mkdir include
+	rm -rf include/kdolib
 	cp ../kommando include/kommando
-	cp -r ../kdolib include/kdolib
+	cp -rf ../kdolib include/kdolib
 
 	sudo docker build -t kommando-sandbox-runner .
 
