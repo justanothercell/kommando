@@ -3,3 +3,4 @@ MEMTRACE.txt
 out.txt
 CACHELOG.txt
 log.txt
+.env
