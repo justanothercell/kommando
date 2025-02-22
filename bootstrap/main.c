@@ -23,13 +23,13 @@ int main(int argc, char* argv[]) {
     compile(options);
 
     if (options.run) {
-        if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RUN" ANSI_RESET_SEQUENCE, "Running " ANSI(ANSI_WHITE_FG) "%s" ANSI_RESET_SEQUENCE " ...", options.source);
+        if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "RUN" ANSI_RESET_SEQUENCE, "Running " ANSI(ANSI_WHITE_FG) "%s" ANSI_RESET_SEQUENCE " ...", options.source);
         fflush(stdout);
         i32 code = system(options.outname);
         if (code == -1) {
             if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_RED_FG) "RUN" ANSI_RESET_SEQUENCE, "Could not start execution");
         } else {
-            if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RUN" ANSI_RESET_SEQUENCE, "Execution finished with code %ld", WEXITSTATUS(code));
+            if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "RUN" ANSI_RESET_SEQUENCE, "Execution finished with code %ld", WEXITSTATUS(code));
         }
     }
 

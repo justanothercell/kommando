@@ -24,7 +24,7 @@ void* map_remove(Map* map, str key);
 void* map_put(Map* map, str key, void* value);
 usize map_size(Map* map);
 
-#define map_foreach(map_ptr, key_name, value_name, map_block) ({ \
+#define map_foreach(map_ptr, key_name, value_name, map_block) do { \
     for (usize i1234567890 = 0;i1234567890 < (map_ptr)->buckets.length;i1234567890++) { \
         Bucket* bucket1234567890 = &(map_ptr)->buckets.elements[i1234567890]; \
         for (usize j1234567890 = 0;j1234567890 < bucket1234567890->length;j1234567890++) { \
@@ -33,6 +33,6 @@ usize map_size(Map* map);
             map_block; \
         } \
     } \
-})
+} while(0)
 
 #endif

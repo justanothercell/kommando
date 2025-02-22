@@ -40,6 +40,7 @@ typedef struct Module {
     Visibility vis;
     ImplList impls;
     Map* package_method_map;
+    Map* package_trait_impl_map;
 } Module;
 LIST(FuncList, FuncDef*);
 
@@ -53,10 +54,21 @@ typedef struct TraceGen {
     bool trace_this;
 } TraceGen;
 
+typedef struct RaiiData {
+    str copy_key;
+    TraitDef* copy;
+    str clone_key;
+    TraitDef* clone;
+    str drop_key;
+    TraitDef* drop;
+    TypeDef* raw;
+} RaiiData;
+
 typedef struct Program {
     Map* packages;
     Module* main_module;
     TraceGen tracegen;
+    RaiiData raii;
 } Program;
 
 typedef struct CompilerOptions CompilerOptions;

@@ -5,6 +5,7 @@
 #include "lib/str.h"
 #include "module.h"
 #include "token.h"
+#include "parser.h"
 
 typedef struct CompilerOptions {
     str source;

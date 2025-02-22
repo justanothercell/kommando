@@ -21,7 +21,7 @@
 #define ANSI_RED_FG     "31"
 #define ANSI_GREEN_FG   "32"
 #define ANSI_YELLO_FG   "33"
-#define ANSI_BLUE_FG    "34"
+#define ANSI_PURPLE_FG    "34"
 #define ANSI_MAGENTA_FG "35"
 #define ANSI_CYAN_FG    "36"
 #define ANSI_WHITE_FG   "37"
@@ -31,11 +31,14 @@
 #define ANSI_RED_BG     "41"
 #define ANSI_GREEN_BG   "42"
 #define ANSI_YELLO_BG   "43"
-#define ANSI_BLUE_BG    "44"
+#define ANSI_PURPLE_BG    "44"
 #define ANSI_MAGENTA_BG "45"
 #define ANSI_CYAN_BG    "46"
 #define ANSI_WHITE_BG   "47"
 #define ANSI_DEFAULT_BG "49"
+
+#define ANSI_RGB_FG(r, g, b) "38;2;" #r ";" #g ";" #b
+#define ANSI_RGB_BG(r, g, b) "48;2;" #r ";" #g ";" #b
 
 #define ANSI1(X, ...) X
 #define ANSI2(X, ...) X __VA_OPT__(";" ANSI1(__VA_ARGS__))

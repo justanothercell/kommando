@@ -31,6 +31,6 @@
 #define FIELDS24(macro, f, ...) macro(f) __VA_OPT__(, FIELDS23(macro, __VA_ARGS__))
 #define FIELDS(macro, ...) FIELDS24(macro, __VA_ARGS__)
 
-#define ENUM(name, ...) typedef enum name { FIELDS(IDENTITY_MACRO, __VA_ARGS__) } name; static const char* name##__NAMES[] = { FIELDS((char*)STRINGIFY, __VA_ARGS__) } /* NOLINT(unused-variable) */
+#define ENUM(name, ...) __attribute__((unused)) typedef enum name { FIELDS(IDENTITY_MACRO, __VA_ARGS__) } name; __attribute__((unused)) static const char* name##__NAMES[] = { FIELDS((char*)STRINGIFY, __VA_ARGS__) }
 
 #endif

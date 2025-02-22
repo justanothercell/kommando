@@ -1,8 +1,5 @@
 #include "ast.h"
 #include "lib.h"
-#include "lib/defines.h"
-#include "lib/list.h"
-#include "lib/map.h"
 #include "resolver.h"
 LIB;
 #include "module.h"

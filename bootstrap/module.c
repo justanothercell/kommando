@@ -19,6 +19,7 @@ void insert_module(Program* program, CompilerOptions* options, Module* module, V
     if (path->elements.length == 1) {
         Identifier* name = path->elements.elements[0];
         module->package_method_map = map_new();
+        module->package_trait_impl_map = map_new();
         if (vis != V_PUBLIC) spanned_error("Package must be public", name->span, "Cannot register package %s as %s, this is probably a compiler error.", to_str_writer(s, fprint_path(s, path)), Visibility__NAMES[vis]);
         if (map_put(program->packages, name->name, module) != NULL) spanned_error("Package already exists", name->span, "Cannot register package %s, it already exists.", to_str_writer(s, fprint_path(s, path)));
         return;
@@ -51,13 +52,14 @@ void insert_module(Program* program, CompilerOptions* options, Module* module, V
     Module* pkg = current;
     while (pkg->parent != NULL) pkg = pkg->parent;
     module->package_method_map = pkg->package_method_map;
+    module->package_trait_impl_map = pkg->package_trait_impl_map;
 
     ModuleItem* old = map_put(current->items, name->name, item);
     if (old != NULL) {
         spanned_error("Name conflict", name->span, "Name %s is already defined in this scope at %s", name->name, to_str_writer(s, fprint_span(s, &old->name->span)));
     }
 
-    if (options->verbosity >= 2) log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
+    if (options->verbosity >= 3) log("Registered module %s", to_str_writer(s, fprint_path(s, module->path)));
 }
 
 Identifier* gen_identifier(str name) {
@@ -74,12 +76,20 @@ Path* gen_path(str path) {
     return p;
 }
 
+static void apply_span(TypeValue* tv, Span span) {
+    list_foreach(&tv->name->elements, i, Identifier* ident, {
+        ident->span = span;
+    });
+    if (tv->generics != NULL) {
+        tv->generics->span = span;
+        list_foreach(&tv->generics->generics, counter, TypeValue* g, apply_span(g, span));
+    }
+}
+
 TypeValue* gen_typevalue(str typevalue, Span* span) {
     TokenStream* stream = tokenstream_new("<generated>", typevalue);
     TypeValue* tv = parse_type_value(stream);
-    if (span != NULL) list_foreach(&tv->name->elements, i, Identifier* ident, {
-        ident->span = *span;
-    });
+    if (span != NULL) apply_span(tv, *span);
     if(try_next_token(stream) != NULL) panic("`%s` is not a valid type value", typevalue);
     return tv;
 }
@@ -95,7 +105,6 @@ TypeDef* gen_simple_type(str name) {
     td->fields = map_new();
     td->transpile_state = 0;
     td->module = NULL;
-    td->head_resolved = false;
     td->traits = list_new(TraitList);
     return td;
 }

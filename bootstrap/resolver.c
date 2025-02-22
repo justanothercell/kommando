@@ -20,6 +20,8 @@ LIB
 #include "token.h"
 #include "compiler.h"
 
+void resolve_funcdef_body(Program* program, CompilerOptions* options, FuncDef* func);
+
 typedef struct VarList {
     VarBox** elements;
     usize length;
@@ -199,7 +201,7 @@ static ModuleItem* resolve_item_raw(Program* program, CompilerOptions* options, 
 // for example: 
 //             Foo  <i32>              <T> (of Foo)            
 //    register_item(tv->generics, NULL, tv->def->generics);
-void register_item(Program* program, CompilerOptions* options, GenericValues* type_values, GenericValues* func_values, GenericKeys* tvs_keys, GenericKeys* fvs_keys, GenericKeys* gkeys, FuncDef* func) {
+void register_item(Program* program, CompilerOptions* options, GenericValues* type_values, GenericValues* func_values, GenericKeys* tvs_keys, GenericKeys* fvs_keys, GenericKeys* gkeys) {
     if (gkeys == NULL) return;
     // no need to register if we are not generic - we just compile the one default nongeneric variant in that case
     if (type_values != NULL || func_values != NULL) {
@@ -208,7 +210,6 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
             GenericUse* use = malloc(sizeof(GenericUse));
             use->type_context = type_values;
             use->func_context = func_values;
-            use->in_func = func;
             map_put(gkeys->generic_uses, key, use);
             list_append(gkeys->generic_use_keys, key);
         }
@@ -220,7 +221,7 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
         list_foreach(&type_values->generics, i, TypeValue* v, {
             GKey* key = tvs_keys->generics.elements[i];
             list_foreach(&key->bounds, i, TraitBound* bound, {
-                if (v->def->module != NULL) { // actual tyoe
+                if (v->def->module != NULL) { // actual type
                     if (!map_contains(v->trait_impls, to_str_writer(s, fprintf(s, "%p", bound->resolved)))) {
                         spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
                             "Type %s does not satisfy trait bound %s::%s.\nConsider implementing this trait for this type", 
@@ -229,7 +230,7 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
                 } else { // generic key
                     if (!list_contains(&v->def->traits, j, TraitDef* def, def == bound->resolved)) {
                     spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
-                            "Type %s does not satisfy trait bound %s::%s.\nConsider implementing this trait for this type", 
+                            "Type %s does not satisfy trait bound %s::%s.\nConsider requiring this trait for this type", 
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
                     }
                 }
@@ -238,11 +239,12 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
                     Map* instances = map_get(bound->func_val_instances, name);
                     if (instances == NULL) continue;
                     map_foreach(instances, str key, GenericValues* values, {
-                        register_item(program, options, v->generics, values, v->def->generics, instance_method->generics, instance_method->generics, func);
+                        UNUSED(key);
+                        register_item(program, options, v->generics, values, v->def->generics, instance_method->generics, instance_method->generics);
                     });
                 });
             });
-            register_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics, func); 
+            register_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics); 
         });
     }
 
@@ -253,30 +255,35 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
         list_foreach(&func_values->generics, i, TypeValue* v, {
             GKey* key = fvs_keys->generics.elements[i];
             list_foreach(&key->bounds, j, TraitBound* bound, {
-                if (!map_contains(v->trait_impls, to_str_writer(s, fprintf(s, "%p", bound->resolved)))
-                 && !list_contains(&v->def->traits, k, TraitDef* trait, trait == bound->resolved)) {
+                if (v->def->module != NULL) { // actual type
+                    if (!map_contains(v->trait_impls, to_str_writer(s, fprintf(s, "%p", bound->resolved)))) {
+                        spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
+                            "Type %s does not satisfy trait bound %s::%s.\nConsider implementing this trait for this type", 
+                            to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
+                    }
+                } else { // generic key
+                    if (!list_contains(&v->def->traits, j, TraitDef* def, def == bound->resolved)) {
                     spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
-                        "Type %s does not satisfy trait bound %s::%s.\nConsider implementing this trait for this type", 
-                        to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
+                            "Type %s does not satisfy trait bound %s::%s.\nConsider requiring this trait for this type", 
+                            to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
+                    }
                 }
                 map_foreach(bound->resolved->methods, str name, ModuleItem* mi, {
                     FuncDef* instance_method = resolve_method_instance(program, options, v, mi->name, true);
                     Map* instances = map_get(bound->func_val_instances, name);
                     if (instances == NULL) continue;
                     map_foreach(instances, str key, GenericValues* values, {
-                        register_item(program, options, v->generics, values, v->def->generics, instance_method->generics, instance_method->generics, func);
+                        UNUSED(key);
+                        register_item(program, options, v->generics, values, v->def->generics, instance_method->generics, instance_method->generics);
                     });
                 });
             });
-            register_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics, func); 
+            register_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics); 
         });
     }
 }
 
-void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, GenericKeys* type_generics);
-void resolve_typedef(Program* program, CompilerOptions* options, TypeDef* ty);
 void resolve_typevalue(Program* program, CompilerOptions* options, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
-void resolve_trait(Program* program, CompilerOptions* options, TraitDef* trait);
 static usize ITEM_CACHE_HOT_HITS = 0;
 static usize ITEM_CACHE_COLD_HITS = 0;
 static usize ITEM_CACHE_MISSES = 0;
@@ -377,23 +384,20 @@ void* resolve_item(Program* program, CompilerOptions* options, Module* module, P
     switch (mi->type) {
         case MIT_FUNCTION: {
             FuncDef* func = mi->item;
-            if (!func->head_resolved) resolve_funcdef(program, options, func, NULL);
             gkeys = func->generics;
         } break;
         case MIT_STRUCT: {
             TypeDef* type = mi->item;
-            if (!type->head_resolved) resolve_typedef(program, options, type);
             gkeys = type->generics;
         } break;
         case MIT_TRAIT: {
             TraitDef* trait = mi->item;
-            if (!trait->head_resolved) resolve_trait(program, options, trait);
             gkeys = trait->keys;
         } break;
         case MIT_CONSTANT:
         case MIT_STATIC: {
             Global* g = mi->item;
-            if (g->type->def == NULL) resolve_typevalue(program, options, g->module, g->type, NULL, NULL);
+            UNUSED(g);
         } break;
         default:
             unreachable();
@@ -428,10 +432,33 @@ void* resolve_item(Program* program, CompilerOptions* options, Module* module, P
     if (kind == MIT_ANY) return mi;
     return mi->item;
 }
-
 static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv);
+
+void resolve_generic_keys(Program* program, CompilerOptions* options, Module* module, GenericKeys* keys, GenericKeys* trait_keys, GenericKeys* func_generics, GenericKeys* type_generics);
+static void tv_apply_traits(Program* program, CompilerOptions* options, TypeValue* tv) {
+    if (tv->def->module == NULL) return; // is a generic key, those work differently
+    map_foreach(tv->def->module->package_trait_impl_map, str key, ImplBlock* impl, {
+        UNUSED(key);
+        if (impl->trait_ref == NULL) panic("Compiler error: This isn't even a trait???");
+        if (impl->trait == NULL) { // during trait head resolution
+            impl->trait = resolve_item_raw(program, options, impl->module, impl->trait_ref->name, MIT_TRAIT, NULL)->item;
+            if (impl->type->def == NULL) {
+                resolve_generic_keys(program, options, impl->module, impl->generics, NULL, NULL, NULL);
+                resolve_typevalue(program, options, impl->module, impl->type, NULL, impl->generics);
+            }
+        }
+        if (options->verbosity >= 8) log("  checking %s on %s", impl->trait->name->name, to_str_writer(s, fprint_typevalue(s, tv)));
+        if (satisfies_impl_bounds(tv, impl->type)) {
+            if (options->verbosity >= 7) log("  adding %s on %s", impl->trait->name->name, to_str_writer(s, fprint_typevalue(s, tv)));
+            if (impl->trait == NULL) unreachable("Compiler error");
+            map_put(tv->trait_impls, to_str_writer(s, fprintf(s, "%p", impl->trait)), impl);
+        }
+    });
+}
+
 void resolve_typevalue(Program* program, CompilerOptions* options, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics) {
     if (tval->def != NULL) return;
+    if (options->verbosity >= 6) log("resolving %s %s", to_str_writer(s, fprint_typevalue(s, tval)), to_str_writer(s, fprint_span(s, &tval->name->elements.elements[0]->span)));
     // might be a generic? >`OvO´<
     if (!tval->name->absolute && tval->name->elements.length == 1) {
         str key = tval->name->elements.elements[0]->name;
@@ -466,15 +493,7 @@ void resolve_typevalue(Program* program, CompilerOptions* options, Module* modul
             resolve_typevalue(program, options, module, tv, func_generics, type_generics);
         });
     }
-    if (td->module != NULL) {
-        map_foreach(td->module->package_method_map, str name, FuncList* list, {
-            list_foreach(list, i, FuncDef* func, {
-                if (func->trait != NULL && satisfies_impl_bounds(tval, func->impl_type)) {
-                    map_put(tval->trait_impls, to_str_writer(s, fprintf(s, "%p", func->trait)), func->impl_block);
-                }
-            });
-        });
-    }
+    tv_apply_traits(program, options, tval);
 }
 
 void assert_types_equal(Program* program, CompilerOptions* options, Module* module, TypeValue* tv1, TypeValue* tv2, Span span, GenericKeys* func_generics, GenericKeys* type_generics) {
@@ -507,8 +526,9 @@ void assert_types_equal(Program* program, CompilerOptions* options, Module* modu
         }
     }
 }
+void resolve_global(Program* program, CompilerOptions* options, Global* g);
 void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, GenericValues* type_generics, GenericValues* func_generics);
-static void var_find(Program* program, CompilerOptions* options, Module* module, VarList* vars, Variable* var, GenericKeys* func_generics, GenericKeys* type_generics) {
+static void find_variable(Program* program, CompilerOptions* options, Module* module, VarList* vars, Variable* var, GenericKeys* func_generics, GenericKeys* type_generics) {
     Path* path = var->path;
     Identifier* name = path->elements.elements[path->elements.length-1];
     if (!path->absolute && path->elements.length == 1) {
@@ -541,7 +561,7 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
         tv->trait_impls = map_new();
         resolve_typevalue(program, options, module, tv, func_generics, type_generics);
         FuncDef* method = resolve_method_instance(program, options, tv, var->method_name, true);
-        if (!method->head_resolved) panic("Compiler error: unresolved method");
+        if (!method->body_resolved) resolve_funcdef_body(program, options, method);
         if (var->method_values->generics.length != method->generics->generics.length) spanned_error("Mismatch generic count", var->method_values->span, "Expected %lld generics, got %lld", method->generics->generics.length, var->method_values->generics.length);
         for (usize i = 0; i < var->method_values->generics.length;i++) {
             str key = method->generics->generics.elements[i]->name->name;
@@ -558,6 +578,7 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
         box->mi = malloc(sizeof(ModuleItem));
         box->mi->item = method;
         box->ty = tv;
+        box->state = VS_COPY;
         if (tv->def->module == NULL) {
             bool found = false;
             list_find_map(&tv->def->key->bounds, i, TraitBound** bound_ref, (*bound_ref)->resolved == method->trait, {
@@ -570,8 +591,8 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
             });
             if (!found) panic("Compiler error: trait not found");
         } else {
-            register_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->generics, NULL);
-            register_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->type_generics, NULL);
+            register_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->generics);
+            register_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->type_generics);
         }
         return;
     }
@@ -580,6 +601,7 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
     switch (item->type) {
         case MIT_FUNCTION: {
             FuncDef* func = item->item;
+            if (!func->body_resolved) resolve_funcdef_body(program, options, func);
             if (func->generics != NULL) {
                 if (var->values == NULL) spanned_error("Generic function", var->path->elements.elements[0]->span, "this function is generic. please provide generic args.");
                 if (func->generics->generics.length != var->values->generics.length) spanned_error("Mismatch generic count", var->path->elements.elements[0]->span, "title says it all, todo better errors in this entire area...");
@@ -590,23 +612,32 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
             tv->generics->generics.elements[0] = ret;
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = tv;
-            register_item(program, options, NULL, var->values, NULL, func->generics, func->generics, func);
+            register_item(program, options, NULL, var->values, NULL, func->generics, func->generics);
+            box->state = VS_COPY;
         } break;
         case MIT_STATIC: {
             if (var->values != NULL) spanned_error("Generic static?", var->path->elements.elements[0]->span, "Static values are not supposed to be generic");
             Global* s = item->item;
-            resolve_typevalue(program, options, s->module, s->type, NULL, NULL);
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = s->type;
             var->global_ref = s;
+            if (map_contains(box->resolved->type->trait_impls, program->raii.copy_key) || list_contains(&box->resolved->type->def->traits, i, TraitDef* trait, trait == program->raii.copy)) {
+                box->state = VS_COPY;
+            } else {
+                box->state = VS_GLOBAL_NONCOPY;
+            }
         } break;
         case MIT_CONSTANT: {
             if (var->values != NULL) spanned_error("Generic const?", var->path->elements.elements[0]->span, "Constants are not supposed to be generic");
             Global* s = item->item;
-            resolve_typevalue(program, options, s->module, s->type, NULL, NULL);
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = s->type;
             var->global_ref = s;
+            if (map_contains(box->resolved->type->trait_impls, program->raii.copy_key) || list_contains(&box->resolved->type->def->traits, i, TraitDef* trait, trait == program->raii.copy)) {
+                box->state = VS_COPY;
+            } else {
+                box->state = VS_GLOBAL_NONCOPY;
+            }
         } break;
         case MIT_STRUCT:
             spanned_error("Expected variable", name->span, "Expected variable or function ref, got struct");
@@ -622,18 +653,21 @@ static void var_find(Program* program, CompilerOptions* options, Module* module,
     }
 }
 
-static VarBox* var_register(VarList* vars, Variable* var) {
+static VarBox* var_register(Program* program, CompilerOptions* options, VarList* vars, Variable* var, TVBox* box) {
     Identifier* name = var->path->elements.elements[var->path->elements.length-1];
     if (var->path->absolute || var->path->elements.length != 1) spanned_error("Variable has too much path", name->span, "This should look more like a single variable and should have been caught earlier, that's a compiler bug.");
     VarBox* v = malloc(sizeof(VarBox));
     v->name = name->name;
     v->id = vars->counter;
     vars->counter += 1;
-    v->resolved = malloc(sizeof(TVBox));
-    v->resolved->type = NULL;
+    v->resolved = box;
     v->mi = NULL;
     v->values = NULL;
-    v->state = VS_UNUSED;
+    if (map_contains(v->resolved->type->trait_impls, program->raii.copy_key)) {
+        v->state = VS_COPY;
+    } else {
+        v->state = VS_NONCOPY;
+    }
     var->box = v;
     list_append(vars, v);
     return v;
@@ -877,7 +911,10 @@ void fill_tvbox(Program *program, CompilerOptions* options, Module *module, Span
 }
 
 static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv) {
-    if (impl_tv->def->module == NULL) return true; // free generic
+    if (impl_tv->def == NULL) panic("Compiler error: unresolved type (impl)");
+    if (impl_tv->def->module == NULL && map_size(impl_tv->trait_impls) == 0) return true; // free generic
+    if (tv->def == NULL && tv->name->elements.length == 1 && str_eq(tv->name->elements.elements[0]->name, "_")) return false;
+    if (tv->def == NULL) panic("Compiler error: unresolved type");
     if (tv->def != impl_tv->def) return false; // type mismatch
     if ((tv->generics == NULL || tv->generics->generics.length == 0) && (impl_tv->generics == NULL || impl_tv->generics->generics.length == 0)) return true; // no generics
     if (tv->generics->generics.length != impl_tv->generics->generics.length) return false;
@@ -887,7 +924,6 @@ static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv) {
     return true;
 }
 
-void register_impl(Program* program, CompilerOptions* options, Module* module, ImplBlock* impl);
 FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, TypeValue* tv, Identifier* name, bool do_error) {
     Module* mod = tv->def->module;
     if (mod == NULL) { // generic type - search through trait bounds
@@ -906,7 +942,6 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
             chosen = method;
         });
         if (chosen != NULL) {
-            if (!chosen->head_resolved) resolve_funcdef(program, options, chosen, chosen->type_generics);
             return chosen;
         }
         if (!do_error) return NULL;
@@ -919,7 +954,6 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
     if (list == NULL || list->length == 0) spanned_error("No such method", name->span, "No such method `%s` defined on any type in package `%s` (on %s).", name->name, base->name->name,  to_str_writer(s, fprint_typevalue(s, tv)));
     FuncDef* chosen = NULL;
     list_foreach(list, i, FuncDef* func, {
-        if (func->impl_block != NULL && !func->impl_block->registered) register_impl(program, options, func->module, func->impl_block);
         if (satisfies_impl_bounds(tv, func->impl_type)) {
             if (chosen != NULL) spanned_error("Multiple method candiates", tv->name->elements.elements[0]->span, "Multiple candiates found for %s::%s\n#1: %s::%s @ %s\n#2: %s::%s @ %s", 
                 to_str_writer(s, fprint_typevalue(s, tv)), name->name,
@@ -933,16 +967,18 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
         spanned_error("No such method", name->span, "No such method `%s` on type %s @ %s defined in package `%s`.", 
         name->name, to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &tv->def->name->span)), base->name->name);
     }
-    if (!chosen->head_resolved) resolve_funcdef(program, options, chosen, chosen->type_generics);
     return chosen;
 }
 
 void finish_tvbox(Program* program, CompilerOptions* options, TVBox* box, FuncDef* ctx) {
-    register_item(program, options, box->type->generics, NULL, box->type->def->generics, NULL, box->type->def->generics, ctx);
+    register_item(program, options, box->type->generics, NULL, box->type->def->generics, NULL, box->type->def->generics);
 }
 
-void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, GenericKeys* type_generics, Block* block, VarList* vars, TVBox* t_return);
-void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, GenericKeys* type_generics, Expression* expr, VarList* vars, TVBox* t_return) {
+void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, Block* block, VarList* vars, TVBox* t_return);
+void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Expression* expr, VarList* vars, TVBox* t_return, bool asref) {
+    Expression* last = CURRENT_EXPR;
+    CURRENT_EXPR = expr;
+    if (options->verbosity >= 6) log("resolving %s in %s @ %s", ExprType__NAMES[expr->type], func->name->name, to_str_writer(s, fprint_span(s, &expr->span)));
     expr->resolved = t_return;
     switch (expr->type) {
         case EXPR_BIN_OP: {
@@ -951,27 +987,27 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             if (str_eq(op->op, ">") || str_eq(op->op, "<") || str_eq(op->op, ">=") || str_eq(op->op, "<=") || str_eq(op->op, "!=") || str_eq(op->op, "==")) {
                 op_arg_box = new_tvbox();
                 TypeValue* bool_ty = gen_typevalue("::core::types::bool", &op->op_span);
-                resolve_typevalue(program, options, func->module, bool_ty, func->generics, type_generics);
-                fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, bool_ty);
+                resolve_typevalue(program, options, func->module, bool_ty, func->generics, func->type_generics);
+                fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, bool_ty);
             } else {
                 op_arg_box = t_return;
             }
-            resolve_expr(program, options, func, type_generics, op->lhs, vars, op_arg_box);
-            resolve_expr(program, options, func, type_generics, op->rhs, vars, op_arg_box);
+            resolve_expr(program, options, func, op->lhs, vars, op_arg_box, false);
+            resolve_expr(program, options, func, op->rhs, vars, op_arg_box, false);
         } break;
         case EXPR_BIN_OP_ASSIGN: {
             BinOp* op = expr->expr;
             TVBox* op_arg_box = new_tvbox();
-            resolve_expr(program, options, func, type_generics, op->lhs, vars, op_arg_box);
-            resolve_expr(program, options, func, type_generics, op->rhs, vars, op_arg_box);
+            resolve_expr(program, options, func, op->lhs, vars, op_arg_box, true);
+            resolve_expr(program, options, func, op->rhs, vars, op_arg_box, false);
             TypeValue* unit_ty = gen_typevalue("::core::types::unit", &op->op_span);
-            resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);
+            resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);
         } break;
         case EXPR_FUNC_CALL: {
             FuncCall* fc = expr->expr;
-            FuncDef* fd = resolve_item(program, options, func->module, fc->name, MIT_FUNCTION, func->generics, type_generics, &fc->generics);
-            
+            FuncDef* fd = resolve_item(program, options, func->module, fc->name, MIT_FUNCTION, func->generics, func->type_generics, &fc->generics);
+            if (!fd->body_resolved) resolve_funcdef_body(program, options, fd);
             // preresolve return
             TypeValue* pre_ret = replace_generic(fd->return_type, NULL, fc->generics, NULL, NULL);
             if (t_return->type != NULL) patch_generics(pre_ret, fd->return_type, t_return->type, NULL, fc->generics);
@@ -989,24 +1025,24 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     TVBox* argbox = new_tvbox();
                     TypeValue* arg_tv = replace_generic(fd->args.elements[i]->type, NULL, fc->generics, NULL, NULL);
                     argbox->type = arg_tv;
-                    resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                    resolve_expr(program, options, func, arg, vars, argbox, false);
                     patch_generics(replace_generic(fd->args.elements[i]->type, NULL, fc->generics, NULL, NULL), fd->args.elements[i]->type, argbox->type, NULL, fc->generics);
                     finish_tvbox(program, options, argbox, func);
                 } else { // variadic arg
                     TVBox* argbox = new_tvbox();
-                    resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                    resolve_expr(program, options, func, arg, vars, argbox, false);
                     finish_tvbox(program, options, argbox, func);
                 }
             });
 
             TypeValue* ret = replace_generic(fd->return_type, NULL, fc->generics, NULL, NULL);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, ret);
-            register_item(program, options, NULL, fc->generics, NULL, fd->generics, fd->generics, func);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ret);
+            register_item(program, options, NULL, fc->generics, NULL, fd->generics, fd->generics);
         } break;
         case EXPR_METHOD_CALL: {
             MethodCall* call = expr->expr;
             TVBox* objectbox = new_tvbox();
-            resolve_expr(program, options, func, type_generics, call->object, vars, objectbox);
+            resolve_expr(program, options, func, call->object, vars, objectbox, true);
 
             TypeValue* ptr = gen_typevalue("::core::types::ptr<_>", &expr->span);
             resolve_typevalue(program, options, func->module, ptr, NULL, NULL);
@@ -1018,13 +1054,14 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 deref_to_call = true;
             }
             FuncDef* method = resolve_method_instance(program, options, method_type, call->name, true);
+            if (!method->body_resolved) resolve_funcdef_body(program, options, method);
             call->def = method;
             if (call->generics != NULL) {
                 if (call->generics->generics.length != method->generics->generics.length) spanned_error("Generic count mismatch", expr->span, "Expected %lld generics, got %lld", call->generics->generics.length, method->generics->generics.length);
                 for (usize i = 0; i < call->generics->generics.length;i++) {
                     str key = method->generics->generics.elements[i]->name->name;
                     TypeValue* generic_value = call->generics->generics.elements[i];
-                    resolve_typevalue(program, options, func->module, generic_value, func->generics, type_generics);
+                    resolve_typevalue(program, options, func->module, generic_value, func->generics, func->type_generics);
                     map_put(call->generics->resolved, key, generic_value);
                 }
             } else if(method->generics != NULL) {
@@ -1059,7 +1096,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     call->object->expr = inner;
 
                     objectbox = new_tvbox();
-                    resolve_expr(program, options, func, type_generics, call->object, vars, objectbox);
+                    resolve_expr(program, options, func, call->object, vars, objectbox, false);
                 }
                 called_type = call->object->resolved->type->generics->generics.elements[0]; // get bone marrow of pointer
             } else { // arg is not a ptr
@@ -1071,7 +1108,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     call->object->expr = inner;
 
                     objectbox = new_tvbox();
-                    resolve_expr(program, options, func, type_generics, call->object, vars, objectbox);
+                    resolve_expr(program, options, func, call->object, vars, objectbox, false);
                 }
                 called_type = call->object->resolved->type;
             }
@@ -1092,18 +1129,18 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     TVBox* argbox = new_tvbox();
                     TypeValue* arg_tv = replace_generic(call->def->args.elements[i+1]->type, type_call_vals, call->generics, method->trait, called_type);
                     argbox->type = arg_tv;
-                    resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                    resolve_expr(program, options, func, arg, vars, argbox, false);
                     patch_generics(replace_generic(call->def->args.elements[i+1]->type, type_call_vals, call->generics, method->trait, called_type), call->def->args.elements[i+1]->type, argbox->type, type_call_vals, call->generics);
                     finish_tvbox(program, options, argbox, func);
                 } else { // variadic arg
                     TVBox* argbox = new_tvbox();
-                    resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                    resolve_expr(program, options, func, arg, vars, argbox, false);
                     finish_tvbox(program, options, argbox, func);
                 }
             });
 
             TypeValue* ret = replace_generic(call->def->return_type, type_call_vals, call->generics, method->trait, called_type);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, ret);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ret);
 
             if (called_type->def->module == NULL) {
                 bool found = false;
@@ -1117,21 +1154,22 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 });
                 if (!found) panic("Compiler error: trait not found");
             } else {
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics, func);    
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics, func);    
+                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics);    
+                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics);    
             }
         } break;
         case EXPR_STATIC_METHOD_CALL: {
             StaticMethodCall* call = expr->expr;
-            resolve_typevalue(program, options, func->module, call->tv, func->generics, type_generics);
+            resolve_typevalue(program, options, func->module, call->tv, func->generics, func->type_generics);
             FuncDef* method = resolve_method_instance(program, options, call->tv, call->name, true);
+            if (!method->body_resolved) resolve_funcdef_body(program, options, method);
             call->def = method;
             if (call->generics != NULL) {
                 if (call->generics->generics.length != method->generics->generics.length) spanned_error("Generic count mismatch", expr->span, "Expected %lld generics, got %lld", call->generics->generics.length, method->generics->generics.length);
                 for (usize i = 0; i < call->generics->generics.length;i++) {
                     str key = method->generics->generics.elements[i]->name->name;
                     TypeValue* generic_value = call->generics->generics.elements[i];
-                    resolve_typevalue(program, options, func->module, generic_value, func->generics, type_generics);
+                    resolve_typevalue(program, options, func->module, generic_value, func->generics, func->type_generics);
                     map_put(call->generics->resolved, key, generic_value);
                 }
             } else if(method->generics != NULL) {
@@ -1164,18 +1202,18 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     TVBox* argbox = new_tvbox();
                     TypeValue* arg_tv = replace_generic(call->def->args.elements[i]->type, type_call_vals, call->generics, method->trait, call->tv);
                     argbox->type = arg_tv;
-                    resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                    resolve_expr(program, options, func, arg, vars, argbox, false);
                     patch_generics(replace_generic(call->def->args.elements[i]->type, type_call_vals, call->generics, method->trait, call->tv), call->def->args.elements[i]->type, argbox->type, type_call_vals, call->generics);
                     finish_tvbox(program, options, argbox, func);
                 } else { // variadic arg
                     TVBox* argbox = new_tvbox();
-                    resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                    resolve_expr(program, options, func, arg, vars, argbox, false);
                     finish_tvbox(program, options, argbox, func);
                 }
             });
 
             TypeValue* ret = replace_generic(call->def->return_type, type_call_vals, call->generics, method->trait, call->tv);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, ret);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ret);
             
             if (call->tv->def->module == NULL) {
                 bool found = false;
@@ -1189,8 +1227,8 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 });
                 if (!found) panic("Compiler error: trait not found");
             } else {
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics, func);  
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics, func);  
+                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics);  
+                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics);  
             }
         } break;
         case EXPR_DYN_RAW_CALL: {
@@ -1200,12 +1238,12 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             dyncall->type = gen_typevalue("::core::types::function_ptr<_>", &expr->span);
             if (t_return->type != NULL) dyncall->type->generics->generics.elements[0] = t_return->type;
             resolve_typevalue(program, options, func->module, dyncall->type, NULL, NULL);
-            resolve_expr(program, options, func, type_generics, call->callee, vars, dyncall);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, dyncall->type->generics->generics.elements[0]);
+            resolve_expr(program, options, func, call->callee, vars, dyncall, true);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, dyncall->type->generics->generics.elements[0]);
             // resolving args, no typehints here, unsafe yada yada
             list_foreach(&call->args, i, Expression* arg, {
                 TVBox* argbox = new_tvbox();
-                resolve_expr(program, options, func, type_generics, arg, vars, argbox);
+                resolve_expr(program, options, func, arg, vars, argbox, false);
                 finish_tvbox(program, options, argbox, func);
             });
         } break;
@@ -1214,7 +1252,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             switch (lit->type) {
                 case STRING: {
                     t_return->type = gen_typevalue("::core::types::c_str", &expr->span);
-                    resolve_typevalue(program, options, func->module, t_return->type, func->generics, type_generics);
+                    resolve_typevalue(program, options, func->module, t_return->type, func->generics, func->type_generics);
                 } break;
                 case NUMERAL: {
                     str num = lit->string;
@@ -1227,7 +1265,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     if (tv == NULL || tv->def == NULL || !default_ty) {
                         tv = gen_typevalue(to_str_writer(stream, fprintf(stream, "::core::types::%s", ty)), &expr->span);
                     }
-                    fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, tv);
+                    fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, tv);
                 } break; 
                 default:
                     unreachable("invalid literal type %s", TokenType__NAMES[lit->type]);
@@ -1235,104 +1273,120 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
         } break;
         case EXPR_BLOCK: {
             Block* block = expr->expr;
-            resolve_block(program, options, func, type_generics, block, vars, t_return);
+            resolve_block(program, options, func, block, vars, t_return);
         } break;
         case EXPR_VARIABLE: {
             Variable* var = expr->expr;
-            var_find(program, options, func->module, vars, var, func->generics, type_generics);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, var->box->resolved->type);
+            find_variable(program, options, func->module, vars, var, func->generics, func->type_generics);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, var->box->resolved->type);
+            if (!asref) { // if it's a ref we do not need to check
+                switch (var->box->state) {
+                    case VS_COPY: { // pass - can be copied
+                    } break;
+                    case VS_NONCOPY: {
+                        var->box->state = VS_MOVED; // got moved
+                        var->box->moved_here = expr->span;
+                    } break;
+                    case VS_MOVED: {
+                        spanned_error("Accessing moved variable", var->box->moved_here, "This variable of type %s was alread moved here.\nTry implementing core::copy::Copy or taking a reference instead of moving", to_str_writer(s, fprint_typevalue(s, var->box->resolved->type)));
+                    } break;
+                    case VS_GLOBAL_NONCOPY: {
+                        spanned_error("Moving global", var->global_ref->name->span, "Cannot move global variable of type %s.\nTry implementing core::copy::Copy or taking a reference instead of moving", to_str_writer(s, fprint_typevalue(s, var->box->resolved->type)));
+                    } break;
+                }
+            }
         } break;
         case EXPR_LET: {
             LetExpr* let = expr->expr;
+            TVBox* box = new_tvbox();
 
-            var_register(vars, let->var);
-            vars->length -= 1; // temporarly unregister (for scenarios like `let x: T = to_T::<U>(x);` where the old argument x: U will already be seen as the new x: T and cause a type mismatch)
             if (let->type != NULL) {
-                resolve_typevalue(program, options, func->module, let->type, func->generics, type_generics);
-                fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, let->var->box->resolved, let->type);
+                resolve_typevalue(program, options, func->module, let->type, func->generics, func->type_generics);
+                fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, box, let->type);
             }
-            resolve_expr(program, options, func, type_generics, let->value, vars, let->var->box->resolved);
-            patch_tvs(&let->type, &let->var->box->resolved->type);
-            vars->length += 1; // now actually register 
+            resolve_expr(program, options, func, let->value, vars, box, false);
+            patch_tvs(&let->type, &box->type);
+
+            var_register(program, options, vars, let->var, box);
 
             TypeValue* tv = gen_typevalue("::core::types::unit", &expr->span);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, tv);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, tv);
         } break;
         case EXPR_ASSIGN: {
             Assign* assign = expr->expr;
             TVBox* assign_t = new_tvbox();
-            resolve_expr(program, options, func, type_generics, assign->asignee, vars, assign_t);
-            resolve_expr(program, options, func, type_generics, assign->value, vars, assign_t);
+            resolve_expr(program, options, func, assign->asignee, vars, assign_t, true);
+            resolve_expr(program, options, func, assign->value, vars, assign_t, false);
 
             TypeValue* tv = gen_typevalue("::core::types::unit", &expr->span);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, tv);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, tv);
         } break;
         case EXPR_CONDITIONAL: {
             Conditional* cond = expr->expr;
 
             TypeValue* bool_ty = gen_typevalue("::core::types::bool", &cond->cond->span);
-            resolve_typevalue(program, options, func->module, bool_ty, func->generics, type_generics);
+            resolve_typevalue(program, options, func->module, bool_ty, func->generics, func->type_generics);
             TVBox* cond_ty = new_tvbox();
             cond_ty->type = bool_ty;
-            resolve_expr(program, options, func, type_generics, cond->cond, vars, cond_ty);
+            resolve_expr(program, options, func, cond->cond, vars, cond_ty, false);
 
             if (cond->otherwise == NULL) {
                 TypeValue* unit_ty = gen_typevalue("::core::types::unit", &cond->cond->span);
-                resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
-                fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);
+                resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
+                fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);
             }
-            resolve_block(program, options, func, type_generics, cond->then, vars, t_return);
+            resolve_block(program, options, func, cond->then, vars, t_return);
             if (cond->otherwise != NULL) {
-                resolve_block(program, options, func, type_generics, cond->otherwise, vars, t_return);
+                resolve_block(program, options, func, cond->otherwise, vars, t_return);
             }
         } break;
         case EXPR_WHILE_LOOP: {
             WhileLoop* wl = expr->expr;
             TypeValue* bool_ty = gen_typevalue("::core::types::bool", &wl->cond->span);
-            resolve_typevalue(program, options, func->module, bool_ty, func->generics, type_generics);
+            resolve_typevalue(program, options, func->module, bool_ty, func->generics, func->type_generics);
             TVBox* condbox = new_tvbox();
             condbox->type = bool_ty;
-            resolve_expr(program, options, func, type_generics, wl->cond, vars, condbox);
+            resolve_expr(program, options, func, wl->cond, vars, condbox, false);
             TypeValue* unit_ty = gen_typevalue("::core::types::unit", &wl->body->span);
-            resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
+            resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
             TVBox* bodybox = new_tvbox();
             bodybox->type = unit_ty;
-            resolve_block(program, options, func, type_generics, wl->body, vars, bodybox);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);            
+            resolve_block(program, options, func, wl->body, vars, bodybox);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);            
         } break;
         case EXPR_RETURN: {
             Expression* ret = expr->expr;
             TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
-            resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
+            resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
             if (ret == NULL) {
                 // we return unit
-                assert_types_equal(program, options, func->module, func->return_type, unit_ty, expr->span, func->generics, type_generics);
+                assert_types_equal(program, options, func->module, func->return_type, unit_ty, expr->span, func->generics, func->type_generics);
             } else {
                 TVBox* return_type = new_tvbox();
                 return_type->type = func->return_type;
-                resolve_expr(program, options, func, type_generics, ret, vars, return_type);
+                resolve_expr(program, options, func, ret, vars, return_type, false);
             }
             // expression yields unit
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);            
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);            
         } break;
         case EXPR_BREAK: {
             if (expr->expr != NULL) {
-                resolve_expr(program, options, func, type_generics, expr->expr, vars, t_return);
+                resolve_expr(program, options, func, expr->expr, vars, t_return, false);
                 todo("XPR_BREAK with expr");
             }
             TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
-            resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);    
+            resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);    
         } break;
         case EXPR_CONTINUE: {
             TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
-            resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);            
+            resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);            
         } break;
         case EXPR_FIELD_ACCESS: {
             FieldAccess* fa = expr->expr;
             TVBox* object_type = new_tvbox();
-            resolve_expr(program, options, func, type_generics, fa->object, vars, object_type);
+            resolve_expr(program, options, func, fa->object, vars, object_type, true);
             TypeValue* reference = gen_typevalue("::core::types::ptr<_>", &expr->span);
             resolve_typevalue(program, options, func->module, reference, NULL, NULL);
             TypeValue* tv = fa->object->resolved->type;
@@ -1345,7 +1399,6 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             if (td->module == NULL) spanned_error("Trying to access field of generic", fa->field->span, "%s @ %s is generic and as such has no visible fields",  to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(stream, fprint_span(stream, &td->name->span)));
             if (td->fields == NULL) unreachable("Fields should not be null unless it's a generic");
             Field* field = map_get(td->fields, fa->field->name);
-            if (field->type->def == NULL) resolve_typevalue(program, options, func->module, field->type, NULL, td->generics);
             if (field == NULL) {
                 if (td->module == NULL) unreachable("Module should not be null unless it's a generic");
                 str path = to_str_writer(stream, {
@@ -1358,18 +1411,20 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                     spanned_error("Invalid struct field", fa->field->span, "%s @ %s has no such field '%s'", to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_span(s, &td->name->span)), fa->field->name);
                 }
             }
+            if (field->type->def == NULL) resolve_typevalue(program, options, func->module, field->type, NULL, td->generics);
             TypeValue* field_ty = replace_generic(field->type, tv->generics, NULL, NULL, NULL);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, field_ty);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, field_ty);
+            if (!asref && !map_contains(field_ty->trait_impls, program->raii.copy_key) 
+             && !list_contains(&field_ty->def->traits, i, TraitDef* trait, trait == program->raii.copy)) spanned_error("Cannot move field", fa->field->span, "Field `%s` of %s with type %s does not implement core::copy::Copy.\nImplement this trait or take a reference instead of moving", fa->field->name, to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_typevalue(s, field_ty)));
         } break;
         case EXPR_STRUCT_LITERAL: {
             StructLiteral* slit = expr->expr;
-            resolve_typevalue(program, options, func->module, slit->type, func->generics, type_generics);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, slit->type);
+            resolve_typevalue(program, options, func->module, slit->type, func->generics, func->type_generics);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, slit->type);
             
             slit->type = t_return->type;
             if (t_return->type->def == NULL) spanned_error("Type could not be inferred", expr->span, "%s is not a complete type", to_str_writer(s, fprint_typevalue(s, t_return->type)));
             TypeDef* type = slit->type->def;
-            if (!type->head_resolved) resolve_typedef(program, options, type);
 
             Map* temp_fields = map_new();
             map_foreach(type->fields, str key, Field* field, {
@@ -1382,7 +1437,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 TypeValue* field_ty = replace_generic(f->type, slit->type->generics, NULL, NULL, NULL);
                 TVBox* fieldbox = new_tvbox();
                 fieldbox->type = field_ty;
-                resolve_expr(program, options, func, type_generics, field->value, vars, fieldbox);
+                resolve_expr(program, options, func, field->value, vars, fieldbox, false);
                 patch_generics(replace_generic(f->type, slit->type->generics, NULL, NULL, NULL), f->type, fieldbox->type, NULL, slit->type->generics);
                 finish_tvbox(program, options, fieldbox, func);
             });
@@ -1391,7 +1446,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 spanned_error("Field not initialized", expr->span, "Field '%s' of struct %s was not initialized", key, type->name->name);
             });
         
-            register_item(program, options, slit->type->generics, NULL, type->generics, NULL, type->generics, func);        
+            register_item(program, options, slit->type->generics, NULL, type->generics, NULL, type->generics);        
         } break;
         case EXPR_C_INTRINSIC: {
             CIntrinsic* ci = expr->expr;
@@ -1416,7 +1471,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                         }
                         list_append(&key, '\0');
                         TypeValue* tv = gen_typevalue(key.elements, &expr->span);
-                        resolve_typevalue(program, options, func->module, tv, func->generics, type_generics);
+                        resolve_typevalue(program, options, func->module, tv, func->generics, func->type_generics);
                         list_append(&ci->type_bindings, tv);
                         list_append(&ci->binding_sizes, i - start_i);
                         if (mode != '.' && mode != ':' && mode != '!' && mode != '#') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
@@ -1441,7 +1496,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                         ident->name = key.elements;
                         ident->span = expr->span;
                         v->path = path_simple(ident);
-                        var_find(program, options, func->module, vars, v, func->generics, type_generics);
+                        find_variable(program, options, func->module, vars, v, func->generics, func->type_generics);
                         list_append(&ci->var_bindings, v);
                         list_append(&ci->binding_sizes, i - start_i);
                         if (mode != ':' && mode != '!') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsic operator `%c%c`", op, mode);
@@ -1455,8 +1510,8 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             if (op != '\0') spanned_error("Invalid c intrinsic", expr->span, "intrinsic ended on operator: `%s`", ci->c_expr);
             if (t_return->type == NULL) {
                 TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
-                resolve_typevalue(program, options, func->module, unit_ty, func->generics, type_generics);
-                fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, unit_ty);
+                resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
+                fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);
             }
         } break;
         case EXPR_TAKEREF: {
@@ -1468,12 +1523,12 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
                 if (reference->def != t_return->type->def) spanned_error("Expected resulting type to be a reference", expr->span, "Type %s, is not a reference, expected %s as a result", to_str_writer(s, fprint_typevalue(s, t_return->type)),to_str_writer(s, fprint_typevalue(s, reference)));
                 inner_tv->type = t_return->type->generics->generics.elements[0];
             }
-            resolve_expr(program, options, func, type_generics, inner, vars, inner_tv);
+            resolve_expr(program, options, func, inner, vars, inner_tv, true);
             finish_tvbox(program, options, inner_tv, func);
             TypeValue* reference = gen_typevalue("::core::types::ptr::<_>", &expr->span);
             reference->generics->generics.elements[0] = inner->resolved->type;
             resolve_typevalue(program, options, func->module, reference, NULL, NULL);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, reference);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, reference);
         } break;
         case EXPR_DEREF: {
             Expression* inner = expr->expr;
@@ -1481,28 +1536,31 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Gen
             if (t_return->type != NULL) {
                 inner_tv->type = gen_typevalue("::core::types::ptr::<_>", &expr->span);
                 inner_tv->type->generics->generics.elements[0] = t_return->type;
-                resolve_typevalue(program, options, func->module, inner_tv->type, func->generics, type_generics);
+                resolve_typevalue(program, options, func->module, inner_tv->type, func->generics, func->type_generics);
             }
-            resolve_expr(program, options, func, type_generics, inner, vars, inner_tv);
+            resolve_expr(program, options, func, inner, vars, inner_tv, asref);
             finish_tvbox(program, options, inner_tv, func);
             if (!str_eq(to_str_writer(s, fprint_td_path(s, inner_tv->type->def)), "::core::types::ptr")) spanned_error("Expected ptr to dereference", expr->span, "Cannot dereference type %s, expected ::core::types::ptr<_>", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             if (inner->resolved->type->generics == NULL || inner->resolved->type->generics->generics.length != 1) spanned_error("Expected ptr to have a pointee", expr->span, "Pointer %s should have one generic argument as its pointee", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
-            fill_tvbox(program, options, func->module, expr->span, func->generics, type_generics, t_return, inner->resolved->type->generics->generics.elements[0]);
+            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, inner->resolved->type->generics->generics.elements[0]);
+            if (!asref && !map_contains(inner_tv->type->trait_impls, program->raii.copy_key) 
+             && !list_contains(&inner_tv->type->def->traits, i, TraitDef* trait, trait == program->raii.copy)) spanned_error("Dereferencing non-copy type", inner->span, "Cannot dereference pointer as %s does not implement core::copy::Copy", to_str_writer(s, fprint_typevalue(s, t_return->type)));
         } break;
         default:
             unreachable("%s", ExprType__NAMES[expr->type]);
     }
+    CURRENT_EXPR = last;
 }
 
-void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, GenericKeys* type_generics, Block* block, VarList* vars, TVBox* t_return) {
+void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, Block* block, VarList* vars, TVBox* t_return) {
     usize restore_len = vars->length;
     
     list_foreach(&block->expressions, i, Expression* expr, {
         if (block->yield_last && i == block->expressions.length - 1) {
-            resolve_expr(program, options, func, type_generics, expr, vars, t_return);
+            resolve_expr(program, options, func, expr, vars, t_return, false);
         } else {
             TVBox* expr_box = new_tvbox();
-            resolve_expr(program, options, func, type_generics, expr, vars, expr_box);
+            resolve_expr(program, options, func, expr, vars, expr_box, false);
             finish_tvbox(program, options, expr_box, func);
         }
     });
@@ -1513,10 +1571,10 @@ void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, Ge
     } else {
         yield_ty = malloc(sizeof(TVBox));
         yield_ty->type = gen_typevalue("::core::types::unit", &block->span);
-        resolve_typevalue(program, options, func->module, yield_ty->type, func->generics, type_generics);
+        resolve_typevalue(program, options, func->module, yield_ty->type, func->generics, func->type_generics);
     }
     block->res = yield_ty->type;
-    fill_tvbox(program, options, func->module, block->span, func->generics, type_generics, t_return, yield_ty->type);
+    fill_tvbox(program, options, func->module, block->span, func->generics, func->type_generics, t_return, yield_ty->type);
     
     finish_tvbox(program, options, yield_ty, func);
     
@@ -1525,6 +1583,7 @@ void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, Ge
 
 void resolve_generic_keys(Program* program, CompilerOptions* options, Module* module, GenericKeys* keys, GenericKeys* trait_keys, GenericKeys* func_generics, GenericKeys* type_generics) {
     if (keys == NULL) return;
+    if (map_size(keys->resolved) > 0) return;
     if (trait_keys != NULL && keys->generics.length != trait_keys->generics.length) spanned_error("Generic count does not match template", keys->span, "Got %lld generics, expected %lld @ %s", keys->generics.length, trait_keys->generics.length, to_str_writer(s, fprint_span(s, &trait_keys->span)));
     list_foreach(&keys->generics, i, GKey* key, {
         TypeDef* type;
@@ -1550,52 +1609,14 @@ void resolve_generic_keys(Program* program, CompilerOptions* options, Module* mo
     });
 }
 
-void resolve_module(Program* program, CompilerOptions* options, Module* module);
-void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, GenericKeys* type_generics) {
-    if (!func->module->resolved && !func->module->in_resolution) {
-        resolve_module(program, options, func->module);
-    }
-    if (func->impl_block != NULL && !func->impl_block->registered) register_impl(program, options, func->module, func->impl_block);
-    if (func->head_resolved) return;
+void resolve_funcdef_head(Program* program, CompilerOptions* options, FuncDef* func) {
     if (options->verbosity >= 3) {
         if (func->trait_def) log("Resolving trait method definition %s::%s::%s", to_str_writer(s, fprint_path(s, func->trait->module->path)), func->trait->name->name, func->name->name);
         else if (func->impl_type == NULL) log("Resolving function %s::%s%s", to_str_writer(s, fprint_path(s, func->module->path)), func->name->name, to_str_writer(s, fprint_generic_keys(s, func->generics)));
         else if (func->trait != NULL) log("Resolving method %s::%s%s in trait %s::%s", to_str_writer(s, fprint_typevalue(s, func->impl_type)), func->name->name, to_str_writer(s, fprint_generic_keys(s, func->generics)), to_str_writer(s, fprint_path(s, func->trait->module->path)), func->trait->name->name);
         else log("Resolving method %s::%s%s", to_str_writer(s, fprint_typevalue(s, func->impl_type)), func->name->name, to_str_writer(s, fprint_generic_keys(s, func->generics)));
     }
-    //if (func->in_resolution) panic("Double resolving func (compiler error)");
-    func->in_resolution = true;
-    if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
-    if (func->return_type == NULL) {
-        func->return_type = gen_typevalue("::core::types::unit", &func->name->span);
-    }
-    if (func->trait_def) {
-        resolve_generic_keys(program, options, func->module, func->generics, NULL, NULL, type_generics);
-    } else if (func->trait != NULL) {
-        ModuleItem* template_mi = map_get(func->trait->methods, func->name->name);
-        FuncDef* template = template_mi->item;
-        resolve_generic_keys(program, options, func->module, func->generics, template->generics, NULL, type_generics);
-        //func->generics->generic_use_keys = template->generics->generic_use_keys;
-        //func->generics->generic_uses = template->generics->generic_uses;
-    } else {
-        resolve_generic_keys(program, options, func->module, func->generics, NULL, NULL, type_generics);
-    }
-    VarList vars = { 0 };
-    list_foreach(&func->args, i, Argument* arg, {
-        VarBox* v = var_register(&vars, arg->var);
-        v->resolved->type = arg->type;
-        resolve_typevalue(program, options, func->module, arg->type, func->generics, type_generics);
-    });
-    resolve_typevalue(program, options, func->module, func->return_type, func->generics, type_generics);
 
-    // header only
-    if (func->trait_def) {
-        if (func->body != NULL) unreachable("Compiler error, this should have been checked previously");
-        func->head_resolved = true;
-        return;
-    }
-
-    bool is_extern = false;
     list_foreach(&func->annotations, i, Annotation a, {
         str p = to_str_writer(s, fprint_path(s, a.path));
         if (str_eq(p, "no_trace")) {            
@@ -1604,43 +1625,72 @@ void resolve_funcdef(Program* program, CompilerOptions* options, FuncDef* func, 
             func->untraced = true;
         } else if (str_eq(p, "extern")) {            
             if (a.type != AT_FLAG) spanned_error("Invalid annotation type", a.path->elements.elements[0]->span, "Expected flag `#[extern]`, found %s", AnnotationType__NAMES[a.type]);
-            if (is_extern) spanned_error("Duplicate annotation flag", a.path->elements.elements[0]->span, "Flag `#[extern]` already set");
-            is_extern = true;
+            if (func->is_extern) spanned_error("Duplicate annotation flag", a.path->elements.elements[0]->span, "Flag `#[extern]` already set");
+            func->is_extern = true;
         } 
     });
-    if (func->body != NULL) {
-        if (is_extern) spanned_error("Local function marked as extern", func->name->span, "Function is marked as extern but also has a body");
-    } else {
-        if (!is_extern) spanned_error("Extern function not marked as such", func->name->span, "Extern function should have the appropiate tag: `#[extern]`");
+    if (!func->trait_def) {
+        if (func->body != NULL) {
+            if (func->is_extern) spanned_error("Local function marked as extern", func->name->span, "Function is marked as extern but also has a body");
+        } else {
+            if (!func->is_extern) spanned_error("Extern function not marked as such", func->name->span, "Extern function should have the appropiate tag: `#[extern]`");
+        }
     }
 
-    if (func->head_resolved) return;
-    func->head_resolved = true;
+    if (str_eq(func->name->name, "_")) spanned_error("Invalid func name", func->name->span, "`_` is a reserved name.");
+    if (func->return_type == NULL) {
+        func->return_type = gen_typevalue("::core::types::unit", &func->name->span);
+    }
+    resolve_generic_keys(program, options, func->module, func->type_generics, NULL, NULL, NULL);
+    if (func->trait_def) {
+        resolve_generic_keys(program, options, func->module, func->generics, NULL, NULL, func->type_generics);
+    } else if (func->trait != NULL) {
+        ModuleItem* template_mi = map_get(func->trait->methods, func->name->name);
+        FuncDef* template = template_mi->item;
+        if (func->generics->generics.length != template->generics->generics.length) spanned_error("Invalid trait impl", func->name->span, "Generic mismatch, the trait method shpould have %lld generics btugot %lld", template->generics->generics.length, func->generics->generics.length);
+        resolve_generic_keys(program, options, func->module, func->generics, template->generics, NULL, func->type_generics);
+    } else {
+        resolve_generic_keys(program, options, func->module, func->generics, NULL, NULL, func->type_generics);
+    }
 
-    if (func->body != NULL) {
-        TVBox* blockbox = new_tvbox();
-        // last expression is not a "return"?
-        if (func->body->expressions.length > 0) {
-            Expression* last = func->body->expressions.elements[func->body->expressions.length - 1];
-            if (last->type != EXPR_RETURN) blockbox->type = func->return_type;
+    list_foreach(&func->args, i, Argument* arg, {
+        resolve_typevalue(program, options, func->module, arg->type, func->generics, func->type_generics);
+    });
+
+    resolve_typevalue(program, options, func->module, func->return_type, func->generics, func->type_generics);
+}
+
+void resolve_funcdef_body(Program* program, CompilerOptions* options, FuncDef* func) {
+    if (func->body_resolved) return;
+    func->body_resolved = true;
+    VarList vars = { 0 };
+    list_foreach(&func->args, i, Argument* arg, {
+        TVBox* box = new_tvbox();
+        box->type = arg->type;
+        var_register(program, options, &vars, arg->var, box);
+    });
+
+    if(func->body == NULL) return;
+
+    TVBox* blockbox = new_tvbox();
+    // last expression is not a "return"?
+    if (func->body->expressions.length > 0) {
+        Expression* last = func->body->expressions.elements[func->body->expressions.length - 1];
+        if (last->type != EXPR_RETURN) blockbox->type = func->return_type;
+    }
+    resolve_block(program, options, func, func->body, &vars, blockbox);
+    finish_tvbox(program, options, blockbox, func);
+    // last expression is not a "return"?
+    if (func->body->expressions.length > 0 && func->body->yield_last) {
+        Expression* last = func->body->expressions.elements[func->body->expressions.length - 1];
+        if (last->type != EXPR_RETURN) {
+            assert_types_equal(program, options, func->module, func->body->res, func->return_type, func->name->span, func->generics, func->type_generics);
         }
-        resolve_block(program, options, func, type_generics, func->body, &vars, blockbox);
-        finish_tvbox(program, options, blockbox, func);
-        // last expression is not a "return"?
-        if (func->body->expressions.length > 0) {
-            Expression* last = func->body->expressions.elements[func->body->expressions.length - 1];
-            if (last->type == EXPR_RETURN) goto return_manually;
-        }
-        assert_types_equal(program, options, func->module, func->body->res, func->return_type, func->name->span, func->generics, type_generics);
-        return_manually: {}
     }
 }
 
-void resolve_typedef(Program* program, CompilerOptions* options, TypeDef* type) {
-    if (!type->module->resolved && !type->module->in_resolution) {
-        resolve_module(program, options, type->module);
-    }
-    if (type->head_resolved) return;
+void resolve_typedef_head(Program* program, CompilerOptions* options, TypeDef* type) {
+    if (options->verbosity >= 3) log("Resolving type %s::%s", to_str_writer(s, fprint_path(s, type->module->path)), type->name->name);
     bool is_extern = false;
     list_foreach(&type->annotations, i, Annotation anno, {
         str name = to_str_writer(s, fprint_path(s, anno.path));
@@ -1658,96 +1708,90 @@ void resolve_typedef(Program* program, CompilerOptions* options, TypeDef* type) 
             type->extern_ref = t->string;
         }
     });
+    if (!is_extern && type->fields == NULL) spanned_error("Extern type", type->name->span, "Extern types need #[extern] tag");
     if (is_extern && type->extern_ref == NULL) spanned_error("No c alias set", type->name->span, "An #[extern] struct needs a #[c_alias=\"alias_t\"]");
     if (type->extern_ref != NULL) {
         if (options->verbosity >= 3) log("Type %s is extern", type->name->name);
-        type->head_resolved = true;
-        return;
     }
-    if (options->verbosity >= 3) log("Resolving type %s::%s", to_str_writer(s, fprint_path(s, type->module->path)), type->name->name);
     if (str_eq(type->name->name, "_")) spanned_error("Invalid type name", type->name->span, "`_` is a reserved name.");
     resolve_generic_keys(program, options, type->module, type->generics, NULL, NULL, NULL);
-    type->head_resolved = true;
+}
+
+void resolve_typedef_body(Program* program, CompilerOptions* options, TypeDef* type) {
+    if (type->fields == NULL) return;
     map_foreach(type->fields, str name, Field* field, {
         UNUSED(name);
         resolve_typevalue(program, options, type->module, field->type, NULL, type->generics);
     });
 }
 
-void register_module_impl_names_rec(Program* program, CompilerOptions* options, Module* module) {
-    list_foreach(&module->impls, i, ImplBlock* impl, {
-        map_foreach(impl->methods, str name, ModuleItem* mi, ({
-            switch (mi->type) {
-                case MIT_FUNCTION: {
-                    FuncDef* method = mi->item;
-                    FuncList* list;
-                    if (map_contains(module->package_method_map, name)) {
-                        list = map_get(module->package_method_map, name);
-                    } else {
-                        list = malloc(sizeof(FuncList));
-                        *list = list_new(FuncList);
-                        map_put(module->package_method_map, name, list);
-                    }
-                    list_append(list, method);
-                } break;
-                default:
-                    unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
-            }
-        }));
-    });
-    map_foreach(module->items, str name, ModuleItem* mi, {
-        switch(mi->type) {
-            case MIT_MODULE:
-                register_module_impl_names_rec(program, options, mi->item);
-                break;
+void register_impl(Program* program, CompilerOptions* options, ImplBlock* impl) {
+    if (options->verbosity >= 5) {
+        if (impl->trait_ref == NULL) log("registring name of impl block of %s", to_str_writer(s, fprint_typevalue(s, impl->type)));
+        else log("registring name of impl block of %s on %s", to_str_writer(s, fprint_typevalue(s, impl->type)), to_str_writer(s, fprint_typevalue(s, impl->trait_ref)));
+    }
+    map_foreach(impl->methods, str name, ModuleItem* mi, ({
+        switch (mi->type) {
+            case MIT_FUNCTION: {
+                FuncDef* method = mi->item;
+                FuncList* list;
+                if (map_contains(impl->module->package_method_map, name)) {
+                    list = map_get(impl->module->package_method_map, name);
+                } else {
+                    list = malloc(sizeof(FuncList));
+                    *list = list_new(FuncList);
+                    map_put(impl->module->package_method_map, name, list);
+                }
+                list_append(list, method);
+            } break;
             default:
-                break;
+                unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
         }
-    });
+    }));
+    if (impl->trait_ref != NULL) {
+        map_put(impl->module->package_trait_impl_map, to_str_writer(s, fprintf(s, "%p", impl)), impl);
+    }
 }
 
-void register_impl(Program* program, CompilerOptions* options, Module* module, ImplBlock* impl) {
-    if (impl->registered) return;
-    resolve_generic_keys(program, options, module, impl->generics, NULL, NULL, NULL);
-    resolve_typevalue(program, options, module, impl->type, NULL, impl->generics);
+void resolve_impl_head(Program* program, CompilerOptions* options, ImplBlock* impl) {
+    if (options->verbosity >= 4) {
+        if (impl->trait_ref == NULL) log("Resolving impl block of %s", to_str_writer(s, fprint_typevalue(s, impl->type)));
+        else log("Resolving impl block of %s on %s", to_str_writer(s, fprint_typevalue(s, impl->type)), to_str_writer(s, fprint_typevalue(s, impl->trait_ref)));
+    }
+    resolve_generic_keys(program, options, impl->module, impl->generics, NULL, NULL, NULL);
+    resolve_typevalue(program, options, impl->module, impl->type, NULL, impl->generics);
+    if (impl->trait_ref != NULL) {
+        impl->trait = resolve_item(program, options, impl->module, impl->trait_ref->name, MIT_TRAIT, NULL, impl->generics, &impl->trait_ref->generics);
+    }
     Module* def_root = impl->type->def->module;
     if (def_root == NULL) spanned_error("TODO: good error message", impl->type->def->name->span, "(impl on generic T)");
     while (def_root->parent != NULL) def_root = def_root->parent;
-    Module* ctx_root = module;
+    Module* ctx_root = impl->module;
     while (ctx_root->parent != NULL) ctx_root = ctx_root->parent;
     if (def_root != ctx_root) spanned_error("Impl on foreign type", impl->type->name->elements.elements[0]->span, "Cannot impl in %s on %s defined in package %s", ctx_root->name->name, to_str_writer(s, fprint_typevalue(s, impl->type)), def_root->name->name);
-    
-    if (impl->trait_ref != NULL) {
-        impl->trait = resolve_item(program, options, module, impl->trait_ref->name, MIT_TRAIT, NULL, impl->generics, &impl->trait_ref->generics);
-    }
-    
+
     map_foreach(impl->methods, str name, ModuleItem* mi, ({
+        UNUSED(name);
         switch (mi->type) {
             case MIT_FUNCTION: {
                 FuncDef* method = mi->item;
                 if (impl->trait != NULL) {
                     method->trait = impl->trait;
                 }
-                resolve_generic_keys(program, options, module, method->type_generics, NULL, NULL, NULL);
+                resolve_funcdef_head(program, options, method);
             } break;
             default:
                 unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
         }
     }));
-    impl->registered = true;
 }
-
-void resolve_impl(Program* program, CompilerOptions* options, ImplBlock* impl) {
-    if (impl->head_resolved) return;
-    if (options->verbosity >= 4) log("Resolving impl block of %s", to_str_writer(s, fprint_typevalue(s, impl->type)));
-    impl->head_resolved = true;
+void resolve_impl_body(Program* program, CompilerOptions* options, ImplBlock* impl) {
     map_foreach(impl->methods, str name, ModuleItem* mi, ({
         UNUSED(name);
         switch (mi->type) {
             case MIT_FUNCTION: {
-                FuncDef* func = mi->item;
-                if (func->head_resolved) continue;
-                resolve_funcdef(program, options, func, func->type_generics);
+                FuncDef* method = mi->item;
+                resolve_funcdef_body(program, options, method);
             } break;
             default:
                 unreachable("%s cant be defined inside impl block", ModuleItemType__NAMES[mi->type]);
@@ -1755,20 +1799,9 @@ void resolve_impl(Program* program, CompilerOptions* options, ImplBlock* impl) {
     }));
 }
 
-void resolve_trait(Program* program, CompilerOptions* options, TraitDef* trait) {
-    if (!trait->module->resolved && !trait->module->in_resolution) {
-        resolve_module(program, options, trait->module);
-    }
-    if (trait->head_resolved) return;
+void resolve_trait_head(Program* program, CompilerOptions* options, TraitDef* trait) {
     if (options->verbosity >= 3) log("Resolving trait %s::%s", to_str_writer(s, fprint_path(s, trait->module->path)), trait->name->name);
-    // needs to be set this early to avoid recursion
-    trait->head_resolved = true;
-    
     // insert self-type as dummy type and remove it afterwards
-    // If anything is named the same it would be shadowed anyways.
-    // If we and up recursivelyresolving other traits this is no issue as the type would be removed and restored the same as it is here.
-    // The only issue would be if someone uses a fully qualified path, ala ::this::module::T where T is the Self-Type, but that edge case is acceptable
-    // for now in favor of getting it done(TM).
     ModuleItem* dummy = malloc(sizeof(ModuleItem));
     dummy->module = trait->module;
     dummy->origin = NULL;
@@ -1785,7 +1818,7 @@ void resolve_trait(Program* program, CompilerOptions* options, TraitDef* trait) 
         switch (mi->type) {
             case MIT_FUNCTION: {
                 FuncDef* func = mi->item;
-                resolve_funcdef(program, options, func, func->type_generics);
+                resolve_funcdef_head(program, options, func);
             } break;
             default:
                 unreachable("%s cant be defined inside trait def", ModuleItemType__NAMES[mi->type]);
@@ -1798,6 +1831,20 @@ void resolve_trait(Program* program, CompilerOptions* options, TraitDef* trait) 
     } else {
         map_remove(trait->module->items, trait->self_key->name->name);
     }
+}
+
+void resolve_trait_body(Program* program, CompilerOptions* options, TraitDef* trait) {
+    map_foreach(trait->methods, str name, ModuleItem* mi, ({
+        UNUSED(name);
+        switch (mi->type) {
+            case MIT_FUNCTION: {
+                FuncDef* method = mi->item;
+                if (method->body != NULL) todo("template functions in trait defs");
+            } break;
+            default:
+                unreachable("%s cant be defined inside trait def", ModuleItemType__NAMES[mi->type]);
+        }
+    }));
 }
 
 // ive missed this typo so often that now its become intentional
@@ -1953,91 +2000,113 @@ Token* const_eval(Expression* expr) {
     }
     return result;
 }
-void resolve_module(Program* program, CompilerOptions* options, Module* module) {
-    if (module->parent != NULL) {
-        if (!module->parent->resolved && !module->parent->in_resolution) {
-            resolve_module(program, options, module->parent);
-        }
+
+void resolve_global(Program* program, CompilerOptions* options, Global* g) {
+    if (options->verbosity >= 3) {
+        if(g->constant) log("Resolving constant %s::%s", to_str_writer(s, fprint_path(s, g->module->path)), g->name->name);
+        else log("Resolving static %s::%s", to_str_writer(s, fprint_path(s, g->module->path)), g->name->name);
     }
-    if (module->resolved) return;
-    str path_str = to_str_writer(stream, fprint_path(stream, module->path));
-    if (module->in_resolution) panic("recursion detected while resolving %s", path_str);
-    module->in_resolution = true;
+    resolve_typevalue(program, options, g->module, g->type, NULL, NULL);
+    if (g->value != NULL) {
+        g->computed_value = const_eval(g->value);
+    } else {
+        if (g->constant) spanned_error("Uninitialized constant", g->name->span, "Constant needs an associasted value.\nNote that this is optional for statics.");
+    }
+}
 
-    if (options->verbosity >= 2) log("Resolving module %s", path_str);
+typedef void (*resolver_fn)(Program* program, CompilerOptions* options,void* item);
 
-    // first we register every method, then we resolve the method (bodie)s, that way they can be defined in any order
-    list_foreach(&module->impls, i, ImplBlock* impl, {
-        register_impl(program, options, module, impl);
+static void resolve_rec(Program* program, CompilerOptions* options, Module* module, ModuleItemType type, resolver_fn resolver) {
+    if (type == MIT_MODULE) panic("Can only resolve items in modules recursively, not modules themselves");
+    map_foreach(module->items, str name, ModuleItem* item, {
+        UNUSED(name);
+        if (item->origin != NULL) continue; // foreign item
+        if (item->type == type) resolver(program, options, item->item);
+        else if (item->type == MIT_MODULE) resolve_rec(program, options, item->item, type, resolver);
     });
-    list_foreach(&module->impls, i, ImplBlock* impl, {
-        resolve_impl(program, options, impl);
-    });
+}
 
-    map_foreach(module->items, str key, ModuleItem* item, {
-        UNUSED(key);
-        switch (item->type) {
-            case MIT_FUNCTION: {
-                FuncDef* func = item->item;
-                if (func->head_resolved) continue;
-                resolve_funcdef(program, options, func, NULL);
-            } break;
-            case MIT_STRUCT: {
-                TypeDef* type = item->item;
-                if (type->head_resolved) continue;
-                resolve_typedef(program, options, type);
-            } break;
-            case MIT_TRAIT: {
-                TraitDef* trait = item->item;
-                if (trait->head_resolved) continue;
-                resolve_trait(program, options, trait);
-            } break;
-            case MIT_MODULE: {
-                Module* mod = item->item;
-                if (!mod->resolved && !mod->in_resolution) resolve_module(program, options, mod);
-            } break;
-            case MIT_CONSTANT:
-            case MIT_STATIC: {
-                Global* g = item->item;
-                if (options->verbosity >= 3) {
-                    if(g->constant) log("Resolving constant %s::%s", to_str_writer(s, fprint_path(s, g->module->path)), g->name->name);
-                    else log("Resolving static %s::%s", to_str_writer(s, fprint_path(s, g->module->path)), g->name->name);
-                }
-                resolve_typevalue(program, options, g->module, g->type, NULL, NULL);
-                if (g->value != NULL) {
-                    g->computed_value = const_eval(g->value);
-                } else {
-                    if (g->constant) spanned_error("Uninitialized constant", g->name->span, "Constant needs an associasted value.\nNote that this is optional for statics.");
-                }
-            } break;
-            case MIT_ANY: 
-                unreachable();
-        }
+static void resolve_rec_impl(Program* program, CompilerOptions* options, Module* module, resolver_fn resolver) {
+    list_foreach(&module->impls, i, ImplBlock* impl, resolver(program, options, impl));
+    map_foreach(module->items, str name, ModuleItem* item, {
+        UNUSED(name);
+        if (item->origin != NULL) continue; // foreign item
+        if (item->type == MIT_MODULE) resolve_rec_impl(program, options, item->item, resolver);
     });
-
-    module->resolved = true;
-    module->in_resolution = false;
 }
 
 void resolve(Program* program, CompilerOptions* options) {
-    if (options->verbosity >= 2) log("Resolving imports");
+    program->raii.copy = resolve_item_raw(program, options, program->main_module, gen_path("::core::copy::Copy"), MIT_TRAIT, NULL)->item;
+    program->raii.copy_key = to_str_writer(s, fprintf(s, "%p", program->raii.copy));
+    program->raii.clone = resolve_item_raw(program, options, program->main_module, gen_path("::core::clone::Clone"), MIT_TRAIT, NULL)->item;
+    program->raii.clone_key = to_str_writer(s, fprintf(s, "%p", program->raii.clone));
+    program->raii.drop = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Drop"), MIT_TRAIT, NULL)->item;
+    program->raii.drop_key = to_str_writer(s, fprintf(s, "%p", program->raii.drop));
+    program->raii.raw = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Raw"), MIT_STRUCT, NULL)->item;
+    
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Registring impl names");
     map_foreach(program->packages, str key, Module* mod, {
         UNUSED(key);
-        register_module_impl_names_rec(program, options, mod);
+        resolve_rec_impl(program, options, mod, (resolver_fn)register_impl);
     });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving imports");
     map_foreach(program->packages, str key, Module* mod, {
         UNUSED(key);
         resolve_module_imports(program, options, mod);
     });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving typedef heads");
     map_foreach(program->packages, str key, Module* mod, {
         UNUSED(key);
-        resolve_module(program, options, mod);
+        resolve_rec(program, options, mod, MIT_STRUCT, (resolver_fn)resolve_typedef_head);
+    });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving trait heads");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec(program, options, mod, MIT_TRAIT, (resolver_fn)resolve_trait_head);
+    });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving impl heads");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec_impl(program, options, mod, (resolver_fn)resolve_impl_head);
+    });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving function heads");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec(program, options, mod, MIT_FUNCTION, (resolver_fn)resolve_funcdef_head);
+    });
+
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving typedef body");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec(program, options, mod, MIT_STRUCT, (resolver_fn)resolve_typedef_body);
+    });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving globals");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec(program, options, mod, MIT_STATIC, (resolver_fn)resolve_global);
+        resolve_rec(program, options, mod, MIT_CONSTANT, (resolver_fn)resolve_global);
+    });
+
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving function body");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec(program, options, mod, MIT_FUNCTION, (resolver_fn)resolve_funcdef_body);
+    });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving impl body");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec_impl(program, options, mod, (resolver_fn)resolve_impl_body);
+    });
+    if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Resolving trait body");
+    map_foreach(program->packages, str key, Module* mod, {
+        UNUSED(key);
+        resolve_rec(program, options, mod, MIT_TRAIT, (resolver_fn)resolve_trait_body);
     });
 
     program->tracegen.top_frame = malloc(sizeof(Variable));
     program->tracegen.top_frame->path = gen_path("::core::trace::TOP_FRAME");
     program->tracegen.top_frame->values = NULL;
-    var_find(program, options, program->main_module, NULL, program->tracegen.top_frame, NULL, NULL);
+    find_variable(program, options, program->main_module, NULL, program->tracegen.top_frame, NULL, NULL);
     program->tracegen.frame_type = gen_typevalue("::core::trace::Frame", NULL);
     resolve_typevalue(program, options, program->main_module, program->tracegen.frame_type, NULL, NULL);
     program->tracegen.function_type = gen_typevalue("::core::trace::Function", NULL);

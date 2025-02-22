@@ -54,6 +54,7 @@ CompilerOptions build_args(StrList* args) {
     options.raw = false;
     options.compile = false;
     options.run = false;
+    options.static_links = false;
     options.emit_spans = false;
     options.package_names = list_new(StrList);
     options.c_headers = list_new(StrList);
@@ -163,7 +164,7 @@ CompilerOptions build_args(StrList* args) {
 
 typedef struct Submodule {
     Path* current;
-    str parentfile;
+    str filepath;
     Identifier* mod;
     Visibility vis;
 } Submodule;
@@ -173,7 +174,7 @@ void compile(CompilerOptions options) {
     Program* program = malloc(sizeof(Program));
     program->packages = map_new();
 
-    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "PARSER" ANSI_RESET_SEQUENCE, "Parsing source files...");
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "PARSER" ANSI_RESET_SEQUENCE, "Parsing source files...");
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
     if (options.verbosity >= 2) log("Parsing package ::main");
     Module* main = parse_module_contents(stream, gen_path("::main"));
@@ -200,14 +201,14 @@ void compile(CompilerOptions options) {
             if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, package->path)));
             if (package->filepath == NULL) spanned_error("Synthetic module error", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
                     to_str_writer(s, fprint_path(s, package->path)), m->name->name);
-            Submodule sm = (Submodule){ .current = package->path, .parentfile=package->filepath, .mod = m->name, .vis = m->vis};
+            Submodule sm = (Submodule){ .current = package->path, .filepath=package->filepath, .mod = m->name, .vis = m->vis};
             list_append(&sublist, sm);
         }));
         for (usize i = 0;i < sublist.length;i++) {
             Submodule sm = sublist.elements[i];
             Path* modpath = path_new(true, sm.current->elements);
             path_append(modpath, sm.mod);
-            str pf = sm.parentfile;
+            str pf = sm.filepath;
             StrList split = rsplitn(pf, '/', 1);
             str fp = split.elements[0];
             str parent = split.elements[1];
@@ -232,16 +233,16 @@ void compile(CompilerOptions options) {
                 if (str_eq(m->name->name, "lib")) spanned_error("Invalid name", m->name->span, "Submodule of %s may not be called lib: lib is a reserved name for toplevel packages", to_str_writer(s, fprint_path(s, package->path)));
                 if (mod->filepath == NULL) spanned_error("Synthetic module error", m->name->span, "Synthetic module may not have submodules: %s cannot have submodule %s", 
                         to_str_writer(s, fprint_path(s, package->path)), m->name->name);
-                Submodule sm = (Submodule){ .current = package->path, .parentfile=package->filepath, .mod = m->name, .vis = m->vis};
-                list_append(&sublist, sm);
+                Submodule ssm = (Submodule){ .current = package->path, .filepath=file, .mod = m->name, .vis = m->vis};
+                list_append(&sublist, ssm);
             }));
         }
     });
 
-    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "RESOLVER" ANSI_RESET_SEQUENCE, "Resolving types...");
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "RESOLVER" ANSI_RESET_SEQUENCE, "Resolving...");
     resolve(program, &options);
 
-    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "TRANSPILER" ANSI_RESET_SEQUENCE, "Transpiling to c code...");
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "TRANSPILER" ANSI_RESET_SEQUENCE, "Transpiling to c code...");
     str code_file_name = to_str_writer(stream, fprintf(stream, "%s.c", options.outname));
     str header_file_name = to_str_writer(stream, fprintf(stream, "%s.h", options.outname));
     FILE* code_file = fopen(code_file_name, "w");
@@ -253,12 +254,12 @@ void compile(CompilerOptions options) {
     if (options.verbosity >= 1) report_item_cache_stats();
 
     if (options.compile) {
-        if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
+        if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "COMPILE_C" ANSI_RESET_SEQUENCE, "Compiling generated c code...");
         str command = to_str_writer(stream, fprintf(stream, "%s -ggdb -Wall -Wno-unused -Wno-builtin-declaration-mismatch %s -lm -o %s %s", 
             options.c_compiler, code_file_name, options.outname, options.static_links ? "-static" : ""));
         fflush(stdout);
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
     }
-    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_YELLO_FG) "CONPILER" ANSI_RESET_SEQUENCE, "Compilation finished!");
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "CONPILER" ANSI_RESET_SEQUENCE, "Compilation finished!");
 }

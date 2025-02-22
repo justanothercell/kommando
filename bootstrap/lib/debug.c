@@ -44,10 +44,10 @@ void check_check(void* ptr) {
     uint8_t* check_l = ((uint8_t*)ptr)+4;
     uint8_t* check_r = ((uint8_t*)ptr)+8+(*(uint32_t*)size_m);
     if (!check_checksum32(check_l)) {
-        panic("block checksum (left) not valid for %p: Wrote over preceeding bytes.\n", (char*)ptr + 8);
+        spanic("block checksum (left) not valid for %p: Wrote over preceeding bytes.\n", (char*)ptr + 8);
     }
     if (!check_checksum32(check_r)) {
-        panic("Block checksum (right) not valid for %p: Wrote over succeeding bytes.\n", (char*)ptr + 8);
+        spanic("Block checksum (right) not valid for %p: Wrote over succeeding bytes.\n", (char*)ptr + 8);
     }
 }
 

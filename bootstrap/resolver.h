@@ -14,4 +14,5 @@ void try_fprint_res_tv(FILE* stream, TypeValue* tv);
 str tfvals_to_key(GenericValues* type_generics, GenericValues* func_generics);
 void report_item_cache_stats();
 TypeValue* replace_generic(TypeValue* tv, GenericValues* type_ctx, GenericValues* func_ctx, TraitDef* trait, TypeValue* trait_called);
+void resolve_typevalue(Program* program, CompilerOptions* options, Module* module, TypeValue* tval, GenericKeys* func_generics, GenericKeys* type_generics);
 #endif

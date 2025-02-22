@@ -57,7 +57,6 @@ typedef struct TraitDef {
     Map* methods;
     GenericKeys* keys;
     Module* module;
-    bool head_resolved;
 } TraitDef;
 LIST(TraitList, TraitDef*);
 
@@ -72,7 +71,6 @@ typedef struct TypeDef {
     AnnoList annotations;
     TraitList traits;
     GKey* key;
-    bool head_resolved;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
 void fprint_td_path(FILE* file, TypeDef* def);
@@ -108,7 +106,6 @@ void fprint_generic_values(FILE* file, GenericValues* values);
 typedef struct GenericUse {
     GenericValues* type_context;
     GenericValues* func_context;
-    FuncDef* in_func;
 } GenericUse;
 
 typedef struct TypeValue {
@@ -169,10 +166,10 @@ void fprint_expression(FILE* file, Expression* expression);
 LIST(ExpressionList, Expression*);
 
 ENUM(VarState,
-    VS_UNUSED,
+    VS_GLOBAL_NONCOPY,
     VS_COPY,
+    VS_NONCOPY,
     VS_MOVED,
-    VS_DROPPED
 );
 
 typedef struct ModuleItem ModuleItem;
@@ -184,6 +181,7 @@ typedef struct VarBox {
     ModuleItem* mi;
     GenericValues* values;
     VarState state;
+    Span moved_here;
 } VarBox;
 LIST(VariableList, Variable*);
 
@@ -295,9 +293,9 @@ typedef struct FuncDef {
     bool trait_def;
     bool no_mangle;
     bool is_variadic;
-    bool head_resolved;
-    bool in_resolution;
     bool untraced;
+    bool is_extern;
+    bool body_resolved;
 } FuncDef;
 
 typedef struct Global {
@@ -322,8 +320,7 @@ typedef struct ImplBlock {
     GenericKeys* generics;
     TypeValue* trait_ref;
     TraitDef* trait;
-    bool head_resolved;
-    bool registered;
+    Module* module;
 } ImplBlock;
 LIST(ImplList, ImplBlock*);
 

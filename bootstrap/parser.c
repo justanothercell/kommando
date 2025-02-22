@@ -31,6 +31,8 @@ bool double_double_colon(TokenStream* stream) {
     return true;
 }
 
+Expression* CURRENT_EXPR = NULL;
+
 AnnoList parse_annotations(TokenStream* stream) {
     AnnoList list = list_new(AnnoList);
     Token* t = next_token(stream);
@@ -102,7 +104,6 @@ TypeDef* parse_struct(TokenStream* stream) {
     type->generics = keys;
     type->transpile_state = 0;
     type->name = name;
-    type->head_resolved = false;
     type->traits = list_new(TraitList);
     type->key = NULL;
     return type;
@@ -112,8 +113,7 @@ TypeDef* parse_struct(TokenStream* stream) {
 ImplBlock* parse_impl(TokenStream* stream, Module* module) {
     ImplBlock* impl = malloc(sizeof(ImplBlock));
     impl->methods = map_new();
-    impl->head_resolved = false;
-    impl->registered = false;
+    impl->module = module;
     Token* t = next_token(stream);
     if (!token_compare(t, "impl", IDENTIFIER)) unexpected_token(t);
     t = peek_next_token(stream);
@@ -189,7 +189,6 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
 
 TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     TraitDef* trait = malloc(sizeof(TraitDef));
-    trait->head_resolved = false;
     trait->methods = map_new();
     trait->module = module;
     Token* t = next_token(stream);
@@ -235,7 +234,6 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     trait->self_type->transpile_state = 0;
     trait->self_type->generics = NULL;
     trait->self_type->module = NULL;
-    trait->self_type->head_resolved = true;
     trait->self_type->traits = list_new(TraitList);
     list_append(&trait->self_type->traits, trait);
 
@@ -1114,13 +1112,12 @@ FuncDef* parse_function_definition(TokenStream* stream) {
     func->args = arguments;
     func->is_variadic = variadic;
     func->generics = keys;
-    func->head_resolved = false;
-    func->in_resolution = false;
     func->impl_type = NULL;
     func->trait = NULL;
     func->annotations = list_new(AnnoList);
     func->type_generics = NULL;
     func->untraced = false;
     func->trait_def = false;
+    func->body_resolved = false;
     return func;
 }

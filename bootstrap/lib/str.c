@@ -117,7 +117,7 @@ str read_to_string(FILE* file) {
 
 str read_file_to_string(str path) {
     FILE* f = fopen(path, "rb");
-    if (f == NULL) panic("Unable to read file %s", path);
+    if (f == NULL) spanic("Unable to read file %s", path);
     str r = read_to_string(f);
     fclose(f);
     return r;   

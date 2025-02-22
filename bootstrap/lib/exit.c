@@ -51,7 +51,7 @@ void signal_handler(int signal) {
 }
 
 void init_exit_handler(void (*exit_func)(str file, usize line, int code)) {
-    if (EXIT_FUNC != NULL) panic("Exit handler may not be initialized twice");
+    if (EXIT_FUNC != NULL) spanic("Exit handler may not be initialized twice");
     EXIT_FUNC = exit_func;
     signal(SIGILL, signal_handler);
     signal(SIGFPE, signal_handler);
@@ -115,10 +115,7 @@ void fprint_stacktrace(FILE* file) {
             str line = loc.elements[1];
             int line_end = 0;
             while (line[line_end] != 0 && line[line_end] != '(') line_end += 1;
-            StrList dir_file = rsplitn(path, __PATH_SEP__, 1);
-            str dir = dir_file.elements[0];
-            str filename = dir_file.elements[1];
-            fprintf(file, ANSI(ANSI_FAINT)" ./%s/"ANSI_RESET_SEQUENCE""ANSI(ANSI_BOLD)"%s:%.*s"ANSI_RESET_SEQUENCE""ANSI(ANSI_FAINT)"%s"ANSI_RESET_SEQUENCE"\n", dir, filename, line_end, line, line + line_end);
+            fprintf(file, " ./%s:%.*s"ANSI(ANSI_FAINT)"%s"ANSI_RESET_SEQUENCE"\n", path, line_end, line, line + line_end);
         }
         else fprintf(file, " "ANSI(ANSI_FAINT)"%s:%s"ANSI_RESET_SEQUENCE"\n", loc.elements[0], loc.elements[1]);
     }
