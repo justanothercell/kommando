@@ -2,6 +2,10 @@ from flask import Flask, send_from_directory, request, redirect, abort
 import requests
 import logging
 from datetime import datetime
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 logging.basicConfig(filename='log/latest.log', level=logging.INFO)
 
@@ -36,4 +40,8 @@ def execute():
     return r.json()
 
 if __name__ == '__main__':
-    app.run('0.0.0.0', 80)
+    if os.getenv('SANDBOX_USE_SSL', 'false') == 'true':
+        context = (os.getenv('SANDBOX_DOMAIN_CERT_FILE'), os.getenv('SANDBOX_DOMAIN_KEY_FILE'))
+        app.run('0.0.0.0', 443, ssl_context=context)
+    else:
+        app.run('0.0.0.0', 80)

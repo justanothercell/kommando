@@ -10,6 +10,8 @@ import time
 
 os.environ['TMPDIR'] = '/tempdata'
 
+TIMEOUT = 10
+
 def rmdir(directory):
     directory = Path(directory)
     for item in directory.iterdir():
@@ -23,9 +25,9 @@ def delete_old_files():
     for item in Path('/tempdata').iterdir():
         if item.is_dir(): # invalid, delete either way
             rmdir(item)
-        else: # delete if older than 1 minute
+        else: # delete if older than twice the timeout
             file_age = time.time() - item.stat().st_mtime
-            if file_age > 60:
+            if file_age > TIMEOUT * 2:
                 item.unlink()
 
 scheduler = BackgroundScheduler()
@@ -33,8 +35,6 @@ scheduler.add_job(func=delete_old_files, trigger='interval', seconds=60)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
-
-TIMEOUT = 10
 
 app = Flask(__name__)
 

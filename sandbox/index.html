@@ -2,6 +2,15 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+        
+        <title>Kommando sandbox</title>
+
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Kommando Sandbox">
+        <meta property="og:description" content="Compile and run kommando code online">
+        <meta name="description" content="Compile and run kommando code online">
+        <!-- <meta property="og:image" content="https://url> -->
+         
         <script src="https://cdn.jsdelivr.net/npm/ansi_up@4.0.4/ansi_up.js"></script>
 		<link rel="stylesheet" data-name="vs/editor/editor.main" href="https://unpkg.com/monaco-editor/min/vs/editor/editor.main.css"/>
 		<link rel="stylesheet" href="./editor.css"/>
@@ -113,7 +122,7 @@
                             } else if (/^\.?\/kdolib.*.kdo$/.test(file)) { // library file
                                 href = github_prefix + file + github_suffix;
                             } else if (/^\w+(\/\w+)*.c$/.test(file)) { // bootstrap source file
-                                href = github_prefix + 'bootstrap/' + file + github_suffix;
+                                href = github_prefix + file + github_suffix;
                             } else { // unknown, raw link
                                 parts.push(html_escape(part));
                                 continue;
