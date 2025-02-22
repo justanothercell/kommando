@@ -236,6 +236,7 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
                 }
                 map_foreach(bound->resolved->methods, str name, ModuleItem* mi, {
                     FuncDef* instance_method = resolve_method_instance(program, options, v, mi->name, true);
+                    if (!instance_method->body_resolved) resolve_funcdef_body(program, options, instance_method);
                     Map* instances = map_get(bound->func_val_instances, name);
                     if (instances == NULL) continue;
                     map_foreach(instances, str key, GenericValues* values, {
@@ -270,6 +271,7 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
                 }
                 map_foreach(bound->resolved->methods, str name, ModuleItem* mi, {
                     FuncDef* instance_method = resolve_method_instance(program, options, v, mi->name, true);
+                    if (!instance_method->body_resolved) resolve_funcdef_body(program, options, instance_method);
                     Map* instances = map_get(bound->func_val_instances, name);
                     if (instances == NULL) continue;
                     map_foreach(instances, str key, GenericValues* values, {
