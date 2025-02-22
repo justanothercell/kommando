@@ -1,5 +1,4 @@
 from flask import Flask, request, abort
-from random import randint
 import subprocess
 import os
 import shlex
@@ -7,10 +6,13 @@ import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 from pathlib import Path
 import time
+from wonderwords import RandomWord
 
 os.environ['TMPDIR'] = '/sandbox'
 
 TIMEOUT = 10
+
+rw = RandomWord()
 
 def rmdir(directory):
     directory = Path(directory)
@@ -40,7 +42,7 @@ app = Flask(__name__)
 
 @app.route('/execute', methods = [ 'POST' ])
 def execute():
-    runner_id = f'{randint(0, 0xFFFFFFFFFFFFFFFF):x}'
+    runner_id = f'{rw.word(include_parts_of_speech=["adjective"])}_{rw.word(include_parts_of_speech=["noun"])}'
     try:
         data = request.json
         if data is None:

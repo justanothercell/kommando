@@ -15,6 +15,6 @@ USER appuser
 # communication port
 EXPOSE 7878
 
-RUN pip install flask apscheduler
+RUN pip install flask apscheduler wonderwords
 
 CMD ["python", "runner.py"]
