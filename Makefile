@@ -8,7 +8,7 @@ build: clean
 	@echo Done!
 
 build_release: clean
-	@echo Building compiler (release) ...
+	@echo Building compiler \(release\) ...
 	@gcc -ggdb -rdynamic -o kommando $(shell find ./bootstrap -name "*.c") $(GCC_FLAGS) $(GCC_WARNINGS) $(GCC_RELEASE_FLAGS)
 	@echo Done!
 
