@@ -12,6 +12,7 @@ preferred-dark-theme = "ayu"
 
 [output.html.code.hidelines]
 rs = "!"
+c = "!"
 
 [output.html.fold]
 enable = true

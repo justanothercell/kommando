@@ -8,7 +8,7 @@ fn average(a: f32, b: f32) -> f32 {
 A block yields it's last value if the semicolon is omitted. As such this function achieves the same thing:
 ```rs
 fn average(a: f32, b: f32) -> f32 {
-    (a + b)/ 2.0
+    (a + b) / 2.0
 }
 ```
 This is the preferred syntax. `return` is only used to return conditionally:

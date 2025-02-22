@@ -53,3 +53,50 @@ fn main() {
 ```
 `p` may now have any and all states, or may even crash the program when used.
 Even if the original object is still around but was moved, `p` is still invalid
+
+---
+
+Unlike c, pointers of literals is supported:
+
+```rs
+!use std::*;
+!
+!fn increment(v: ptr<i32>) { // v points to value
+!    *v += 1; // increment the value pointed to by v
+!    c_api::printf("incremented: %d\n", *v); // read the value pointed to by v
+!}
+!
+fn main() {
+    increment(&1);
+}
+```
+
+This is equivalent to the following c code:
+
+```c
+!#include <stdio.h>
+!
+!void increment(int* v) { // v points to value
+!    *v += 1; // increment the value pointed to by v
+!    printf("incremented: %d\n", *v); // read the value pointed to by v
+!}
+!
+int main() {
+    int _temp = 1;
+    increment(&_temp);
+}
+```
+
+The pointer is only valid for the duration of the function call:
+
+```rs
+!use std::*;
+!
+!fn identity<T>(x: T) -> T {
+!    x // passthrough
+!}
+!
+fn main() {
+    let invalid_ptr = identity(&1);
+}
+```
