@@ -1,0 +1,9 @@
+use core::types::*;
+
+pub trait T: Drop {
+    fn drop(self: ptr<T>);
+}
+
+pub struct Raw<T> {
+    item: T
+}

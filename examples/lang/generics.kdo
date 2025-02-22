@@ -60,7 +60,7 @@ fn main() {
     print_typeinfo::<Box<Box<std::i32>>>();
 }
 
-fn unbox<I>(b: Box<I>) -> I {
+fn unbox<I: core::copy::Copy>(b: Box<I>) -> I {
     b.item
 }
 

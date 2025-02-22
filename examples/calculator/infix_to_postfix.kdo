@@ -138,6 +138,5 @@ fn main() {
             printf("%c ", op);
         };
         printf("\n");
-        ops.free(); // clear allocated memory
     }
 }

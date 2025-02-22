@@ -1,0 +1,29 @@
+use std::*;
+
+use core::clone::Clone;
+use core::drop::Drop;
+
+pub struct Box<T> {
+    item: ptr<T>
+}
+
+impl<T> Box<T> {
+    pub fn new(t: T) -> Box<T> {
+        _ { item: std::mem::new(t) }
+    }
+    pub fn ref(self: ptr<Box<T>>) -> ptr<T> {
+        self.item
+    }
+}
+
+impl<T: Clone> Box<T>: Clone {
+    pub fn clone(self: ptr<Box<T>>) -> Box<T> {
+        Box::<T>::new(self.item.clone())
+    }
+}
+
+impl<T> Box<T>: Drop {
+    pub fn drop(self: ptr<Box<T>>) {
+        std::mem::free(self.item)
+    }
+}

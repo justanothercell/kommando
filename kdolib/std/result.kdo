@@ -1,19 +1,24 @@
 use std::*;
 use std::fmt::*;
 
+use core::copy::Copy;
+use core::clone::Clone;
+use core::drop::Drop;
+use core::drop::Raw;
+
 pub struct Result<T, E> {
-    value: T,
-    error: E,
+    value: Raw<T>,
+    error: Raw<E>,
     is_ok: bool
 }
 
 impl<T, E> Result<T, E> {
     pub fn ok(value: T) -> Result<T, E> {
-        _ { value: value, error: std::mem::uninit(), is_ok: true }
+        _ { value: _ { item: value }, error: _ { item: std::mem::uninit() }, is_ok: true }
     }
 
     pub fn err(error: E) -> Result<T, E> {
-        _ { value: std::mem::uninit(), error: error, is_ok: false }
+        _ { value: _ { item: std::mem::uninit() }, error: _ { item: error }, is_ok: false }
     }
 
     pub fn is_ok(self: Result<T, E>) -> bool {
@@ -26,7 +31,7 @@ impl<T, E> Result<T, E> {
 
     pub fn to_ok_option(self: Result<T, E>) -> Option<T> {
         if self.is_ok {
-            Option::<_>::some(self.value)
+            Option::<_>::some(std::mem::replace(&self.value.item, std::mem::uninit()))
         } else {
             Option::<_>::none()
         }
@@ -36,47 +41,23 @@ impl<T, E> Result<T, E> {
         if self.is_ok {
             Option::<_>::none()
         } else {
-            Option::<_>::some(self.error)
+            Option::<_>::some(std::mem::replace(&self.error.item, std::mem::uninit()))
         }
     }
 
     pub fn unwrap_or(self: Result<T, E>, fallback: T) -> T {
         if self.is_ok {
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
             fallback
         }
     }
 
-    pub fn as_ref(self: ptr<Result<T, E>>) -> Result<ptr<T>, E> {
+    pub fn as_ref(self: ptr<Result<T, E>>) -> Result<ptr<T>, ptr<E>> {
         if self.is_ok {
-            Result::<_, _>::ok(&self.value)
+            Result::<_, _>::ok(&self.value.item)
         } else {
-            Result::<_, _>::err(self.error)
-        }
-    }
-
-    pub fn deref(self: Result<ptr<T>, E>) -> Result<T, E> {
-        if self.is_ok {
-            Result::<_, _>::ok(*self.value)
-        } else {
-            Result::<_, _>::err(self.error)
-        }
-    }
-
-    pub fn err_as_ref(self: ptr<Result<T, E>>) -> Result<T, ptr<E>> {
-        if self.is_ok {
-            Result::<_, _>::ok(self.value)
-        } else {
-            Result::<_, _>::err(&self.error)
-        }
-    }
-
-    pub fn err_deref(self: ptr<Result<T, ptr<E>>>) -> Result<T, E> {
-        if self.is_ok {
-            Result::<_, _>::ok(self.value)
-        } else {
-            Result::<_, _>::err(*self.error)
+            Result::<_, _>::err(&self.error.item)
         }
     }
 }
@@ -84,17 +65,17 @@ impl<T, E> Result<T, E> {
 impl<T, E: Fmt> Result<T, E> {
     pub fn unwrap(self: Result<T, E>) -> T {
         if self.is_ok {
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
-            panic(format("Unwrapping erroneous result $", self.error.dyn_fmt()))
+            panic(format("Unwrapping erroneous result $", self.error.item.dyn_fmt()))
         }
     }
 
     pub fn expect(self: Result<T, E>, error: c_str) -> T {
         if self.is_ok {
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
-            panic(format("Unwrapping erroneous result: $: $", error.dyn_fmt(), self.error.dyn_fmt()))
+            panic(format("Unwrapping erroneous result: $: $", error.dyn_fmt(), self.error.item.dyn_fmt()))
         }
     }
 }
@@ -105,10 +86,53 @@ impl<T: Fmt, E: Fmt> Result<T, E>: Fmt {
     }
     fn fmt(self: ptr<Result<T, E>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
         if self.is_ok {
-            stream.write_str("some(").write(fmt, self.value).write_str(")");
+            stream.write_str("some(").write(fmt, &self.value.item).write_str(")");
             stream.write_str(")");
         } else {
-            stream.write_str("err(").write(fmt, self.error).write_str(")");
+            stream.write_str("err(").write(fmt, &self.error.item).write_str(")");
+        }
+    }
+}
+
+impl<T: Copy, E: Copy> Result<T, E>: Copy {}
+
+impl<T: Copy, E> Result<T, E> {
+    pub fn deref(self: Result<ptr<T>, E>) -> Result<T, E> {
+        if self.is_ok {
+            Result::<_, _>::ok(*self.value.item)
+        } else {
+            Result::<_, _>::err(std::mem::replace(&self.error.item, std::mem::uninit()))
+        }
+    }
+}
+
+impl<T, E: Copy> Result<T, E> {
+    pub fn err_deref(self: ptr<Result<T, ptr<E>>>) -> Result<T, E> {
+        if self.is_ok {
+            Result::<_, _>::ok(std::mem::replace(&self.value.item, std::mem::uninit()))
+        } else {
+            Result::<_, _>::err(*self.error.item)
+        }
+    }
+}
+
+
+impl<T: Clone, E: Clone> Result<T, E>: Clone {
+    fn clone(self: ptr<Result<T, E>>) -> Result<T, E> {
+        if self.is_ok {
+            Result::<_, _>::ok(self.value.item.clone())
+        } else {
+            Result::<_, _>::err(self.error.item.clone())
+        }
+    }
+}
+
+impl<T: Drop, E: Drop> Result<T, E>: Drop {
+    fn drop(self: ptr<Result<T, E>>) {
+        if self.is_ok {
+            self.value.item.drop();
+        } else {
+            self.error.item.drop();
         }
     }
 }

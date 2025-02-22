@@ -5,6 +5,9 @@ pub mod hash;
 pub mod eq;
 pub mod cmp;
 pub mod fmt;
+pub mod copy;
+pub mod clone;
+pub mod drop;
 
 pub mod types;
 pub mod intrinsics;

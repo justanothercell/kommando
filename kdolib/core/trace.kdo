@@ -1,9 +1,12 @@
 use core::types::*;
+use core::copy::Copy;
 
 pub struct Location {
     file: c_str,
     line: usize,
 }
+
+impl Location: Copy { }
 
 impl Location {
     pub fn fprint(self: Location, stream: c_api::CFileStream) {
@@ -19,6 +22,8 @@ pub struct Function {
     loc: Location
 }
 
+impl Function: Copy { }
+
 #[thread_local]
 pub static TOP_FRAME: ptr<Frame> = 0;
 
@@ -28,6 +33,8 @@ pub struct Frame {
     loc: Location,
     callflags: u8
 }
+
+impl Frame: Copy { }
 
 // This is the root of a callstack.
 // frame.line and frame.file are both set to zero/NULL in this case since this a root function is logically called by some intrinsic and not by kommando source code.

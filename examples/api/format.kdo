@@ -11,7 +11,7 @@ impl Vehicle: Fmt {
     }
 
     fn fmt(self: ptr<Vehicle>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
-        stream.write(fmt, self.wheels).write_str(" wheeler");
+        stream.write(fmt, &self.wheels).write_str(" wheeler");
     }
 }
 

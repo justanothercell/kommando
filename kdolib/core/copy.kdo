@@ -1,0 +1,31 @@
+use core::types::*;
+
+// marker trait
+pub trait T: Copy {}
+
+impl<T> ptr<T>: Copy { }
+impl<T> function_ptr<T>: Copy { }
+impl c_str: Copy { }
+impl raw_ptr: Copy { }
+
+impl bool: Copy { }
+impl TypeId: Copy { }
+
+impl i8: Copy { }
+impl i16: Copy { }
+impl i32: Copy { }
+impl i64: Copy { }
+impl i128: Copy { }
+impl isize: Copy { }
+
+impl u8: Copy { }
+impl u16: Copy { }
+impl u32: Copy { }
+impl u64: Copy { }
+impl u128: Copy { }
+impl usize: Copy { }
+
+impl f16: Copy { }
+impl f32: Copy { }
+impl f64: Copy { }
+impl f128: Copy { }

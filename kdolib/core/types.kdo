@@ -128,7 +128,7 @@ pub struct f128;
 pub struct bool;
 
 #[extern]
-#[size=4]
-#[align=4]
-#[c_alias="int"]
+#[size=8]
+#[align=8]
+#[c_alias="unsigned long"]
 pub struct TypeId;

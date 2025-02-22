@@ -2,18 +2,23 @@
 use std::*;
 use std::fmt::*;
 
+use core::copy::Copy;
+use core::clone::Clone;
+use core::drop::Drop;
+use core::drop::Raw;
+
 pub struct Option<T> {
-    value: T,
+    value: Raw<T>,
     exists: bool
 }
 
 impl<T> Option<T> {
     pub fn some(value: T) -> Option<T> {
-        _ { value: value, exists: true }
+        _ { value: _ { item: value }, exists: true }
     }
 
     pub fn none() -> Option<T> {
-        _ { value: std::mem::uninit(), exists: false }
+        _ { value: _ { item: std::mem::uninit() }, exists: false }
     }
 
     pub fn is_some(self: Option<T>) -> bool {
@@ -26,7 +31,7 @@ impl<T> Option<T> {
 
     pub fn to_result<E>(self: Option<T>, error: E) -> Result<T, E> {
         if self.exists {
-            Result::<_, _>::ok(self.value)
+            Result::<_, _>::ok(std::mem::replace(&self.value.item, std::mem::uninit()))
         } else {
             Result::<_, _>::err(error)
         }
@@ -34,7 +39,7 @@ impl<T> Option<T> {
 
     pub fn unwrap(self: Option<T>) -> T {
         if self.exists {
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
             panic("Unwrapping empty option")
         }
@@ -42,7 +47,7 @@ impl<T> Option<T> {
 
     pub fn unwrap_or(self: Option<T>, fallback: T) -> T {
         if self.exists {
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
             fallback
         }
@@ -50,17 +55,17 @@ impl<T> Option<T> {
 
     pub fn expect(self: Option<T>, error: c_str) -> T {
         if self.exists {
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
             panic(format("Unwrapping empty option: $", error.dyn_fmt()))
         }
     }
 
     pub fn replace(self: ptr<Option<T>>, new: T) -> Option<T> {
+        let old = std::mem::replace(&self.value.item, new);
         if self.exists {
-            Option::<_>::some(std::mem::replace(&self.value, new))
+            Option::<_>::some(old)
         } else {
-            self.value = new;
             self.exists = true;
             Option::<_>::none()
         }
@@ -69,7 +74,7 @@ impl<T> Option<T> {
     pub fn take(self: ptr<Option<T>>) -> T {
         if self.exists {
             self.exists = false;
-            self.value
+            std::mem::replace(&self.value.item, std::mem::uninit())
         } else {
             panic("ERROR: Cannot take value out of empty option\n")
         }
@@ -78,7 +83,7 @@ impl<T> Option<T> {
     pub fn try_take(self: ptr<Option<T>>) -> Option<T> {
         if self.exists {
             self.exists = false;
-            Option::<_>::some(self.value)
+            Option::<_>::some(std::mem::replace(&self.value.item, std::mem::uninit()))
         } else {
             self.exists = false;
             Option::<_>::none()
@@ -87,15 +92,7 @@ impl<T> Option<T> {
 
     pub fn as_ref(self: ptr<Option<T>>) -> Option<ptr<T>> {
         if self.exists {
-            Option::<_>::some(&self.value)
-        } else {
-            Option::<_>::none()
-        }
-    }
-
-    pub fn deref(self: Option<ptr<T>>) -> Option<T> {
-        if self.exists {
-            Option::<_>::some(*self.value)
+            Option::<_>::some(&self.value.item)
         } else {
             Option::<_>::none()
         }
@@ -108,9 +105,39 @@ impl<T: Fmt> Option<T>: Fmt {
     }
     fn fmt(self: ptr<Option<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
         if self.exists {
-            stream.write_str("some(").write(fmt, self.value).write_str(")");
+            stream.write_str("some(").write(fmt, &self.value.item).write_str(")");
         } else {
             stream.write_str("none");
+        }
+    }
+}
+
+impl<T: Copy> Option<T>: Copy {}
+
+impl<T: Copy> Option<T>{
+    pub fn deref(self: Option<ptr<T>>) -> Option<T> {
+        if self.exists {
+            Option::<_>::some(*self.value.item)
+        } else {
+            Option::<_>::none()
+        }
+    }
+}
+
+impl<T: Clone> Option<T>: Clone {
+    fn clone(self: ptr<Option<T>>) -> Option<T> {
+        if self.exists {
+            Option::<_>::some(self.value.item.clone())
+        } else {
+            Option::<_>::none()
+        }
+    }
+}
+
+impl<T: Drop> Option<T>: Drop {
+    fn drop(self: ptr<Option<T>>) {
+        if self.exists {
+            self.value.item.drop();
         }
     }
 }

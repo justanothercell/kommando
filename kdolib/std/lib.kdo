@@ -19,12 +19,15 @@ pub mod result;
 pub use fmt::format;
 pub use fmt::print;
 pub use fmt::println;
+
 pub use option::Option;
 pub use result::Result;
 
 pub use error::panic;
 pub use error::unreachable;
 pub use error::todo;
+
+pub use mem::box::Box;
 
 pub use core::types::*;
 pub use core::true;

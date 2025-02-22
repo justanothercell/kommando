@@ -1,5 +1,7 @@
 use std::*;
 
+use core::drop::Drop;
+
 // QUeue implemented on a ring buffer
 pub struct Queue<T> {
     index: usize,
@@ -76,5 +78,15 @@ impl<T> Queue<T> {
         v.index = 0;
         v.length = 0;
         v.capacity = 0;
+    }
+}
+
+impl<T> Queue<T>: Drop {
+    fn drop(self: ptr<Queue<T>>) {
+        let i = 0usize;
+        while i < self.length {
+            std::mem::replace(std::mem::arr_offset(self.buffer, (i + self.index) % self.capacity), std::mem::uninit()); // drops item
+        };
+        std::mem::free(self.buffer);
     }
 }

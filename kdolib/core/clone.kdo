@@ -1,0 +1,7 @@
+use core::types::*;
+
+use core::copy::Copy;
+
+pub trait T: Clone {
+    fn clone(self: ptr<T>) -> T;
+}

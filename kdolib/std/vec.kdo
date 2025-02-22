@@ -1,5 +1,8 @@
 use std::*;
 use std::slice::Slice;
+use core::copy::Copy;
+use core::clone::Clone;
+use core::drop::Drop;
 
 pub struct Vec<T> {
     length: usize,
@@ -35,26 +38,12 @@ impl<T> Vec<T> {
         v.length += 1;
     }
 
-    pub fn get(v: ptr<Vec<T>>, i: usize) -> Option<T> {
-        if i < v.length {
-            Option::<_>::some(*std::mem::arr_offset(v.buffer, i))
-        } else {
-            Option::<_>::none()
-        }
-    }
-
     pub fn get_ref(v: ptr<Vec<T>>, i: usize) -> Option<ptr<T>> {
         if i < v.length {
             Option::<_>::some(std::mem::arr_offset(v.buffer, i))
         } else {
             Option::<_>::none()
         }
-    }
-    pub fn last(v: ptr<Vec<T>>) -> Option<T> {
-        if v.length == 0 {
-            return Option::<_>::none();
-        };
-        v.get(v.length - 1)
     }
     pub fn last_ref(v: ptr<Vec<T>>) -> Option<ptr<T>> {
         if v.length == 0 {
@@ -103,13 +92,6 @@ impl<T> Vec<T> {
         v.length = 0;
     }
 
-    pub fn free(v: ptr<Vec<T>>) {
-        std::mem::free(v.buffer);
-        v.buffer = std::mem::null();
-        v.length = 0;
-        v.capacity = 0;
-    }
-
     pub fn slice(v: ptr<Vec<T>>) -> Slice<T> {
         v.slice_range(0, v.length)
     }
@@ -142,9 +124,46 @@ impl<T: Fmt> Vec<T>: Fmt {
         let i = 0usize;
         while i < v.length {
             if i > 0 { stream.write_str(", "); };
-            v.get(i).unwrap().fmt(fmt, stream);
+            v.get_ref(i).unwrap().fmt(fmt, stream);
             i += 1;
         };
         stream.write_str("]");
+    }
+}
+
+impl<T: Copy> Vec<T> {
+    pub fn last(v: ptr<Vec<T>>) -> Option<T> {
+        if v.length == 0 {
+            return Option::<_>::none();
+        };
+        v.get(v.length - 1)
+    }
+    
+    pub fn get(v: ptr<Vec<T>>, i: usize) -> Option<T> {
+        if i < v.length {
+            Option::<_>::some(*std::mem::arr_offset(v.buffer, i))
+        } else {
+            Option::<_>::none()
+        }
+    }
+}
+
+impl<T: Clone> Vec<T>: Clone {
+    fn clone(self: ptr<Vec<T>>) -> Vec<T> {
+        let cloned = Vec::<T>::new_with(self.capacity);
+        while cloned.length < self.length {
+            cloned.push(self.get_ref(cloned.length).unwrap().clone());
+        };
+        cloned
+    }
+}
+
+impl<T> Vec<T>: Drop {
+    fn drop(self: ptr<Vec<T>>) {
+        let i = 0usize;
+        while i < self.length {
+            std::mem::replace(std::mem::arr_offset(self.buffer, i), std::mem::uninit()); // drops item
+        };
+        std::mem::free(self.buffer);
     }
 }

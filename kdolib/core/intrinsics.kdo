@@ -30,3 +30,7 @@ pub fn short_typename<T>() -> ::core::types::c_str {
 pub fn typeid<T>() -> ::core::types::TypeId { 
     $"@#[T]u"
 }
+
+#[extern]
+#[symbol="__intrinsic_forget"]
+pub fn forget<T>(t: T); // drops t without running destructors
