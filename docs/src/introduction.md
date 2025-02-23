@@ -6,7 +6,7 @@ The first part of the docs is a sequential introduction to the language and the 
 The parts after are itemized lists of features and not meant for sequential reading. Rather use them as a dictionary.
 
 # Resources
-- online [sandbox](http://callie.cat)
+- online [sandbox](https://callie.cat)
 - [this](./introduction.md) book
 - the kommando [github](https://github.com/justanothercell/kommando/tree/dev) repository, containing:
     - many [examples](https://github.com/justanothercell/kommando/tree/dev/examples)
