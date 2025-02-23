@@ -14,6 +14,12 @@ pub struct Entry<K, V> {
 
 impl<K: Copy, V: Copy> Entry<K, V>: Copy { }
 
+impl<K: Clone, V: Clone> Entry<K, V>: Clone {
+    fn clone(self: ptr<Entry<K, V>>) -> Entry<K, V> {
+        _ { key: self.key.clone(), value: self.value.clone() }
+    }
+}
+
 pub struct HashMap<K, V> {
     buckets: Vec<Vec<Entry<K, V>>>,
     random: u64,
@@ -23,7 +29,7 @@ pub struct HashMap<K, V> {
 
 impl<K: Hash + Eq, V> HashMap<K, V> {
     pub fn new() -> HashMap<K, V> {
-        HashMap::<_, _>::new_with(0.75)
+        HashMap::<K, V>::new_with(0.75)
     }
 
     pub fn new_with(load_factor: f32) -> HashMap<K, V> {

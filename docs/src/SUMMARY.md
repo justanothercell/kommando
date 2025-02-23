@@ -27,6 +27,8 @@
         - [Pointers](./lang/primitives/pointers.md)
     - [Structs](./lang/structs.md)
     - [Functions](./lang/functions.md)
+    - [RAII](./lang/raii/raii.md)
+        - [Move](./lang/raii/move.md)
 - [Api](./api/api.md)
     - [Vectors](./api/vec.md)
     - [Slices](./api/slice.md)

@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "lib.h"
+#include "lib/list.h"
 #include "resolver.h"
 LIB;
 #include "module.h"
@@ -131,6 +132,49 @@ void fprint_typevalue(FILE* file, TypeValue* tval) {
         list_foreach(&tval->generics->generics, i, TypeValue* generic, {
             if (i > 0) fprintf(file, ", ");
             fprint_typevalue(file, generic);
+        });
+        fputc('>', file);   
+    }
+}
+
+void fprint_full_typevalue(FILE* file, TypeValue* tval) {
+    if (tval == NULL) {
+        fprintf(file, "(null)");
+        return;
+    }
+    bool has_impls = map_size(tval->trait_impls) > 0 || (tval->def != NULL && tval->def->traits.length > 0);
+    if (has_impls) fprintf(file, "{");
+    if (tval->def != NULL && tval->def->module != NULL) {
+        fprint_path(file, tval->def->module->path);
+        fprintf(file, "::%s", tval->def->name->name);
+    } else{
+        fprint_path(file, tval->name);        
+    }
+    if (has_impls) {
+        fprintf(file, ": ");
+        bool first = true;
+        map_foreach(tval->trait_impls, str key, ImplBlock* impl, {
+            UNUSED(key);
+            if (!first) fprintf(file, " + ");
+            fprint_path(file, impl->trait->module->path);
+            fprintf(file, "::%s", impl->trait->name->name);
+            first = false;
+        });
+        if (tval->def != NULL) {
+            list_foreach(&tval->def->traits, i, TraitDef* trait, {
+                if (i > 0) fprintf(file, " + ");
+                fprint_path(file, trait->module->path);
+                fprintf(file, "::%s", trait->name->name);
+                first = false;
+            });
+        }
+        if (has_impls) fprintf(file, "}");
+    }
+    if (tval->generics != NULL && tval->generics->generics.length > 0) {
+        fputc('<', file);
+        list_foreach(&tval->generics->generics, i, TypeValue* generic, {
+            if (i > 0) fprintf(file, ", ");
+            fprint_full_typevalue(file, generic);
         });
         fputc('>', file);   
     }

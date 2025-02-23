@@ -31,7 +31,7 @@ impl<T> Option<T> {
 
     pub fn to_result<E>(self: Option<T>, error: E) -> Result<T, E> {
         if self.exists {
-            Result::<_, _>::ok(std::mem::replace(&self.value.item, std::mem::uninit()))
+            Result::<_, _>::ok(self.value.take())
         } else {
             Result::<_, _>::err(error)
         }
@@ -39,7 +39,7 @@ impl<T> Option<T> {
 
     pub fn unwrap(self: Option<T>) -> T {
         if self.exists {
-            std::mem::replace(&self.value.item, std::mem::uninit())
+            self.value.take()
         } else {
             panic("Unwrapping empty option")
         }
@@ -47,7 +47,7 @@ impl<T> Option<T> {
 
     pub fn unwrap_or(self: Option<T>, fallback: T) -> T {
         if self.exists {
-            std::mem::replace(&self.value.item, std::mem::uninit())
+            self.value.take()
         } else {
             fallback
         }
@@ -55,7 +55,7 @@ impl<T> Option<T> {
 
     pub fn expect(self: Option<T>, error: c_str) -> T {
         if self.exists {
-            std::mem::replace(&self.value.item, std::mem::uninit())
+            self.value.take()
         } else {
             panic(format("Unwrapping empty option: $", error.dyn_fmt()))
         }
@@ -74,7 +74,7 @@ impl<T> Option<T> {
     pub fn take(self: ptr<Option<T>>) -> T {
         if self.exists {
             self.exists = false;
-            std::mem::replace(&self.value.item, std::mem::uninit())
+            self.value.take()
         } else {
             panic("ERROR: Cannot take value out of empty option\n")
         }
@@ -83,7 +83,7 @@ impl<T> Option<T> {
     pub fn try_take(self: ptr<Option<T>>) -> Option<T> {
         if self.exists {
             self.exists = false;
-            Option::<_>::some(std::mem::replace(&self.value.item, std::mem::uninit()))
+            Option::<_>::some(self.value.take())
         } else {
             self.exists = false;
             Option::<_>::none()
@@ -92,7 +92,7 @@ impl<T> Option<T> {
 
     pub fn as_ref(self: ptr<Option<T>>) -> Option<ptr<T>> {
         if self.exists {
-            Option::<_>::some(&self.value.item)
+            Option::<_>::some(self.value.ref())
         } else {
             Option::<_>::none()
         }
@@ -105,7 +105,7 @@ impl<T: Fmt> Option<T>: Fmt {
     }
     fn fmt(self: ptr<Option<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
         if self.exists {
-            stream.write_str("some(").write(fmt, &self.value.item).write_str(")");
+            stream.write_str("some(").write(fmt, self.value.ref()).write_str(")");
         } else {
             stream.write_str("none");
         }

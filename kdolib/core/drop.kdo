@@ -1,4 +1,9 @@
 use core::types::*;
+use core::copy::Copy;
+use core::clone::Clone;
+
+#[extern]
+fn alloca(size: usize) -> raw_ptr;
 
 pub trait T: Drop {
     fn drop(self: ptr<T>);
@@ -6,4 +11,58 @@ pub trait T: Drop {
 
 pub struct Raw<T> {
     item: T
+}
+
+impl<T> Raw<T> {
+
+}
+
+impl<T> Raw<T> {
+    // WARNING: this will drop returned value once it goes out of scope
+    pub fn replace(self: ptr<Raw<T>>, new: T) -> T {
+        let old: T = $"((@![Raw<T>]*)$![self])->item"; // take out of struct, `item` is now invalid copy
+        $"((@![Raw<T>]*)$![self])->item = $![new]"; // insert new item, replaced invalid item does not get dropped
+        old // return valid old item
+    }
+
+    // WARNING: this will invalidate the current object and the returned object will be dropped once it goes out of scope.
+    // Taking the item a second time or using the value replace yields (or not forgetting that value) without putting something in first is UB
+    pub fn take(self: ptr<Raw<T>>) -> T {
+        let new_raw = alloca(core::intrinsics::sizeof::<T>());
+        let new: ptr<T> = core::intrinsics::typecast(new_raw);
+        self.replace(*new)
+    }
+
+    // WARNING: this will forget the old item without running destructors
+    pub fn put(self: ptr<Raw<T>>, new: T) {
+        let old = self.replace(new);
+        core::intrinsics::forget(old);
+    }
+
+    // alias for take, see warnigns there
+    pub fn drop_manually(self: ptr<Raw<T>>) {
+        self.take();
+    }
+
+    pub fn ref(self: ptr<Raw<T>>) -> ptr<T> {
+        &self.item
+    }
+}
+
+impl<T: Copy> Raw<T> {
+    pub fn get(self: ptr<Raw<T>>) -> T {
+        self.item
+    }
+}
+
+impl<T: Clone> Raw<T> {
+    pub fn cloned(self: ptr<Raw<T>>) -> T {
+        self.item.clone()
+    }
+}
+
+impl<T: Clone> Raw<T>: Clone {
+    pub fn clone(self: ptr<Raw<T>>) -> Raw<T> {
+        _ { item: self.item.clone() }
+    }
 }

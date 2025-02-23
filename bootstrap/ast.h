@@ -116,6 +116,7 @@ typedef struct TypeValue {
     Map* trait_impls;
 } TypeValue;
 void fprint_typevalue(FILE* file, TypeValue* tval);
+void fprint_full_typevalue(FILE* file, TypeValue* tval);
 
 typedef struct VarBox VarBox;
 typedef struct Global Global;
@@ -166,7 +167,6 @@ void fprint_expression(FILE* file, Expression* expression);
 LIST(ExpressionList, Expression*);
 
 ENUM(VarState,
-    VS_GLOBAL_NONCOPY,
     VS_COPY,
     VS_NONCOPY,
     VS_MOVED,
@@ -180,9 +180,14 @@ typedef struct VarBox {
     TypeValue* ty;
     ModuleItem* mi;
     GenericValues* values;
-    VarState state;
-    Span moved_here;
+    usize stack_index;
+    bool is_copy;
 } VarBox;
+typedef struct StackVar {
+    VarState state;
+    Span moved_at;
+    VarBox* var;
+} StackVar;
 LIST(VariableList, Variable*);
 
 typedef struct CIntrinsic {
