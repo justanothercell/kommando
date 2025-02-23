@@ -13,7 +13,7 @@
 > [!NOTE]
 > Switch to `dev` branch for the most up-to-date version
 
-> Take a look at the online [Sandbox](http://callie.cat) and the [docs](http://callie.cat/docs)
+> Take a look at the online [Sandbox](https://callie.cat) and the [docs](http://callie.cat/docs)
 
 ## Quickstart
 ```sh
