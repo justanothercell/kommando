@@ -11,7 +11,7 @@
 |  | \\_/\_|| \| || || |_|_| |\_|   |__| || |\_||_|| |\_||__     \___[_[_]__]___|
 ```
 
-> Take a look at the online [Sandbox](http://callie.cat) and the [docs](http://callie.cat/docs)
+> Take a look at the online [Sandbox](https://callie.cat) and the [docs](http://callie.cat/docs)
 
 ## Quickstart
 ```sh
