@@ -89,7 +89,7 @@ TypeDef* parse_struct(TokenStream* stream) {
             TypeValue* tv = parse_type_value(stream);
             if (map_contains(fields, field_name->name)) spanned_error("Duplicate field name", field_name->span, "field with name %s already exists in struct %s", field_name->name, name->name);
             Field* field = malloc(sizeof(Field));
-            field->name = name;
+            field->name = field_name;
             field->type = tv;
             map_put(fields, field_name->name, field);
             list_append(&flist, field_name);
@@ -554,6 +554,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
                 Expression* otherwise = parse_expresslet(stream, true);
                 if (otherwise->type != EXPR_CONDITIONAL) spanned_error("Invalid continuation of else", otherwise->span, "Expected `else if ... { ... }`, got %s", ExprType__NAMES[otherwise->type]);
                 conditional->otherwise = malloc(sizeof(Block));
+                conditional->otherwise->dropped =list_new(VarBoxList);
                 conditional->otherwise->span = otherwise->span;
                 conditional->otherwise->expressions = list_new(ExpressionList);
                 list_append(&conditional->otherwise->expressions, otherwise);
@@ -975,6 +976,7 @@ empty: {}
     block->expressions = expressions;
     block->yield_last = yield_last;
     block->span = from_points(&start, &end);
+    block->dropped = list_new(VarBoxList);
     return block;
 }
 

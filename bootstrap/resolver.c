@@ -1722,7 +1722,13 @@ void resolve_block(Program* program, CompilerOptions* options, FuncDef* func, Bl
     
     finish_tvbox(program, options, yield_ty, func);
     
-    vars->length = restore_len;
+    while (vars->length > restore_len) {
+        vars->length -= 1;
+        StackVar last = vars->elements[vars->length];
+        if (last.state == VS_NONCOPY) { // not copy but also not moved -> need to drop
+            list_append(&block->dropped, last.var);
+        }
+    }
 }
 
 void resolve_generic_keys(Program* program, CompilerOptions* options, Module* module, GenericKeys* keys, GenericKeys* trait_keys, GenericKeys* func_generics, GenericKeys* type_generics) {
@@ -1930,6 +1936,22 @@ void resolve_impl_head(Program* program, CompilerOptions* options, ImplBlock* im
     }));
 }
 void resolve_impl_body(Program* program, CompilerOptions* options, ImplBlock* impl) {
+    // we are implementing the copy trait
+    if (impl->trait == program->raii.copy) {
+        // no tan extern type
+        if (impl->type->def->fields != NULL) {
+            map_foreach(impl->type->def->fields, str name, Field* field, {
+                TypeValue* field_ty = replace_generic(program, options, field->type, impl->type->generics, NULL, NULL, NULL);
+                if (!map_contains(field_ty->trait_impls, program->raii.copy_key) && !list_contains(&field_ty->def->traits, i, TraitDef* trait, trait == program->raii.copy)) {
+                    spanned_error("Copy type with noncopy field", field->name->span, 
+                    "Trying to implement core::copy::Copy on %s,\nbut field %s: %s is not Copy.\nFull impl type: %s\nFull impl field type: %s",
+                    to_str_writer(s, fprint_typevalue(s, impl->type)), name, to_str_writer(s, fprint_typevalue(s, field_ty)),
+                    to_str_writer(s, fprint_full_typevalue(s, impl->type)), to_str_writer(s, fprint_full_typevalue(s, field_ty)));
+                }
+            });
+        }
+    }
+
     map_foreach(impl->methods, str name, ModuleItem* mi, ({
         UNUSED(name);
         switch (mi->type) {

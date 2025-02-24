@@ -13,9 +13,7 @@ pub struct Raw<T> {
     item: T
 }
 
-impl<T> Raw<T> {
-
-}
+impl<T: Copy> Raw<T>: Copy {}
 
 impl<T> Raw<T> {
     // WARNING: this will drop returned value once it goes out of scope

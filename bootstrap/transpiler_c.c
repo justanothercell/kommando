@@ -301,6 +301,10 @@ str gen_c_static_name(Global* s) {
     return name;
 }
 
+str gen_c_varbox_name(VarBox* box) {
+    return to_str_writer(stream, fprintf(stream,"%s%llx", box->name, box->id));
+}
+
 str gen_c_var_name(Program* program, CompilerOptions* options, Variable* v, GenericValues* type_generics, GenericValues* func_generics) {
     if (v->global_ref != NULL) {
         if (v->global_ref->constant) {
@@ -313,7 +317,7 @@ str gen_c_var_name(Program* program, CompilerOptions* options, Variable* v, Gene
         return gen_c_static_name(v->global_ref);
     }
     if (v->box->name != NULL) {
-        return to_str_writer(stream, fprintf(stream,"%s%llx", v->box->name, v->box->id));
+        return gen_c_varbox_name(v->box);
     } else {
         if (v->method_name != NULL) {
             FuncDef* func = v->box->mi->item;
@@ -351,6 +355,10 @@ void reset_temp_context() {
 }
 str gen_temp_c_name(str name) {
     return to_str_writer(stream, fprintf(stream, "%s%lxt", name, TEMP_COUNTER++));
+}
+
+void transpile_drop(Program* program, CompilerOptions* options, FILE* code_stream, FuncDef* func, GenericValues* type_generics, GenericValues* func_generics, TypeValue* generic_type, str c_object) {
+    
 }
 
 void transpile_block(Program* program, CompilerOptions* options, FILE* code_stream, FuncDef* func, GenericValues* type_generics, GenericValues* func_generics, Block* block, str return_var, bool pass_ref, str continue_label, str break_label);
@@ -895,6 +903,10 @@ void transpile_block(Program* program, CompilerOptions* options, FILE* code_stre
         } else {
             transpile_expression(program, options, code_stream, func, type_generics, func_generics, expr, NULL, false, continue_label, break_label);
         }
+    });
+    list_foreach(&block->dropped, i, VarBox* var, {
+        str c_name = gen_c_varbox_name(var);
+        transpile_drop(program, options, code_stream, func, type_generics, func_generics, var->resolved->type, c_name);
     });
 }
 

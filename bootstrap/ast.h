@@ -189,6 +189,7 @@ typedef struct StackVar {
     VarBox* var;
 } StackVar;
 LIST(VariableList, Variable*);
+LIST(VarBoxList, VarBox*);
 
 typedef struct CIntrinsic {
     TypeValueList type_bindings;
@@ -247,6 +248,7 @@ typedef struct Block {
     bool yield_last;
     Span span;
     TypeValue* res;
+    VarBoxList dropped;
 } Block;
 
 typedef struct FieldAccess {
