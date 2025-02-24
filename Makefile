@@ -29,12 +29,24 @@ compile:
 	./kommando $(shell ./kdolib/link) $$name.kdo $$name -c $(flags)
 
 help:
+	@if [ ! -f ./kommando ]; then \
+		make --no-print-directory build; \
+	fi
 	@./kommando --help
+	@echo Additional make commands:
+	@echo '    make test  <args?>   - test compile examples'
+	@echo '               verbose=1 - show compile errors in test'
+	@echo '               release=1 - run compiler in release mode'
 
 clean_examples:
 	@git clean -fX examples >/dev/null
 
-test: build clean_examples
+test: clean_examples
+	@if [ -v release ]; then \
+		make --no-print-directory build_release; \
+	else \
+		make --no-print-directory build; \
+	fi; \
 	@success=0; \
 	fail=0; \
 	all_files=$$(find ./examples -name "*.kdo"); \
