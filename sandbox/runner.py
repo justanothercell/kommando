@@ -61,7 +61,7 @@ def execute():
         if not os.path.isfile(f'/sandbox/{runner_id}'):
             return { 'success': True, 'output': '\n'.join(output[-1000:]), 'exit_code': exit_code }
         try:
-            run_process = subprocess.run(f'./sandbox{runner_id}', shell=True, cwd='/sandbox', capture_output=True, timeout=TIMEOUT)
+            run_process = subprocess.run(f'/sandbox/{runner_id}', shell=True, cwd='/sandbox', capture_output=True, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             return { 'success': False, 'output': f'Execution timed out after {TIMEOUT}s', 'exit_code': -1 }
         run_exit_code = run_process.returncode
