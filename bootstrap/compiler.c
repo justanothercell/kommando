@@ -39,7 +39,7 @@ CompilerOptions build_args(StrList* args) {
         printf("    --include=path/to/c_header.h (multiple possible)\n");
         printf("The following options are compiler diagnostics:\n");
         printf("    --trace-compiler - trace the compiler on panic\n");
-        printf("    --emit-spans     - Write source references as comments in generated c\n");
+        printf("    --emit-info      - Write source references and other diagnostics as comments in generated c\n");
         printf("    --log-lines      - Include [source.c:line] in console logs\n");
         printf("Using `make` with sensibe defaults:\n");
         printf("make run file=<infile> flags=\"<optional compiler flags>\"\n");
@@ -55,7 +55,7 @@ CompilerOptions build_args(StrList* args) {
     options.compile = false;
     options.run = false;
     options.static_links = false;
-    options.emit_spans = false;
+    options.emit_info = false;
     options.package_names = list_new(StrList);
     options.c_headers = list_new(StrList);
     options.packages = map_new();
@@ -75,8 +75,8 @@ CompilerOptions build_args(StrList* args) {
                 TRACE_ON_PANIC = true;
             } else if (str_eq(arg, "log-lines")) {
                 LOG_LINES = true;
-            } else if (str_eq(arg, "emit-spans")) {
-                options.emit_spans = true;
+            } else if (str_eq(arg, "emit-info")) {
+                options.emit_info = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
             } else if (str_eq(arg, "silent")) {
@@ -244,13 +244,26 @@ void compile(CompilerOptions options) {
 
     if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "TRANSPILER" ANSI_RESET_SEQUENCE, "Transpiling to c code...");
     str code_file_name = to_str_writer(stream, fprintf(stream, "%s.c", options.outname));
-    str header_file_name = to_str_writer(stream, fprintf(stream, "%s.h", options.outname));
+    str type_h_file_name = to_str_writer(stream, fprintf(stream, "%s_t.h", options.outname));
+    str object_h_file_name = to_str_writer(stream, fprintf(stream, "%s_o.h", options.outname));
     FILE* code_file = fopen(code_file_name, "w");
-    FILE* header_file = fopen(header_file_name, "w");
-    transpile_to_c(program, &options, header_file, code_file, header_file_name);
-    fclose(header_file);
+    FILE* type_h_file = fopen(type_h_file_name, "w");
+    FILE* object_h_file = fopen(object_h_file_name, "w");
+    str base_name = options.outname;
+    usize i = strlen(base_name);
+    while (i > 0) {
+        if (base_name[i] == '/' || base_name[i] == '\\') {
+            i += 1;
+            break;
+        }
+        i -= 1;
+    }
+    transpile_to_c(program, &options, type_h_file, object_h_file, code_file, base_name + i);
     fclose(code_file);
+    fclose(type_h_file);
+    fclose(object_h_file);
 
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "TRANSPILER" ANSI_RESET_SEQUENCE, "Transpiled %lld type and %lld function instances", program->t.type_queue.length, program->t.func_queue.length);
     if (options.verbosity >= 1) report_item_cache_stats();
 
     if (options.compile) {

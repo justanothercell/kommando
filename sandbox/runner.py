@@ -84,7 +84,11 @@ def execute():
         except OSError:
             pass
         try:
-            os.remove(f'/sandbox/{runner_id}.h')
+            os.remove(f'/sandbox/{runner_id}_t.h')
+        except OSError:
+            pass
+        try:
+            os.remove(f'/sandbox/{runner_id}_o.h')
         except OSError:
             pass
 

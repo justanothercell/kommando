@@ -79,7 +79,6 @@ void fprint_type(FILE* file, TypeDef* def);
 typedef struct TraitBound {
     TypeValue* bound;
     TraitDef* resolved;
-    Map* func_val_instances;
 } TraitBound;
 LIST(TraitBoundList, TraitBound*);
 typedef struct GKey {
@@ -91,8 +90,6 @@ typedef struct GenericKeys {
     Span span;
     GKeyList generics;
     Map* resolved;
-    StrList* generic_use_keys;
-    Map* generic_uses;
 } GenericKeys;
 void fprint_generic_keys(FILE* file, GenericKeys* keys);
 

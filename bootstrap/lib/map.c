@@ -4,6 +4,9 @@
 #include "../lib.h"
 LIB;
 
+int DUMMY = 0;
+void* DUMMY_ITEM = &DUMMY;
+
 Map* map_new() {
     Map* map = malloc(sizeof(Map));
     map->buckets = list_new(BucketList);
@@ -27,6 +30,13 @@ usize map_size(Map* map) {
         size += map->buckets.elements[i].length;
     }
     return size;
+}
+
+void map_free(Map* map) {
+    for(usize i = 0;i < map->buckets.length;i++) {
+        free(map->buckets.elements[i].elements);
+    }
+    free(map->buckets.elements);
 }
 
 bool map_contains(Map* map, str key) {

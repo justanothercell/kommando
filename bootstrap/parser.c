@@ -157,9 +157,6 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         func->impl_block = impl;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
-            func->generics->generic_use_keys = malloc(sizeof(StrList));
-            *func->generics->generic_use_keys = list_new(StrList);
-            func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
             func->generics->generics = list_new(GKeyList);
             func->generics->span = func->name->span;
@@ -167,9 +164,6 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
         if (impl->generics != NULL) {
             func->type_generics = malloc(sizeof(GenericKeys));
             func->type_generics->span = impl->generics->span;
-            func->type_generics->generic_use_keys = malloc(sizeof(StrList));
-            *func->type_generics->generic_use_keys = list_new(StrList);
-            func->type_generics->generic_uses = map_new();
             func->type_generics->resolved = map_new();
             func->type_generics->generics = list_new(GKeyList);
             list_foreach(&impl->generics->generics, i, GKey* key, { list_append(&func->type_generics->generics, key); });
@@ -208,7 +202,6 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     TraitBound* bound = malloc(sizeof(TraitBound));
     bound->bound = selfbound;
     bound->resolved = NULL;
-    bound->func_val_instances = map_new();
     list_append(&trait->self_key->bounds, bound);
     t = peek_next_token(stream);
     trait->keys = NULL;
@@ -216,9 +209,6 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
         trait->keys = parse_generic_keys(stream);
     } else {
         trait->keys = malloc(sizeof(GenericKeys));
-        trait->keys->generic_use_keys = malloc(sizeof(StrList));
-        *trait->keys->generic_use_keys = list_new(StrList);
-        trait->keys->generic_uses = map_new();
         trait->keys->resolved = map_new();
         trait->keys->generics = list_new(GKeyList);
         trait->keys->span = trait->name->span;
@@ -265,9 +255,6 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
         func->impl_block = NULL;
         if (func->generics == NULL) {
             func->generics = malloc(sizeof(GenericKeys));
-            func->generics->generic_use_keys = malloc(sizeof(StrList));
-            *func->generics->generic_use_keys = list_new(StrList);
-            func->generics->generic_uses = map_new();
             func->generics->resolved = map_new();
             func->generics->generics = list_new(GKeyList);
             func->generics->span = func->name->span;
@@ -1000,7 +987,6 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
                     TraitBound* tb = malloc(sizeof(TraitBound));
                     tb->bound = bound;
                     tb->resolved = NULL;
-                    tb->func_val_instances = map_new();
                     list_append(&gkey->bounds, tb);
                     t = next_token(stream);
                     if (!token_compare(t, "+", SNOWFLAKE)) {
@@ -1018,9 +1004,6 @@ GenericKeys* parse_generic_keys(TokenStream* stream) {
     keys->generics = generics;
     keys->span = from_points(&left, &right);
     keys->resolved = map_new();
-    keys->generic_uses = map_new();
-    keys->generic_use_keys = malloc(sizeof(StrList));
-    *keys->generic_use_keys = list_new(StrList);
     return keys;
 }
 

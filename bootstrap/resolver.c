@@ -208,23 +208,8 @@ static ModuleItem* resolve_item_raw(Program* program, CompilerOptions* options, 
     return result;
 }
 
-// this key is at some point instanciated with these values
-// for example: 
-//             Foo  <i32>              <T> (of Foo)            
-//    register_item(tv->generics, NULL, tv->def->generics);
-void register_item(Program* program, CompilerOptions* options, GenericValues* type_values, GenericValues* func_values, GenericKeys* tvs_keys, GenericKeys* fvs_keys, GenericKeys* gkeys) {
+void validate_item(Program* program, CompilerOptions* options, GenericValues* type_values, GenericValues* func_values, GenericKeys* tvs_keys, GenericKeys* fvs_keys, GenericKeys* gkeys) {
     if (gkeys == NULL) return;
-    // no need to register if we are not generic - we just compile the one default nongeneric variant in that case
-    if (type_values != NULL || func_values != NULL) {
-        str key = tfvals_to_key(type_values, func_values);
-        if (!map_contains(gkeys->generic_uses, key)) {
-            GenericUse* use = malloc(sizeof(GenericUse));
-            use->type_context = type_values;
-            use->func_context = func_values;
-            map_put(gkeys->generic_uses, key, use);
-            list_append(gkeys->generic_use_keys, key);
-        }
-    }
     if (type_values != NULL) {
         if (tvs_keys != NULL && type_values->generics.length != tvs_keys->generics.length) unreachable("Compiler error: keys and values length doesnt match: %s @ %s and %s @ %s",
             to_str_writer(s, fprint_generic_keys(s, tvs_keys)), to_str_writer(s, fprint_span(s, &tvs_keys->span)),
@@ -245,18 +230,8 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
                     }
                 }
-                map_foreach(bound->resolved->methods, str name, ModuleItem* mi, {
-                    FuncDef* instance_method = resolve_method_instance(program, options, v, mi->name, true);
-                    if (!instance_method->body_resolved) resolve_funcdef_body(program, options, instance_method);
-                    Map* instances = map_get(bound->func_val_instances, name);
-                    if (instances == NULL) continue;
-                    map_foreach(instances, str key, GenericValues* values, {
-                        UNUSED(key);
-                        register_item(program, options, v->generics, values, v->def->generics, instance_method->generics, instance_method->generics);
-                    });
-                });
             });
-            register_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics); 
+            validate_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics); 
         });
     }
 
@@ -280,18 +255,8 @@ void register_item(Program* program, CompilerOptions* options, GenericValues* ty
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
                     }
                 }
-                map_foreach(bound->resolved->methods, str name, ModuleItem* mi, {
-                    FuncDef* instance_method = resolve_method_instance(program, options, v, mi->name, true);
-                    if (!instance_method->body_resolved) resolve_funcdef_body(program, options, instance_method);
-                    Map* instances = map_get(bound->func_val_instances, name);
-                    if (instances == NULL) continue;
-                    map_foreach(instances, str key, GenericValues* values, {
-                        UNUSED(key);
-                        register_item(program, options, v->generics, values, v->def->generics, instance_method->generics, instance_method->generics);
-                    });
-                });
             });
-            register_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics); 
+            validate_item(program, options, v->generics, NULL, v->def->generics, NULL, v->def->generics); 
         });
     }
 }
@@ -304,7 +269,7 @@ static usize ITEM_CACHE_MISSES = 0;
 static_assert(HOT_CACHE_SIZE > 0, "HOT_CACHE_SIZE has to be greater than zero");
 static_assert(COLD_CACHE_SIZE > 0, "COLD_CACHE_SIZE has to be greater than zero");
 void report_item_cache_stats() {
-    log("Item cache hot hits: %llu cold hits: %llu misses: %llu", ITEM_CACHE_HOT_HITS, ITEM_CACHE_COLD_HITS, ITEM_CACHE_MISSES);
+    info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "CACHE" ANSI_RESET_SEQUENCE, "Hot hits: %llu | Cold hits: %llu | Misses: %llu", ITEM_CACHE_HOT_HITS, ITEM_CACHE_COLD_HITS, ITEM_CACHE_MISSES);
 }
 void* resolve_item(Program* program, CompilerOptions* options, Module* module, Path* path, ModuleItemType kind, GenericKeys* func_generics, GenericKeys* type_generics, GenericValues** gvalsref) {
     typedef struct {
@@ -603,16 +568,12 @@ static void find_variable(Program* program, CompilerOptions* options, Module* mo
             bool found = false;
             list_find_map(&tv->def->key->bounds, i, TraitBound** bound_ref, (*bound_ref)->resolved == method->trait, {
                 found = true;
-                TraitBound* bound = *bound_ref;
-                if (!map_contains(bound->func_val_instances, method->name->name)) map_put(bound->func_val_instances, method->name->name, map_new());
-                Map* instances = map_get(bound->func_val_instances, method->name->name);
-                str key = gvals_to_key(var->method_values);
-                if (!map_contains(instances, key)) map_put(instances, key, var->method_values);
+                break;
             });
             if (!found) panic("Compiler error: trait not found");
         } else {
-            register_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->generics);
-            register_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->type_generics);
+            validate_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->generics);
+            validate_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->type_generics);
         }
         return;
     }
@@ -632,7 +593,7 @@ static void find_variable(Program* program, CompilerOptions* options, Module* mo
             tv->generics->generics.elements[0] = ret;
             box->resolved = malloc(sizeof(TVBox));
             box->resolved->type = tv;
-            register_item(program, options, NULL, var->values, NULL, func->generics, func->generics);
+            validate_item(program, options, NULL, var->values, NULL, func->generics, func->generics);
             box->is_copy = true;
         } break;
         case MIT_STATIC: {
@@ -719,6 +680,7 @@ TypeValue* replace_generic(Program* program, CompilerOptions* options, TypeValue
             list_append(&clone->generics->generics, val);
             map_put(clone->generics->resolved, real_key, val);
         });
+        map_free(rev);
         tv_apply_traits(program, options, clone);
         return clone;
     }
@@ -1013,7 +975,7 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
 }
 
 void finish_tvbox(Program* program, CompilerOptions* options, TVBox* box, FuncDef* ctx) {
-    register_item(program, options, box->type->generics, NULL, box->type->def->generics, NULL, box->type->def->generics);
+    validate_item(program, options, box->type->generics, NULL, box->type->def->generics, NULL, box->type->def->generics);
 }
 
 void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Expression* expr, VarList* vars, TVBox* t_return, bool asref) {
@@ -1078,7 +1040,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
 
             TypeValue* ret = replace_generic(program, options, fd->return_type, NULL, fc->generics, NULL, NULL);
             fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ret);
-            register_item(program, options, NULL, fc->generics, NULL, fd->generics, fd->generics);
+            validate_item(program, options, NULL, fc->generics, NULL, fd->generics, fd->generics);
         } break;
         case EXPR_METHOD_CALL: {
             MethodCall* call = expr->expr;
@@ -1191,16 +1153,12 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                 bool found = false;
                 list_find_map(&called_type->def->key->bounds, i, TraitBound** bound_ref, (*bound_ref)->resolved == method->trait, {
                     found = true;
-                    TraitBound* bound = *bound_ref;
-                    if (!map_contains(bound->func_val_instances, method->name->name)) map_put(bound->func_val_instances, method->name->name, map_new());
-                    Map* instances = map_get(bound->func_val_instances, method->name->name);
-                    str key = gvals_to_key(call->generics);
-                    if (!map_contains(instances, key)) map_put(instances, key, call->generics);
+                    break;
                 });
                 if (!found) panic("Compiler error: trait not found");
             } else {
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics);    
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics);    
+                validate_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics);    
+                validate_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics);    
             }
         } break;
         case EXPR_STATIC_METHOD_CALL: {
@@ -1268,16 +1226,12 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                 bool found = false;
                 list_find_map(&call->tv->def->key->bounds, i, TraitBound** bound_ref, (*bound_ref)->resolved == method->trait, {
                     found = true;
-                    TraitBound* bound = *bound_ref;
-                    if (!map_contains(bound->func_val_instances, method->name->name)) map_put(bound->func_val_instances, method->name->name, map_new());
-                    Map* instances = map_get(bound->func_val_instances, method->name->name);
-                    str key = gvals_to_key(call->generics);
-                    if (!map_contains(instances, key)) map_put(instances, key, call->generics);
+                    break;
                 });
                 if (!found) panic("Compiler error: trait not found");
             } else {
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics);  
-                register_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics);  
+                validate_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->generics);  
+                validate_item(program, options, type_call_vals, call->generics, call->def->type_generics, call->def->generics, call->def->type_generics);  
             }
         } break;
         case EXPR_DYN_RAW_CALL: {
@@ -1590,7 +1544,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                 spanned_error("Field not initialized", expr->span, "Field '%s' of struct %s was not initialized", key, type->name->name);
             });
         
-            register_item(program, options, slit->type->generics, NULL, type->generics, NULL, type->generics);        
+            validate_item(program, options, slit->type->generics, NULL, type->generics, NULL, type->generics);        
         } break;
         case EXPR_C_INTRINSIC: {
             CIntrinsic* ci = expr->expr;

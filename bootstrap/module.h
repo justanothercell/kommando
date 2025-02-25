@@ -64,11 +64,34 @@ typedef struct RaiiData {
     TypeDef* raw;
 } RaiiData;
 
+typedef struct QueuedFunc {
+    str key;
+    FuncDef* func;
+    GenericValues* type_generics;
+    GenericValues* func_generics;
+} QueuedFunc;
+LIST(QFList, QueuedFunc);
+
+typedef struct QueuedType {
+    str key;
+    TypeValue* type;
+} QueuedType;
+LIST(QTList, QueuedType);
+
+typedef struct TranspilerData {
+    Map* type_map;
+    Map* type_done_map;
+    Map* func_map;
+    QTList type_queue;
+    QFList func_queue;
+} TranspilerData;
+
 typedef struct Program {
     Map* packages;
     Module* main_module;
     TraceGen tracegen;
     RaiiData raii;
+    TranspilerData t;
 } Program;
 
 typedef struct CompilerOptions CompilerOptions;
