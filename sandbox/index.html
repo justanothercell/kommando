@@ -110,7 +110,6 @@
                         if (/^\/sandbox\/\w+.kdo$/.test(file)) { // main kdo file
                             parts.push('<a href="#" onclick="event.preventDefault();editor_jump_to([' + loc + ']);" style="color: inherit">' + html_escape(part) + '</a>');
                         } else {
-                            console.log(file);
                             let href = '';
                             let github_prefix = 'https://github.com/justanothercell/kommando/blob/dev/';
                             let github_suffix = '';
