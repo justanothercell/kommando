@@ -42,7 +42,7 @@ app = Flask(__name__)
 
 @app.route('/execute', methods = [ 'POST' ])
 def execute():
-    runner_id = f'{rw.word(include_parts_of_speech=["adjective"])}_{rw.word(include_parts_of_speech=["noun"])}'
+    runner_id = f'{rw.word(include_parts_of_speech=["adjective"])}_{rw.word(include_parts_of_speech=["noun"])}'.replace('-', '_')
     try:
         data = request.json
         if data is None:
