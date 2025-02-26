@@ -115,13 +115,15 @@
                             if (loc.length > 0 && loc[0]) github_suffix = '#L' + loc[0];
                             if (/^\/sandbox\/\w+.c$/.test(file)) { // generated c file, inaccessible
                                 parts.push(html_escape(part));
-                            } else if (/^\/sandbox\/\w+.h$/.test(file)) { // generated c header file(s), inaccessible
                                 continue;
+                            } else if (/^\/sandbox\/\w+.h$/.test(file)) { // generated c header file(s), inaccessible
                                 parts.push(html_escape(part));
                                 continue;
                             } else if (/^\.?\/kdolib.*.kdo$/.test(file)) { // library file
                                 href = github_prefix + file + github_suffix;
-                            } else if (/^\w+(\/\w+)*.c$/.test(file)) { // bootstrap source file
+                            } else if (/^ w+.c$/.test(file)) { // bootstrap short source file
+                                href = github_prefix + 'bootstrap/' + file + github_suffix;
+                            } else if (/^\.?\w+(\/\w+)*.c$/.test(file)) { // bootstrap source file
                                 href = github_prefix + file + github_suffix;
                             } else { // unknown, raw link
                                 parts.push(html_escape(part));
