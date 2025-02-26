@@ -23,6 +23,7 @@
         <div id="header">
             <button id="button-run">Run</button>
             <input type="checkbox" id="show-compiler-output"><label id="show-compiler-output-label">Compiler<br>Output</label>
+            <input type="checkbox" id="generate-artifacts"><label id="generate-artifacts-label">Generate<br>Artifacts</label>
             <input id="compiler-flags" placeholder="compiler flags | try --help for a list of options">
         </div>
         <div id="main">
@@ -72,6 +73,7 @@
             const run_button = document.getElementById('button-run');
             const compiler_flags = document.getElementById('compiler-flags');
             const compiler_output = document.getElementById('show-compiler-output')
+            const artifact_output = document.getElementById('generate-artifacts')
             run_button.onclick = (e) => run();
             const output = document.getElementById('output');
             const ansi_up = new AnsiUp();
@@ -99,7 +101,7 @@
                 editor.focus();
             }
 
-            function linkify_output_text(text) {
+            function linkify_output_text(text, artifacts) {
                 let parts = []
                 for (let part of text.split(/(\.?\/?\w+(?:\/\w+)*\.\w+(?::\d+(?::\d+)?(?:-\d+)?)?)/g)) {
                     if (!part) continue;
@@ -113,13 +115,27 @@
                             let href = '';
                             let github_prefix = 'https://github.com/justanothercell/kommando/blob/dev/';
                             let github_suffix = '';
+                            let viwer_suffix = '';
                             if (loc.length > 0 && loc[0]) github_suffix = '#L' + loc[0];
-                            if (/^\/sandbox\/\w+\.c$/.test(file)) { // generated c file, inaccessible
-                                parts.push(html_escape(part));
-                                continue;
-                            } else if (/^\/sandbox\/\w+.h$/.test(file)) { // generated c header file(s), inaccessible
-                                parts.push(html_escape(part));
-                                continue;
+                            if (loc.length > 0 && loc[0]) viwer_suffix = '#L' + loc[0];
+                            if (loc.length > 1 && loc[1]) viwer_suffix += ':' + loc[1];
+                            if (/^\/sandbox\/\w+\.c$/.test(file)) { // generated c file
+                                let name = file.replace('/sandbox/', '');
+                                console.log(name, artifacts, name in artifacts);
+                                if (artifacts != null && artifacts.includes(name)) {
+                                    href = '/artifacts/' + name + viwer_suffix;
+                                } else {
+                                    parts.push(html_escape(part));
+                                    continue;
+                                }
+                            } else if (/^\/sandbox\/\w+.h$/.test(file)) { // generated c header file(s)
+                                let name = file.replace('/sandbox/', '');
+                                if (artifacts != null && artifacts.includes(name)) {
+                                    href = '/artifacts/' + name + viwer_suffix;
+                                } else {
+                                    parts.push(html_escape(part));
+                                    continue;
+                                }
                             } else if (/^\.\/kdolib(\/\w+)+\.kdo$/.test(file)) { // library file
                                 href = github_prefix + file + github_suffix;
                             } else if (/^\w+\.c$/.test(file)) { // bootstrap short source file
@@ -140,15 +156,15 @@
                 return parts.join('');
             }
 
-            function set_output(text){
+            function set_output(text, artifacts){
                 output.innerHTML = ansi_up.ansi_to_html(text);
                 for (const node of output.childNodes) {
                     if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== "") {
                         let span = document.createElement("span");
-                        span.innerHTML = linkify_output_text(node.textContent);
+                        span.innerHTML = linkify_output_text(node.textContent, artifacts);
                         output.replaceChild(span, node);
                     } else {
-                        node.innerHTML = linkify_output_text(node.textContent);
+                        node.innerHTML = linkify_output_text(node.textContent, artifacts);
                     }
                 }
             }
@@ -160,6 +176,7 @@
                 output.innerHTML = 'Executing...';
                 let flags = compiler_flags.value;
                 let show_output = compiler_output.checked;
+                let artifacts = artifact_output.checked;
                 let code = editor.getValue();
                 let i = 0;
                 let handler = setInterval(() => {
@@ -176,21 +193,39 @@
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ compiler_flags: flags, show_compiler_output: show_output, code: code })
+                    body: JSON.stringify({ 
+                        compiler_flags: flags, 
+                        show_compiler_output: show_output, 
+                        generate_artifacts: artifacts, 
+                        code: code
+                    })
                 })
                 .then((response) => {
                     if (response.status != 200) {
-                        set_output('\x1b[1;37mError executing:\n' + response.statusText + '\x1b[0m');
+                        set_output('\x1b[1;37mError executing:\n' + response.statusText + '\x1b[0m', null);
                         exec_state = 'idle';
                         return;
                     }
                     return response.json()
                 }).then((json) => {
                     if (!json) return;
+                    let artifacts = null;
+                    let artifact_suffix = '';
+                    if ('artifacts' in json && json['artifacts'].length > 0) {
+                        artifacts = json['artifacts'];
+                        artifact_suffix = '\n\nCompilation artifacts:\n'
+                        artifacts.forEach(artifact => {
+                            artifact_suffix += '\x1b[1;37m/sandbox/' + artifact + '\x1b[0m\n';
+                        });
+                    }
                     if (json['success']) {
-                        set_output(json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
+                        set_output(json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m' + artifact_suffix, artifacts);
                     } else {
-                        set_output('\x1b[1;37mCompilation error:\x1b[0m\n' + json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m');
+                        set_output('\x1b[1;37mCompilation error:\x1b[0m\n' + json['output'] + '\n\x1b[1;37mProcess exited with code ' + json['exit_code'] + '\x1b[0m' + artifact_suffix, artifacts);
+                    }
+                    if (artifacts != null) {
+                        output.innerHTML += '<br><br><span>Click to download artifacts</span><br>'
+                        
                     }
                     exec_state = 'idle';
                 }).finally(() => {
@@ -202,18 +237,22 @@
             function load() {
                 let flags = localStorage.getItem('editor.flags');
                 let show_output = localStorage.getItem('editor.show_output');
+                let artifacts = localStorage.getItem('editor.artifacts');
                 let code = localStorage.getItem('editor.code');
                 if (flags != null) compiler_flags.value = flags;
                 if (show_output != null) compiler_output.checked = show_output == 'true';
+                if (artifacts != null) artifact_output.checked = artifacts == 'true';
                 if (code != null) editor.setValue(code);
             }
 
             function save() {
                 let flags = compiler_flags.value;
                 let show_output = compiler_output.checked;
+                let artifacts = artifact_output.checked;
                 let code = editor.getValue();
                 localStorage.setItem('editor.flags', flags);
                 localStorage.setItem('editor.show_output', show_output);
+                localStorage.setItem('editor.artifacts', artifacts);
                 localStorage.setItem('editor.code', code);
             }
 

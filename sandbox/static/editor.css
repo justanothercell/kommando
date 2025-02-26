@@ -100,6 +100,17 @@ h1 {
     font-size: 14px;
 }
 
+#generate-artifacts {
+    margin-right: 10px;
+    margin-left: 10px;
+}
+
+#generate-artifacts-label {
+    font-family: monospace;
+    color: var(--main-text-color);
+    font-size: 14px;
+}
+
 #compiler-flags {
     background: #555555;
     font-family: monospace;
