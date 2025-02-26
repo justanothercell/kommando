@@ -55,7 +55,7 @@ impl<T> Vec<T> {
     pub fn pop(v: ptr<Vec<T>>) -> Option<T> {
         if v.length > 0 {
             v.length -= 1;
-            Option::<_>::some(*std::mem::arr_offset(v.buffer, v.length))
+            Option::<_>::some(std::mem::arr_take_unchecked(v.buffer, v.length))
         } else {
             Option::<_>::none()
         }
@@ -72,17 +72,19 @@ impl<T> Vec<T> {
             );
         };
         v.length -= 1;
-        Option::<_>::some(*std::mem::arr_offset(v.buffer, v.length))
+        Option::<_>::some(std::mem::arr_take_unchecked(v.buffer, v.length))
     }
 
     pub fn remove(v: ptr<Vec<T>>, index: usize) -> Option<T> {
         if index >= v.length {
             return Option::<_>::none();
         };
-        let item = *std::mem::arr_offset(v.buffer, index);
+        let item = std::mem::arr_take_unchecked(v.buffer, index);
         v.length -= 1;
         while index < v.length {
-            *std::mem::arr_offset(v.buffer, index) = *std::mem::arr_offset(v.buffer, index+1);
+            let a = std::mem::arr_offset(v.buffer, index);
+            let b = std::mem::arr_offset(v.buffer, index+1);
+            std::mem::swap(a, b);
             index += 1;
         };
         Option::<_>::some(item)
@@ -162,7 +164,8 @@ impl<T> Vec<T>: Drop {
     fn drop(self: ptr<Vec<T>>) {
         let i = 0usize;
         while i < self.length {
-            std::mem::replace(std::mem::arr_offset(self.buffer, i), std::mem::uninit()); // drops item
+            std::mem::arr_take_unchecked(self.buffer, i); // drops item
+            i += 1;
         };
         std::mem::free(self.buffer);
     }

@@ -31,5 +31,5 @@ fn main() {
     while pies.length < pies.capacity {
         pies.push(math::PIf32 * numcast(pies.length));
     };
-    println("$", pies.dyn_fmt());    
+    println("$", pies.dyn_fmt());
 }

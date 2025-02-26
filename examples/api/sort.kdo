@@ -1,5 +1,6 @@
 use std::*;
 use std::vec::Vec;
+use std::slice::Slice;
 
 fn main() {
     std::error::init_handler();
@@ -27,4 +28,14 @@ fn main() {
         c_api::printf("%02ld. %s\n", i+1, names.get(i).unwrap());
         i += 1;
     };
+
+    c_api::printf("\n");
+
+    let sentence = "the quick brown fox jumps over the lazy dog";
+    c_api::printf("%s\n", sentence);
+    // sentence is readonly since it is a literal - we need to convert it to an owned instance
+    // convert c_str -> Slice<char> -> Vec<char>
+    let sentence = Slice::<_>::from_c_str(sentence).to_vec();
+    sentence.slice().sort();
+    c_api::printf("%s\n", sentence.as_str());
 }

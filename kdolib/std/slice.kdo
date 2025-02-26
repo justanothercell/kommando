@@ -47,25 +47,26 @@ impl<T> Slice<T> {
         if s.length <= 1 {
             return;
         };
-        let pivot = s.get_ref(numcast(c_api::rand64()) % s.length).unwrap();
+        let pivot = std::mem::take_unchecked(s.get_ref(numcast(c_api::rand64()) % s.length).unwrap());
         let a = 0usize;
         let b = s.length - 1;
         let homogeneous = true;
         while a != b {
             let item = s.get_ref(a).unwrap();
-            let r = (comparator)(item, pivot);
+            let r = (comparator)(item, &pivot);
             homogeneous &= r == 0;
-            if r <= 0 { // item is smaller than pivot
+            if r <= 0 { // item is smaller  or equal to pivot
                 a += 1;
-            } else { // item is bigger or equal to pivot
+            } else { // item is bigger than pivot
                 std::mem::swap(item, s.get_ref(b).unwrap());
                 b -= 1;
             }
         };
+        std::mem::forget(pivot);
         if homogeneous {
             return;
         };
-        let left = s.slice_range(0, a);
+        let left = s.slice_range(0, a+1);
         let right = s.slice_range(a, s.length);
         left.sort_with(comparator);
         right.sort_with(comparator);
@@ -118,10 +119,20 @@ impl<T: Copy> Slice<T> {
 }
 
 impl<T: Clone> Slice<T> {
-    pub fn cloned(self: ptr<Slice<T>>) -> Vec<T> {
+    pub fn to_vec(self: ptr<Slice<T>>) -> Vec<T> {
         let cloned = Vec::<T>::new_with(self.length);
         while cloned.length < self.length {
             cloned.push(self.get_ref(cloned.length).unwrap().clone());
+        };
+        cloned
+    }
+}
+
+impl<T: Copy> Slice<T> {
+    pub fn to_vec(self: ptr<Slice<T>>) -> Vec<T> {
+        let cloned = Vec::<T>::new_with(self.length);
+        while cloned.length < self.length {
+            cloned.push(self.get(cloned.length).unwrap());
         };
         cloned
     }

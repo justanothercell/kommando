@@ -193,6 +193,7 @@ typedef struct CIntrinsic {
     VariableList var_bindings;
     UsizeList binding_sizes;
     str c_expr;
+    TypeValue* tv;
 } CIntrinsic;
 
 typedef struct StructFieldLit {

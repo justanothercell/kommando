@@ -1,5 +1,60 @@
-struct Foo { }
+use std::*;
+
+use core::drop::Drop;
+use core::fmt::*;
+
+struct Child { id: i32 }
+
+struct Parent { 
+    fav_child: Child,
+    other_child: Child
+}
+
+impl Parent: Drop {
+    fn drop(self: ptr<Parent>) {
+        println("> Parent dropped");
+    }
+}
+
+impl Child: Drop {
+    fn drop(self: ptr<Child>) {
+        println("> $ dropped", self.dyn_fmt());
+    }
+}
+
+impl Child: Fmt {
+    fn dyn_fmt(self: ptr<Child>) -> DynFmt {
+        _ { object: typecast(self), fmt: Child::<>::fmt }
+    }
+    fn fmt(self: ptr<Child>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write_str("Child [").write(fmt, &self.id).write_str("]");
+    }
+}
+
+fn create_child(id: i32) -> Child {
+    _ { id: id }
+}
+
+fn inspect_child(child: ptr<Child>) {
+    println("inspected $", child.dyn_fmt());
+}
 
 fn main() {
-    let x = Foo { };
+    println("Creating orphans...");
+    Child { id: 0-1 };
+    &Child { id: 0-2 };
+    let child = &&Child { id: 0-3 };
+    inspect_child(&Child { id: 0-4 });
+    println("Returning orphans...");
+    create_child(0-5);
+    let r = create_child(12); // this one is actually held on to!
+    let r2 = &create_child(0-7);
+    println("Creating happy family...");
+    let p = Parent {
+        fav_child: _ { id: 0 },
+        other_child: _ { id: 1 }
+    };
+    println("Replacing favourite child...");
+    p.fav_child = _ { id: 2 }; // this drops the old fav child
+    println("End of function, everything drops...");
 }

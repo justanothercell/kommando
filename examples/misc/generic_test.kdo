@@ -1,4 +1,5 @@
 use core::types::*;
+use core::copy::Copy;
 
 #[extern]
 fn printf(fmt: c_str, ...) -> i32; 
@@ -23,7 +24,7 @@ struct Bar<T> {
 
 }
 
-impl<T> Foo<T> {
+impl<T: Copy> Foo<T> {
     fn x(self: Foo<T>, t: T) -> ptr<T> {
         noop::<W<T>>();
         &t
@@ -33,7 +34,7 @@ impl<T> Foo<T> {
         &Bar::<T> {}.y(t)
     }
 }
-impl<K> Bar<K> {
+impl<K: Copy> Bar<K> {
     fn y(self: Foo<K>, t: ptr<K>) -> K {
         noop::<U<K>>();
         *Foo::<K> {}.x(*t)

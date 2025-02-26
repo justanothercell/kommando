@@ -128,7 +128,7 @@ str tfvals_to_key(GenericValues* type_generics, GenericValues* func_generics) {
     });
 }
 
-static ModuleItem* resolve_item_raw(Program* program, CompilerOptions* options, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
+ModuleItem* resolve_item_raw(Program* program, CompilerOptions* options, Module* module, Path* path, ModuleItemType kind, List* during_imports_mask) {
     Module* context_module = module;
     Identifier* name = path->elements.elements[path->elements.length-1];
     ModuleItem* result;
@@ -430,14 +430,18 @@ static void tv_apply_traits(Program* program, CompilerOptions* options, TypeValu
             map_put(tv->trait_impls, to_str_writer(s, fprintf(s, "%p", impl->trait)), impl);
         }
     });
-    if (map_contains(tv->trait_impls, program->raii.copy_key) && map_contains(tv->trait_impls, program->raii.drop_key)) {
-        ImplBlock* copy = map_get(tv->trait_impls, program->raii.copy_key);
-        ImplBlock* drop = map_get(tv->trait_impls, program->raii.drop_key);
-        spanned_error("Copy and Drop may not be implemented on the same type", tv->name->elements.elements[0]->span, 
-            "\n::core::copy::Copy implemented @ %s\n::core::drop::Drop implemented @ %s\nFull type: %s",
-            to_str_writer(s, fprint_span(s, &copy->type->name->elements.elements[0]->span)), 
-            to_str_writer(s, fprint_span(s, &drop->type->name->elements.elements[0]->span)),
-            to_str_writer(s, fprint_full_typevalue(s, tv)));
+    if (map_contains(tv->trait_impls, program->raii.copy_key)) {
+        if (map_contains(tv->trait_impls, program->raii.drop_key)) {
+            ImplBlock* copy = map_get(tv->trait_impls, program->raii.copy_key);
+            ImplBlock* drop = map_get(tv->trait_impls, program->raii.drop_key);
+            spanned_error("Copy and Drop may not be implemented on the same type", tv->name->elements.elements[0]->span, 
+                "\n::core::copy::Copy implemented for %s @ %s\n::core::drop::Drop implemented for %s @ %s\nFull type: %s",
+                to_str_writer(s, fprint_typevalue(s, copy->type)), 
+                to_str_writer(s, fprint_span(s, &copy->type->name->elements.elements[0]->span)), 
+                to_str_writer(s, fprint_typevalue(s, drop->type)), 
+                to_str_writer(s, fprint_span(s, &drop->type->name->elements.elements[0]->span)),
+                to_str_writer(s, fprint_full_typevalue(s, tv)));
+        }
     }
     if (options->verbosity >= 7) log("applied traits to %s", to_str_writer(s, fprint_full_typevalue(s, tv)));
 }
@@ -900,11 +904,11 @@ void fill_tvbox(Program *program, CompilerOptions* options, Module *module, Span
 static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv) {
     // if (tv->def == NULL || tv->def == impl_tv->def) log("  %s | %s", to_str_writer(s, fprint_full_typevalue(s, tv)), to_str_writer(s, fprint_full_typevalue(s, impl_tv)));
     if (impl_tv->def == NULL) panic("Compiler error: unresolved type (impl)");
-    if (impl_tv->def->module != NULL && tv->def->module == NULL) return false; // concrete given, we have generic -> that doesn't work!
     if (impl_tv->def->traits.length == 0) {
         if (impl_tv->def->module == NULL) return true;
         if (tv->def == NULL && tv->name->elements.length == 1 && str_eq(tv->name->elements.elements[0]->name, "_")) return true;
     }
+    if (impl_tv->def->module != NULL && tv->def->module == NULL) return false; // concrete given, we have generic -> that doesn't work!
     if (tv->def == NULL && tv->name->elements.length == 1 && str_eq(tv->name->elements.elements[0]->name, "_")) return false;
     if (tv->def == NULL) panic("Compiler error: unresolved type");
     if (impl_tv->def->module != NULL && tv->def->module != NULL && tv->def != impl_tv->def) return false; // concrete types and a mismatch!
@@ -1282,16 +1286,16 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
             Variable* var = expr->expr;
             find_variable(program, options, func->module, vars, var, func->generics, func->type_generics);
             fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, var->box->resolved->type);
-            if (!asref) { // if it's a ref we do not need to check
-                if(!var->box->is_copy) {
-                    if (var->global_ref != NULL) {
-                        spanned_error("Moving global", var->global_ref->name->span, "Cannot move global variable of type %s @ %s.\nTry implementing core::copy::Copy or taking a reference instead of moving", to_str_writer(s, fprint_typevalue(s, var->box->resolved->type)), to_str_writer(s, fprint_span(s, &var->box->resolved->type->name->elements.elements[0]->span)));
-                    } else {
-                        StackVar* sv = &vars->elements[var->box->stack_index];
-                        switch (sv->state) {
+            if(!var->box->is_copy) {
+                if (var->global_ref != NULL && !asref) {
+                    spanned_error("Moving global", var->global_ref->name->span, "Cannot move global variable of type %s @ %s.\nTry implementing core::copy::Copy or taking a reference instead of moving", to_str_writer(s, fprint_typevalue(s, var->box->resolved->type)), to_str_writer(s, fprint_span(s, &var->box->resolved->type->name->elements.elements[0]->span)));
+                } else {
+                    StackVar* sv = &vars->elements[var->box->stack_index];
+                    switch (sv->state) {
                         case VS_COPY: { // pass - can be copied
-                    } break;
+                        } break;
                         case VS_NONCOPY: {
+                            if (asref) break;
                             // declared outside while loop
                             if (var->box->stack_index < vars->loop_index) {
                                 if (vars->return_flag || vars->break_flag) {
@@ -1307,7 +1311,6 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                         case VS_MOVED: {
                             spanned_error("Accessing moved variable", sv->moved_at, "This variable of type %s @ %s was alread moved here.\nTry implementing core::copy::Copy or taking a reference instead of moving", to_str_writer(s, fprint_typevalue(s, var->box->resolved->type)), to_str_writer(s, fprint_span(s, &var->box->resolved->type->name->elements.elements[0]->span)));
                         } break;
-                        }
                     }
                 }
             }
@@ -1558,12 +1561,24 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                     mode = c;
                 } else if (op != '\0') {
                     if (op == '@') {
-                        if (c != '[') spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                        if (c != '[') {
+                            expr->span.left.column += i;
+                            expr->span.right.column += i;
+                            expr->span.left.index += i;
+                            expr->span.right.index += i;
+                            spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                        }
                         usize start_i = i;
                         String key = list_new(String);
                         while (true) {
                             char c = ci->c_expr[i++];
-                            if (c == '\0') spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                            if (c == '\0') {
+                                expr->span.left.column += i;
+                                expr->span.right.column += i;
+                                expr->span.left.index += i;
+                                expr->span.right.index += i;
+                                spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
+                            }
                             if (c == ']') break;
                             list_append(&key, c);
                         }
@@ -1572,14 +1587,32 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                         resolve_typevalue(program, options, func->module, tv, func->generics, func->type_generics);
                         list_append(&ci->type_bindings, tv);
                         list_append(&ci->binding_sizes, i - start_i);
-                        if (mode != '.' && mode != ':' && mode != '!' && mode != '#') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
+                        if (mode != '.' && mode != ':' && mode != '!' && mode != '#') {
+                            expr->span.left.column += i;
+                            expr->span.right.column += i;
+                            expr->span.left.index += i;
+                            expr->span.right.index += i;
+                            spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
+                        }
                     } else if (op == '$') {
-                        if (c != '[') spanned_error("Invalid c intrinsic", expr->span, "Expected `$%c[Type]`", mode);
+                        if (c != '[') {
+                            expr->span.left.column += i;
+                            expr->span.right.column += i;
+                            expr->span.left.index += i;
+                            expr->span.right.index += i;
+                            spanned_error("Invalid c intrinsic", expr->span, "Expected `$%c[var]`", mode);
+                        }
                         usize start_i = i;
                         String key = list_new(String);
                         while (true) {
                             char c = ci->c_expr[i++];
-                            if (c == '\0') spanned_error("Invalid c intrinsic", expr->span, "Expected `$%c[Type]`", mode);
+                            if (c == '\0') {
+                                expr->span.left.column += i;
+                                expr->span.right.column += i;
+                                expr->span.left.index += i;
+                                expr->span.right.index += i;
+                                spanned_error("Invalid c intrinsic", expr->span, "Expected `$%c[var]`", mode);
+                            }
                             if (c == ']') break;
                             list_append(&key, c);
                         }
@@ -1597,8 +1630,20 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                         find_variable(program, options, func->module, vars, v, func->generics, func->type_generics);
                         list_append(&ci->var_bindings, v);
                         list_append(&ci->binding_sizes, i - start_i);
-                        if (mode != ':' && mode != '!') spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsic operator `%c%c`", op, mode);
-                    } else spanned_error("Invalid c intrinsic op", expr->span, "No such intrinsic operator `%c`", op);
+                        if (mode != ':' && mode != '!') {
+                            expr->span.left.column += i;
+                            expr->span.right.column += i;
+                            expr->span.left.index += i;
+                            expr->span.right.index += i;
+                            spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsic operator `%c%c`", op, mode);
+                        }
+                    } else {
+                        expr->span.left.column += i;
+                        expr->span.right.column += i;
+                        expr->span.left.index += i;
+                        expr->span.right.index += i;
+                        spanned_error("Invalid c intrinsic op", expr->span, "No such intrinsic operator `%c`", op);
+                    }
                     op = '\0';
                     mode = '\0';
                 } else if (c == '@' || c == '$') {
@@ -1606,7 +1651,11 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                 };
             }
             if (op != '\0') spanned_error("Invalid c intrinsic", expr->span, "intrinsic ended on operator: `%s`", ci->c_expr);
-            if (t_return->type == NULL) {
+            if (ci->tv != NULL) {
+                resolve_typevalue(program, options, func->module, ci->tv, func->generics, func->type_generics);
+                fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ci->tv);
+            } 
+            if (t_return->type == NULL && ci->tv == NULL) {
                 TypeValue* unit_ty = gen_typevalue("::core::types::unit", &expr->span);
                 resolve_typevalue(program, options, func->module, unit_ty, func->generics, func->type_generics);
                 fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, unit_ty);
@@ -1641,8 +1690,8 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
             if (!str_eq(to_str_writer(s, fprint_td_path(s, inner_tv->type->def)), "::core::types::ptr")) spanned_error("Expected ptr to dereference", expr->span, "Cannot dereference type %s, expected ::core::types::ptr<_>", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             if (inner->resolved->type->generics == NULL || inner->resolved->type->generics->generics.length != 1) spanned_error("Expected ptr to have a pointee", expr->span, "Pointer %s should have one generic argument as its pointee", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, inner->resolved->type->generics->generics.elements[0]);
-            if (!asref && !map_contains(inner_tv->type->trait_impls, program->raii.copy_key) 
-             && !list_contains(&inner_tv->type->def->traits, i, TraitDef* trait, trait == program->raii.copy)) spanned_error("Dereferencing non-copy type", inner->span, "Cannot dereference pointer as %s does not implement core::copy::Copy", to_str_writer(s, fprint_typevalue(s, t_return->type)));
+            if (!asref && !map_contains(t_return->type->trait_impls, program->raii.copy_key) 
+             && !list_contains(&t_return->type->def->traits, i, TraitDef* trait, trait == program->raii.copy)) spanned_error("Dereferencing non-copy type", inner->span, "Cannot dereference pointer as %s does not implement core::copy::Copy", to_str_writer(s, fprint_typevalue(s, t_return->type)));
         } break;
         default:
             unreachable("%s", ExprType__NAMES[expr->type]);

@@ -31,6 +31,6 @@ pub fn typeid<T>() -> ::core::types::TypeId {
     $"@#[T]u"
 }
 
-#[extern]
-#[symbol="__intrinsic_forget"]
-pub fn forget<T>(t: T); // drops t without running destructors
+pub fn forget<T>(t: T) {
+    // compiler magic - t is not dropped
+}

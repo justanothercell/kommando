@@ -54,7 +54,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         let i = 0usize;
         while i < bucket.length {
             let old_entry = bucket.get_ref(i).unwrap();
-            if old_entry.key.eq(&key) {
+            if old_entry.key.eq(&entry.key) {
                 return Option::<_>::some(std::mem::replace(old_entry, entry));
             };
             i += 1;

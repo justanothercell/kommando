@@ -37,17 +37,17 @@ impl<T> Queue<T> {
             v.buffer = std::mem::arr_resize(v.buffer, v.capacity);
             let i = 0usize;
             while i < v.index {
-                *std::mem::arr_offset(v.buffer, (old_capacity + i) % v.capacity) = *std::mem::arr_offset(v.buffer, i);
+                std::mem::replace(std::mem::arr_offset(v.buffer, (old_capacity + i) % v.capacity), std::mem::arr_take_unchecked(v.buffer, i));
                 i += 1;
             }
         };
-        *std::mem::arr_offset(v.buffer, (v.index + v.length) % v.capacity) = item;
+        std::mem::replace(std::mem::arr_offset(v.buffer, (v.index + v.length) % v.capacity), item);
         v.length += 1;
     }
 
     pub fn pop(v: ptr<Queue<T>>) -> Option<T> {
         if v.length > 0 {
-            let item = *std::mem::arr_offset(v.buffer, v.index);
+            let item = std::mem::arr_take_unchecked(v.buffer, v.index);
             v.length -= 1;
             v.index += 1;
             if v.index == v.capacity {
@@ -85,7 +85,7 @@ impl<T> Queue<T>: Drop {
     fn drop(self: ptr<Queue<T>>) {
         let i = 0usize;
         while i < self.length {
-            std::mem::replace(std::mem::arr_offset(self.buffer, (i + self.index) % self.capacity), std::mem::uninit()); // drops item
+            std::mem::arr_take_unchecked(self.buffer, (i + self.index) % self.capacity); // drops item
         };
         std::mem::free(self.buffer);
     }

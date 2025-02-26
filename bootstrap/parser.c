@@ -475,9 +475,16 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
         }
     } else if (token_compare(t, "$", SNOWFLAKE)) {
         t = next_token(stream);
-        if (t->type != STRING) unexpected_token(t, "expected string for c intrinsic: `$\"<intrinsic>\"`");
+        TypeValue* tv = NULL;
+        if (t->type != STRING) {
+            stream->peek = t;
+            tv = parse_type_value(stream);
+            t = next_token(stream);
+            if (t->type != STRING) unexpected_token(t, "expected string for c intrinsic: `$\"<intrinsic>\"`");
+        }
         CIntrinsic* ci = malloc(sizeof(CIntrinsic));
         ci->c_expr = t->string;
+        ci->tv = tv;
         ci->type_bindings = list_new(TypeValueList);
         ci->var_bindings = list_new(VariableList);
         ci->binding_sizes = list_new(UsizeList);
@@ -902,6 +909,7 @@ Path* parse_path(TokenStream* stream) {
 
 TypeValue* parse_type_value(TokenStream* stream) {
     Path* name = parse_path(stream);
+    if (name->elements.length == 0) spanned_error("Expected type", next_token(stream)->span, "Expected thype but got this instead?");
     TypeValue* tval = malloc(sizeof(TypeValue));
     tval->name = name;
     tval->generics = NULL;

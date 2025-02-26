@@ -111,7 +111,7 @@ impl i16: Fmt {
 impl i32: Fmt { 
     pub fn dyn_fmt(self: ptr<i32>) -> DynFmt { _ { object: typecast(self), fmt: i32::<>::fmt } }
     pub fn fmt(self: ptr<i32>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
-        stream.writef("%ld", self);
+        stream.writef("%d", self);
     }
 }
 impl i64: Fmt { 
@@ -143,7 +143,7 @@ impl u16: Fmt {
 impl u32: Fmt { 
     pub fn dyn_fmt(self: ptr<u32>) -> DynFmt { _ { object: typecast(self), fmt: u32::<>::fmt } }
     pub fn fmt(self: ptr<u32>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
-        stream.writef("%lu", self);
+        stream.writef("%u", self);
     }
 }
 impl u64: Fmt { 

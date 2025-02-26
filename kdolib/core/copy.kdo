@@ -8,6 +8,7 @@ impl<T> function_ptr<T>: Copy { }
 impl c_str: Copy { }
 impl raw_ptr: Copy { }
 
+impl unit: Copy { }
 impl bool: Copy { }
 impl TypeId: Copy { }
 

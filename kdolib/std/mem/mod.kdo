@@ -3,6 +3,8 @@ pub mod box;
 use std::*;
 use std::io::stderr;
 
+use core::copy::Copy;
+
 pub fn new_uninit<T>() -> ptr<T> {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 { return null(); };
@@ -32,13 +34,14 @@ pub fn new_zeroed<T>() -> ptr<T> {
 pub fn uninit<T>() -> T {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
-    *typecast(raw_ptr)
+    $"*(@![T]*)$![raw_ptr]"
 }
 
 pub fn zeroed<T>() -> T {
     let size = core::intrinsics::sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
-    *typecast(c_api::memset(raw_ptr, 0, size))
+    c_api::memset(raw_ptr, 0, size);
+    $"*(@![T]*)$![raw_ptr]"
 }
 
 
@@ -76,8 +79,13 @@ pub fn arr_offset<T>(arr: ptr<T>, i: usize) -> ptr<T> {
     typecast(usize_ptr + size * i)
 }
 
-pub fn arr_get<T>(arr: ptr<T>, i: usize) -> T {
+pub fn arr_get<T: Copy>(arr: ptr<T>, i: usize) -> T {
     *arr_offset(arr, i)
+}
+
+// see std::mem::take_unchecked for warnings
+pub fn arr_take_unchecked<T>(arr: ptr<T>, i: usize) -> T {
+    take_unchecked(arr_offset(arr, i))
 }
 
 pub fn null<T>() -> ptr<T> {
@@ -89,9 +97,18 @@ pub fn to_raw<T>(ptr: ptr<T>) -> raw_ptr {
 }
 
 pub fn swap<T>(p1: ptr<T>, p2: ptr<T>) {
-    let temp = *p1;
-    *p1 = *p2;
-    *p2 = temp;
+    $"@![T] temp = *$![p1]";
+    $"*$![p1] = *$![p2]";
+    $"*$![p2] = temp";
+}
+
+
+// Takes the item out of the pointer. 
+// If the item is trivially copyable, then no further cution need be taken.
+// If not, then you need to make sure the item is only ever dropped once and is not modified internally
+// while both instances exist. 
+pub fn take_unchecked<T>(p: ptr<T>) -> T {
+    $"*$![p]"
 }
 
 pub fn replace<T>(ptr: ptr<T>, item: T) -> T {

@@ -26,9 +26,7 @@ impl<T> Raw<T> {
     // WARNING: this will invalidate the current object and the returned object will be dropped once it goes out of scope.
     // Taking the item a second time or using the value replace yields (or not forgetting that value) without putting something in first is UB
     pub fn take(self: ptr<Raw<T>>) -> T {
-        let new_raw = alloca(core::intrinsics::sizeof::<T>());
-        let new: ptr<T> = core::intrinsics::typecast(new_raw);
-        self.replace(*new)
+        $"(*$![self]).item"
     }
 
     // WARNING: this will forget the old item without running destructors
