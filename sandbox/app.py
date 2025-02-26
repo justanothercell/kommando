@@ -16,6 +16,7 @@ def index():
     return send_from_directory('.', 'index.html')
 
 @app.route('/docs')
+@app.route('/docs/')
 def guide():
     return redirect('/docs/index.html')
 
