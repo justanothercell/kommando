@@ -121,9 +121,9 @@
                                 continue;
                             } else if (/^\.?\/kdolib.*.kdo$/.test(file)) { // library file
                                 href = github_prefix + file + github_suffix;
-                            } else if (/^ w+.c$/.test(file)) { // bootstrap short source file
+                            } else if (/^w+.c$/.test(file)) { // bootstrap short source file
                                 href = github_prefix + 'bootstrap/' + file + github_suffix;
-                            } else if (/^\.?\w+(\/\w+)*.c$/.test(file)) { // bootstrap source file
+                            } else if (/^\.\/bootstrap(\/\w+)*.c$/.test(file)) { // bootstrap source file
                                 href = github_prefix + file + github_suffix;
                             } else { // unknown, raw link
                                 parts.push(html_escape(part));
