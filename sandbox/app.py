@@ -11,8 +11,6 @@ import os
 
 load_dotenv()
 
-artifact_map = {}
-
 def delete_old_files():
     for item in Path('./artifacts').iterdir():
         if item.name == '.gitignore':
@@ -53,13 +51,6 @@ def style():
 def execute():
     print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} [\x1b[1;33mEXEC\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m')
     print(request.json)
-    if request.remote_addr in artifact_map:
-        for artifact in artifact_map[request.remote_addr]:
-            try:
-                os.remove(f'artifacts/{artifact}')
-            except OSError:
-                pass 
-        del artifact_map[request.remote_addr]
     try:
         r = requests.post('http://localhost:7878/execute', json=request.json)
     except Exception:
@@ -69,11 +60,9 @@ def execute():
         artifacts = r['artifacts']
         if len(artifacts) > 0:
             r['artifacts'] = []
-            artifact_map[request.remote_addr] = []
             for name, content in artifacts.items():
                 with open(f'artifacts/{name}', 'w') as artifactfile:
                     artifactfile.write(content)
-                artifact_map[request.remote_addr].append(name)
                 r['artifacts'].append(name)
         else:
             del r['artifacts']
