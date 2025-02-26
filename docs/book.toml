@@ -4,6 +4,7 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Kommando Docs"
+description = "Documentation for the kommando programming language"
 
 [output.html]
 mathjax-support = true
