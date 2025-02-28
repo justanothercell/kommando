@@ -37,7 +37,7 @@ def index():
 
 @app.route('/docs')
 def docs_index():
-    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} [\x1b[1;34mDOCS\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {index.html}')
+    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} [\x1b[1;34mDOCS\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m index.html')
     return send_from_directory('../docs/book/', 'index.html')
 
 @app.route('/docs/')
