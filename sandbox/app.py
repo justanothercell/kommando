@@ -37,7 +37,6 @@ def index():
 
 @app.route('/docs')
 @app.route('/docs/')
-@app.route('/docs/index.html')
 @app.route('/docs/introduction.html')
 def docs():
     response = redirect('/docs/index.html')
