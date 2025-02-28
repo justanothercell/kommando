@@ -47,6 +47,17 @@ def docs():
             response.headers['Link'] = f'<http://{DOMAIN_NAME}/docs>; rel="canonical"'
     return response
 
+@app.route('/docs/index.html')
+def docs_index():
+    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} [\x1b[1;34mDOCS\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m index.html')
+    response = send_from_directory('../docs/book/', 'index.html')
+    if DOMAIN_NAME is not None:
+        if USE_SSL:
+            response.headers['Link'] = f'<https://{DOMAIN_NAME}/docs>; rel="canonical"'
+        else:
+            response.headers['Link'] = f'<http://{DOMAIN_NAME}/docs>; rel="canonical"'
+    return response
+
 @app.route('/docs/<path:item>')
 def docs_item(item):
     if item.endswith('.html'):
