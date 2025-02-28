@@ -36,17 +36,15 @@ def index():
     return render_template('index.html')
 
 @app.route('/docs')
+def docs_index():
+    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} [\x1b[1;34mDOCS\x1b[0m] \x1b[1m{request.remote_addr}\x1b[0m {index.html}')
+    return send_from_directory('../docs/book/', 'index.html')
+
 @app.route('/docs/')
 @app.route('/docs/index.html')
 @app.route('/docs/introduction.html')
-def docs():
-    response = send_from_directory('../docs/book/', 'index.html')
-    if DOMAIN_NAME is not None:
-        if USE_SSL:
-            response.headers['Link'] = f'<https://{DOMAIN_NAME}/docs>; rel="canonical"'
-        else:
-            response.headers['Link'] = f'<http://{DOMAIN_NAME}/docs>; rel="canonical"'
-    return response
+def docs_index_alias():
+    return redirect('/docs')
 
 @app.route('/docs/<path:item>')
 def docs_item(item):
