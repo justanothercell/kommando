@@ -1,6 +1,6 @@
 from pathlib import Path
 import time
-from flask import Flask, send_from_directory, request, redirect, abort, render_template
+from flask import Flask, send_from_directory, request, redirect, abort, render_template, Response, jsonify
 from werkzeug.security import safe_join
 import requests
 import logging
@@ -10,6 +10,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import os
 
 load_dotenv()
+
+DOMAIN_NAME = os.getenv('DOMAIN_NAME')
 
 def delete_old_files():
     for item in Path('./artifacts').iterdir():
@@ -34,8 +36,12 @@ def index():
 
 @app.route('/docs')
 @app.route('/docs/')
+@app.route('/docs/introduction.html')
 def docs():
-    return redirect('/docs/index.html')
+    response = redirect('/docs/index.html')
+    if DOMAIN_NAME is not None:
+        response.headers['Link'] = f'<{DOMAIN_NAME}/docs>; rel="canonical"'
+    return response
 
 @app.route('/docs/<path:item>')
 def docs_item(item):
@@ -66,7 +72,9 @@ def execute():
                 r['artifacts'].append(name)
         else:
             del r['artifacts']
-    return r
+    response = jsonify(r)
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    return response
 
 @app.route('/artifacts/<name>')
 def artifacts(name):
@@ -77,7 +85,10 @@ def artifacts(name):
         return 'This artifact does not exist. Note that artifacts periodically get deleted', 404
     with open(file) as artifactfile:
         content = artifactfile.read()
-    return render_template('viewer.html', file_name=name, file_content=content, file_language='c')
+
+    response = Response(render_template('viewer.html', file_name=name, file_content=content, file_language='c'))
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    return response
     
 @app.route('/raw_artifacts/<name>')
 def raw_artifacts(name):
@@ -88,7 +99,13 @@ def raw_artifacts(name):
         return 'This artifact does not exist. Note that artifacts periodically get deleted', 404
     with open(file) as artifactfile:
         content = artifactfile.read()
-    return f'<pre style="font-family: monospace;">{content}</pre>'
+    if "text/html" in request.headers.get("Accept", ""):
+        response = Response(f'<pre style="font-family: monospace;">{content}</pre>', mimetype='text/html')
+    else:
+        response = Response(content, mimetype='text/plain')
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    return response
+    
 
 
 if __name__ == '__main__':
