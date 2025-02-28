@@ -12,6 +12,7 @@ import os
 load_dotenv()
 
 DOMAIN_NAME = os.getenv('DOMAIN_NAME')
+USE_SSL = os.getenv('SANDBOX_USE_SSL', 'false') == 'true'
 
 def delete_old_files():
     for item in Path('./artifacts').iterdir():
@@ -36,11 +37,15 @@ def index():
 
 @app.route('/docs')
 @app.route('/docs/')
+@app.route('/docs/index.html')
 @app.route('/docs/introduction.html')
 def docs():
-    response = redirect('/docs/index.html')
+    response = send_from_directory('../docs/book/', 'index.html')
     if DOMAIN_NAME is not None:
-        response.headers['Link'] = f'<{DOMAIN_NAME}/docs>; rel="canonical"'
+        if USE_SSL:
+            response.headers['Link'] = f'<https://{DOMAIN_NAME}/docs>; rel="canonical"'
+        else:
+            response.headers['Link'] = f'<http://{DOMAIN_NAME}/docs>; rel="canonical"'
     return response
 
 @app.route('/docs/<path:item>')
@@ -109,7 +114,7 @@ def raw_artifacts(name):
 
 
 if __name__ == '__main__':
-    if os.getenv('SANDBOX_USE_SSL', 'false') == 'true':
+    if USE_SSL:
         context = (os.getenv('SANDBOX_DOMAIN_CERT_FILE'), os.getenv('SANDBOX_DOMAIN_KEY_FILE'))
         app.run('0.0.0.0', 443, ssl_context=context)
     else:
