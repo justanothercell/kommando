@@ -15,6 +15,6 @@ USER appuser
 # communication port
 EXPOSE 7878
 
-RUN pip install flask apscheduler wonderwords
+RUN pip install flask apscheduler wonderwords gunicorn
 
-CMD ["python", "runner.py"]
+CMD [ "gunicorn", " --bind 0.0.0.0:7878", "app:app"]

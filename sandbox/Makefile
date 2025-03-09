@@ -1,5 +1,7 @@
 SHELL = /bin/bash
 
+include .env
+
 delete_image:
 	-sudo docker rmi kommando-sandbox-runner
 
@@ -31,3 +33,6 @@ shell_container:
 	sudo docker exec -it kommando-sandbox-runner-instance sh
 
 clean_all: delete_container delete_image
+
+run_server_with_ssl:
+	sudo gunicorn --certfile=$($SANDBOX_DOMAIN_CERT_FILE) --keyfile=$($SANDBOX_DOMAIN_KEY_FILE) --bind 0.0.0.0:443 app:app
