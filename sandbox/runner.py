@@ -8,15 +8,18 @@ from pathlib import Path
 import time
 from wonderwords import RandomWord
 
-os.environ['TMPDIR'] = '/sandbox'
-
 TIMEOUT = 10
 
 rw = RandomWord()
 
+nodelete = [item.name for item in Path('/sandbox').iterdir()]
+print(f'/sandbox permanent items: {nodelete}')
+
 def rmdir(directory):
     directory = Path(directory)
     for item in directory.iterdir():
+        if item.name in nodelete:
+            continue
         if item.is_dir():
             rmdir(item)
         else:
