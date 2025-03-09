@@ -69,10 +69,15 @@ Identifier* gen_identifier(str name) {
     return ident;
 }
 
-Path* gen_path(str path) {
+Path* gen_path(str path, Span* span) {
     TokenStream* stream = tokenstream_new("<generated>", path);
     Path* p = parse_path(stream);
     if(try_next_token(stream) != NULL) panic("`%s` is not a valid path", path);
+    if (span != NULL) {
+        for (usize i = 0;i < p->elements.length;i++) {
+            p->elements.elements[i]->span = *span;
+        }
+    }
     return p;
 }
 
@@ -105,7 +110,7 @@ TypeDef* gen_simple_type(str name) {
     td->fields = map_new();
     td->transpile_state = 0;
     td->module = NULL;
-    td->traits = list_new(TraitList);
+    td->traits = list_new(TraitBoundList);
     return td;
 }
 

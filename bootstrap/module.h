@@ -99,5 +99,5 @@ void insert_module(Program* program, CompilerOptions* options, Module* module, V
 
 Identifier* gen_identifier(str name);
 TypeValue* gen_typevalue(str typevalue, Span* span);
-Path* gen_path(str path);
+Path* gen_path(str path, Span* span);
 #endif

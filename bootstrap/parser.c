@@ -104,7 +104,7 @@ TypeDef* parse_struct(TokenStream* stream) {
     type->generics = keys;
     type->transpile_state = 0;
     type->name = name;
-    type->traits = list_new(TraitList);
+    type->traits = list_new(TraitBoundList);
     type->key = NULL;
     return type;
 }
@@ -161,13 +161,7 @@ ImplBlock* parse_impl(TokenStream* stream, Module* module) {
             func->generics->generics = list_new(GKeyList);
             func->generics->span = func->name->span;
         }
-        if (impl->generics != NULL) {
-            func->type_generics = malloc(sizeof(GenericKeys));
-            func->type_generics->span = impl->generics->span;
-            func->type_generics->resolved = map_new();
-            func->type_generics->generics = list_new(GKeyList);
-            list_foreach(&impl->generics->generics, i, GKey* key, { list_append(&func->type_generics->generics, key); });
-        }
+        func->type_generics = impl->generics;
         ModuleItem* mi = malloc(sizeof(ModuleItem));
         mi->item = func;
         mi->type = MIT_FUNCTION;
@@ -224,8 +218,7 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     trait->self_type->transpile_state = 0;
     trait->self_type->generics = NULL;
     trait->self_type->module = NULL;
-    trait->self_type->traits = list_new(TraitList);
-    list_append(&trait->self_type->traits, trait);
+    trait->self_type->traits = list_new(TraitBoundList);
 
     trait->self_key->bounds.elements[0]->bound->def = trait->self_type;
 
@@ -235,7 +228,6 @@ TraitDef* parse_traitdef(TokenStream* stream, Module* module) {
     trait->self_tv->generics = NULL;
     trait->self_tv->name = path_simple(trait->self_key->name);
     trait->self_tv->trait_impls = map_new();
-    map_put(trait->self_tv->trait_impls, to_str_writer(s, fprintf(s, "%p", trait)), trait);
 
     t = next_token(stream);
     if (!token_compare(t, "{", SNOWFLAKE)) unexpected_token(t);

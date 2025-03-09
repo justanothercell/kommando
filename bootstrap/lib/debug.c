@@ -6,6 +6,8 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "debug.h"
+
 FILE* MEMTRACE = NULL;
 
 void opentrace() {
@@ -53,7 +55,7 @@ void check_check(void* ptr) {
 
 void* debug_malloc(size_t size, char* file, int line) {
     opentrace();
-    void* ptr = malloc(size + 12);
+    void* ptr = __raw_malloc(size + 12);
     fprintf(MEMTRACE, "MALLOC %p %lu @ %s:%d\n", (char*)ptr + 8, size, file, line);
     fflush(MEMTRACE);
     set_check(ptr, size);
@@ -67,7 +69,7 @@ void* debug_realloc(void* ptr, size_t size, char* file, int line) {
     }
     opentrace();
     usize p = (usize)ptr;
-    void* new_ptr = realloc(ptr, size + 12);
+    void* new_ptr = __raw_realloc(ptr, size + 12);
     if (ptr == NULL) fprintf(MEMTRACE, "REALLOC %p %p %lu @ %s:%d\n", (char*)p, (char*)new_ptr + 8, size, file, line);
     else fprintf(MEMTRACE, "REALLOC %p %p %lu @ %s:%d\n", (char*)p + 8, (char*)new_ptr + 8, size, file, line);
     fflush(MEMTRACE);
@@ -83,10 +85,6 @@ void debug_free(void* ptr, char* file, int line) {
     opentrace();
     if (ptr == NULL) fprintf(MEMTRACE, "FREE %p @ %s:%d\n", ptr, file, line);
     else fprintf(MEMTRACE, "FREE %p @ %s:%d\n", (char*)ptr + 8, file, line);
-    free(ptr);
+    __raw_free(ptr);
     fflush(MEMTRACE);
-}
-
-void __raw_free(void* ptr) {
-    free(ptr);
 }

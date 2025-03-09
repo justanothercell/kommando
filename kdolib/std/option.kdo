@@ -114,10 +114,20 @@ impl<T: Fmt> Option<T>: Fmt {
 
 impl<T: Copy> Option<T>: Copy {}
 
-impl<T: Copy> Option<T>{
+impl<T: Copy> Option<ptr<T>>{
     pub fn deref(self: Option<ptr<T>>) -> Option<T> {
         if self.exists {
-            Option::<_>::some(*self.value.item)
+            Option::<_>::some(*self.value.get())
+        } else {
+            Option::<_>::none()
+        }
+    }
+}
+
+impl<T: Clone> Option<ptr<T>>{
+    pub fn cloned(self: ptr<Option<ptr<T>>>) -> Option<T> {
+        if self.exists {
+            Option::<_>::some(self.value.get().clone())
         } else {
             Option::<_>::none()
         }
@@ -127,7 +137,7 @@ impl<T: Copy> Option<T>{
 impl<T: Clone> Option<T>: Clone {
     fn clone(self: ptr<Option<T>>) -> Option<T> {
         if self.exists {
-            Option::<_>::some(self.value.item.clone())
+            Option::<_>::some(self.value.cloned())
         } else {
             Option::<_>::none()
         }

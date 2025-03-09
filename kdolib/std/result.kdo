@@ -100,12 +100,32 @@ impl<T: Fmt, E: Fmt> Result<T, E>: Fmt {
 
 impl<T: Copy, E: Copy> Result<T, E>: Copy {}
 
+impl<T: Copy, E: Copy> Result<ptr<T>, ptr<E>> {
+    fn deref(self: Result<ptr<T>, ptr<E>>) -> Result<T, E> {
+        if self.is_ok {
+            Result::<_, _>::ok(*self.value.get())
+        } else {
+            Result::<_, _>::err(*self.error.get())
+        }
+    }
+}
+
 impl<T: Clone, E: Clone> Result<T, E>: Clone {
     fn clone(self: ptr<Result<T, E>>) -> Result<T, E> {
         if self.is_ok {
             Result::<_, _>::ok(self.value.cloned())
         } else {
             Result::<_, _>::err(self.error.cloned())
+        }
+    }
+}
+
+impl<T: Clone, E: Clone> Result<ptr<T>, ptr<E>> {
+    fn cloned(self: ptr<Result<ptr<T>, ptr<E>>>) -> Result<T, E> {
+        if self.is_ok {
+            Result::<_, _>::ok(self.value.get().clone())
+        } else {
+            Result::<_, _>::err(self.error.get().clone())
         }
     }
 }

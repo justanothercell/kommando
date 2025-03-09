@@ -47,8 +47,11 @@ fn main() {
     inspect_child(&Child { id: 0-4 });
     println("Returning orphans...");
     create_child(0-5);
-    let r = create_child(12); // this one is actually held on to!
-    let r2 = &create_child(0-7);
+    let r2 = &create_child(0-6);
+    let r = create_child(0-7); // this one is actually held on to!
+    println("Replacing orphan...");
+    let r_ref = &r;
+    *r_ref = Child { id: 0-8 };
     println("Creating happy family...");
     let p = Parent {
         fav_child: _ { id: 0 },

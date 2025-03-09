@@ -1,0 +1,11 @@
+use std::*;
+use core::drop::Drop;
+use c_api::printf;
+
+fn main() {
+    $"$![c_api::printf](\"hello, world\\n\")";
+
+    // with intermediate variable
+    let print_var = c_api::printf;
+    $"((int(*)(char*, ...))$![print_var])(\"hello, world\\n\")";
+}

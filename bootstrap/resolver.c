@@ -163,7 +163,7 @@ ModuleItem* resolve_item_raw(Program* program, CompilerOptions* options, Module*
             i += 1;
             module = package;
         } else {
-            spanned_error("No such item", m->span, "Item %s does not exist", m->name);
+            spanned_error("No such item", m->span, "Item %s of type %s does not exist", m->name, ModuleItemType__NAMES[kind]);
         }
     }
     while (i < path->elements.length - 1) {
@@ -224,7 +224,7 @@ void validate_item(Program* program, CompilerOptions* options, GenericValues* ty
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
                     }
                 } else { // generic key
-                    if (!list_contains(&v->def->traits, j, TraitDef* def, def == bound->resolved)) {
+                    if (!list_contains(&v->def->traits, j, TraitBound* impl, impl->resolved == bound->resolved)) {
                     spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
                             "Type %s does not satisfy trait bound %s::%s.\nConsider requiring this trait for this type", 
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
@@ -249,7 +249,7 @@ void validate_item(Program* program, CompilerOptions* options, GenericValues* ty
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
                     }
                 } else { // generic key
-                    if (!list_contains(&v->def->traits, j, TraitDef* def, def == bound->resolved)) {
+                    if (!list_contains(&v->def->traits, j, TraitBound* impl, impl->resolved == bound->resolved)) {
                     spanned_error("Unsatisfied trait bound", v->name->elements.elements[v->name->elements.length-1]->span, 
                             "Type %s does not satisfy trait bound %s::%s.\nConsider requiring this trait for this type", 
                             to_str_writer(s, fprint_type(s, v->def)), to_str_writer(s, fprint_path(s, bound->resolved->module->path)), bound->resolved->name->name);
@@ -419,7 +419,7 @@ static void tv_apply_traits(Program* program, CompilerOptions* options, TypeValu
         if (impl->trait == NULL) { // during trait head resolution
             impl->trait = resolve_item_raw(program, options, impl->module, impl->trait_ref->name, MIT_TRAIT, NULL)->item;
             if (impl->type->def == NULL) {
-                resolve_generic_keys(program, options, impl->module, impl->generics, NULL, NULL, NULL);
+                resolve_generic_keys(program, options, impl->module, impl->generics, NULL, NULL, impl->generics);
                 resolve_typevalue(program, options, impl->module, impl->type, NULL, impl->generics);
             }
         }
@@ -492,16 +492,16 @@ void assert_types_equal(Program* program, CompilerOptions* options, Module* modu
     Span span1 = from_points(&tv1->name->elements.elements[0]->span.left, &tv1->name->elements.elements[tv1->name->elements.length-1]->span.right);
     Span span2 = from_points(&tv2->name->elements.elements[0]->span.left, &tv2->name->elements.elements[tv2->name->elements.length-1]->span.right);
     if (tv1->def != tv2->def) {
-        spanned_error("Types do not match", span, "%s @ %s and %s @ %s", 
-            to_str_writer(stream, fprint_typevalue(stream, tv1)), to_str_writer(stream, fprint_span(stream, &span1)),
-            to_str_writer(stream, fprint_typevalue(stream, tv2)), to_str_writer(stream, fprint_span(stream, &span2))
+        spanned_error("Types do not match", span, "\n%s @ %s, defined @ %s and\n%s @ %s, defined @ %s", 
+            to_str_writer(stream, fprint_typevalue(stream, tv1)), to_str_writer(stream, fprint_span(stream, &span1)), to_str_writer(stream, fprint_span(stream, &tv1->def->name->span)),
+            to_str_writer(stream, fprint_typevalue(stream, tv2)), to_str_writer(stream, fprint_span(stream, &span2)), to_str_writer(stream, fprint_span(stream, &tv2->def->name->span))
         );
     }
     if (tv1->generics != NULL && tv2->generics != NULL) {
         if (tv1->generics->generics.length != tv2->generics->generics.length) {
-            spanned_error("Types do not match", span, "%s @ %s and %s @ %s", 
-                to_str_writer(stream, fprint_typevalue(stream, tv1)), to_str_writer(stream, fprint_span(stream, &span1)),
-                to_str_writer(stream, fprint_typevalue(stream, tv2)), to_str_writer(stream, fprint_span(stream, &span2))
+            spanned_error("Type generics do not match", span, "\n%s @ %s, defined @ %s and\n%s @ %s, defined @ %s", 
+                to_str_writer(stream, fprint_typevalue(stream, tv1)), to_str_writer(stream, fprint_span(stream, &span1)), to_str_writer(stream, fprint_span(stream, &tv1->def->name->span)),
+                to_str_writer(stream, fprint_typevalue(stream, tv2)), to_str_writer(stream, fprint_span(stream, &span2)), to_str_writer(stream, fprint_span(stream, &tv2->def->name->span))
             );
         }
         for (usize i = 0;i < tv1->generics->generics.length;i++) {
@@ -695,7 +695,7 @@ TypeValue* replace_generic(Program* program, CompilerOptions* options, TypeValue
     TypeValue* func_candidate = NULL;
     if (func_ctx != NULL) func_candidate = map_get(func_ctx->resolved, name);
     TypeValue* trait_candidate = NULL;
-    if (trait != NULL && str_eq(trait->self_key->name->name, name)) trait_candidate = trait_called; 
+    if (trait != NULL && str_eq(trait->self_key->name->name, name)) trait_candidate = trait_called;
     if (type_candidate != NULL && func_candidate != NULL) {
         spanned_error("Multiple generic candidates (Ty/Fn)", tv->name->elements.elements[0]->span, "Generic `%s` could be replaced by %s @ %s or %s @ %s", name,
             to_str_writer(s, fprint_typevalue(s, type_candidate)), to_str_writer(s, fprint_span(s, &type_candidate->name->elements.elements[0]->span)),
@@ -803,10 +803,19 @@ static void r_collect_generics(TypeValue* template, TypeValue* match, GenericKey
 // Error when unable to fill all generic names
 //
 //                              Foo<T, U>            Foo<i32, u32>     <T, U>
-GenericValues* collect_generics(TypeValue* template, TypeValue* match, GenericKeys* keys) {
+GenericValues* collect_generics(TypeValue* template, TypeValue* match, GenericKeys* keys, FuncDef* call, TypeValue* called_type) {
     GenericValues* gvals = malloc(sizeof(GenericValues));
     gvals->generics = list_new(TypeValueList);
     gvals->resolved = map_new();
+    if (call->impl_type != NULL && call->trait_def && call->impl_type->def == template->def) {
+        if (template->generics != NULL && template->generics->generics.length > 0) panic("Compiler error: trait self-template has generics");
+        list_find_map(&called_type->def->traits, i, TraitBound** bound, (*bound)->resolved == call->trait, {
+            if ((*bound)->bound->generics == NULL) return gvals;
+            free(gvals);
+            return (*bound)->bound->generics;
+        });
+        unreachable("Compiler error: type implementing trait doesn't implement trait");
+    }
     if (keys == NULL) return gvals;
     list_foreach(&keys->generics, i, GKey* key, {
         UNUSED(key);
@@ -816,10 +825,10 @@ GenericValues* collect_generics(TypeValue* template, TypeValue* match, GenericKe
     list_foreach(&keys->generics, i, GKey* key, {
         UNUSED(key);
         if (gvals->generics.elements[i] == NULL) {
-            spanned_error("Unbound generic", key->name->span, "Generic `%s` was not bound by %s @ %s and as such could not be filled by %s @ %s", 
+            spanned_error("Unbound generic", key->name->span, "\nGeneric `%s` was not bound by\n%s @ %s\nand as such could not be filled by\n%s @ %s", 
                 key->name->name, 
-                to_str_writer(s, fprint_typevalue(s, template)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)),
-                to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_span(s, &match->name->elements.elements[0]->span)));
+                to_str_writer(s, fprint_full_typevalue(s, template)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)),
+                to_str_writer(s, fprint_full_typevalue(s, match)), to_str_writer(s, fprint_span(s, &match->name->elements.elements[0]->span)));
         }
     });
     return gvals;
@@ -913,11 +922,11 @@ static bool satisfies_impl_bounds(TypeValue* tv, TypeValue* impl_tv) {
     if (tv->def == NULL) panic("Compiler error: unresolved type");
     if (impl_tv->def->module != NULL && tv->def->module != NULL && tv->def != impl_tv->def) return false; // concrete types and a mismatch!
     if (impl_tv->def->module == NULL) { // check trait bounds if this is a generic
-        list_foreach(&impl_tv->def->traits, i, TraitDef* trait, {
+        list_foreach(&impl_tv->def->traits, i, TraitBound* trait_impl, {
             if (tv->def->module == NULL) {
-                if (!list_contains(&tv->def->traits, j, TraitDef* t, t == trait)) return false;
+                if (!list_contains(&tv->def->traits, j, TraitBound* impl, impl->resolved == trait_impl->resolved)) return false;
             } else {
-                if (!map_contains(tv->trait_impls, to_str_writer(s, fprintf(s, "%p", trait)))) return false;
+                if (!map_contains(tv->trait_impls, to_str_writer(s, fprintf(s, "%p", trait_impl->resolved)))) return false;
             } 
         });
     }
@@ -936,8 +945,8 @@ FuncDef* resolve_method_instance(Program* program, CompilerOptions* options, Typ
     Module* mod = tv->def->module;
     if (mod == NULL) { // generic type - search through trait bounds
         FuncDef* chosen = NULL;
-        list_foreach(&tv->def->traits, i, TraitDef* t, {
-            ModuleItem* mi = map_get(t->methods, name->name);
+        list_foreach(&tv->def->traits, i, TraitBound* impl, {
+            ModuleItem* mi = map_get(impl->resolved->methods, name->name);
             if (mi == NULL) continue;
             FuncDef* method = mi->item;
             if (chosen != NULL) {
@@ -1120,7 +1129,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                 called_type = call->object->resolved->type;
             }
             call->tv = called_type;
-            GenericValues* type_call_vals = collect_generics(method->impl_type, called_type, method->type_generics);
+            GenericValues* type_call_vals = collect_generics(method->impl_type, called_type, method->type_generics, method, called_type);
             call->impl_vals = type_call_vals;
 
             patch_generics(replace_generic(program, options, call->def->args.elements[0]->type, type_call_vals, call->generics, method->trait, called_type), call->def->args.elements[0]->type, objectbox->type, NULL, call->generics);
@@ -1151,7 +1160,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
             });
 
             TypeValue* ret = replace_generic(program, options, call->def->return_type, type_call_vals, call->generics, method->trait, called_type);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ret);
+            fill_tvbox(program, options, func->module, ret->name->elements.elements[0]->span, func->generics, func->type_generics, t_return, ret);
 
             if (called_type->def->module == NULL) {
                 bool found = false;
@@ -1190,7 +1199,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                     map_put(call->generics->resolved, key->name->name, dummy);
                 });
             }
-            GenericValues* type_call_vals = collect_generics(method->impl_type, call->tv, method->type_generics);
+            GenericValues* type_call_vals = collect_generics(method->impl_type, call->tv, method->type_generics, method, call->tv);
             call->impl_vals = type_call_vals;
 
             // preresolve return
@@ -1224,7 +1233,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
             });
 
             TypeValue* ret = replace_generic(program, options, call->def->return_type, type_call_vals, call->generics, method->trait, call->tv);
-            fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, ret);
+            fill_tvbox(program, options, func->module, ret->name->elements.elements[0]->span, func->generics, func->type_generics, t_return, ret);
             
             if (call->tv->def->module == NULL) {
                 bool found = false;
@@ -1516,7 +1525,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
             TypeValue* field_ty = replace_generic(program, options, field->type, tv->generics, NULL, NULL, NULL);
             fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, field_ty);
             if (!asref && !map_contains(field_ty->trait_impls, program->raii.copy_key) 
-             && !list_contains(&field_ty->def->traits, i, TraitDef* trait, trait == program->raii.copy)) spanned_error("Cannot move field", fa->field->span, "Field `%s` of %s with type %s does not implement core::copy::Copy.\nImplement this trait or take a reference instead of moving", fa->field->name, to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_typevalue(s, field_ty)));
+             && !list_contains(&field_ty->def->traits, i, TraitBound* impl, impl->resolved == program->raii.copy)) spanned_error("Cannot move field", fa->field->span, "Field `%s` of %s with type %s does not implement core::copy::Copy.\nImplement this trait or take a reference instead of moving", fa->field->name, to_str_writer(s, fprint_typevalue(s, tv)), to_str_writer(s, fprint_typevalue(s, field_ty)));
         } break;
         case EXPR_STRUCT_LITERAL: {
             StructLiteral* slit = expr->expr;
@@ -1562,10 +1571,10 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                 } else if (op != '\0') {
                     if (op == '@') {
                         if (c != '[') {
-                            expr->span.left.column += i;
-                            expr->span.right.column += i;
-                            expr->span.left.index += i;
-                            expr->span.right.index += i;
+                            expr->span.left.column += i+1;
+                            expr->span.right.column += i+1;
+                            expr->span.left.index += i+1;
+                            expr->span.right.index += i+1;
                             spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
                         }
                         usize start_i = i;
@@ -1573,33 +1582,38 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                         while (true) {
                             char c = ci->c_expr[i++];
                             if (c == '\0') {
-                                expr->span.left.column += i;
-                                expr->span.right.column += i;
-                                expr->span.left.index += i;
-                                expr->span.right.index += i;
+                                expr->span.left.column += i+1;
+                                expr->span.right.column += i+1;
+                                expr->span.left.index += i+1;
+                                expr->span.right.index += i+1;
                                 spanned_error("Invalid c intrinsic", expr->span, "Expected `@%c[Type]`", mode);
                             }
                             if (c == ']') break;
                             list_append(&key, c);
                         }
                         list_append(&key, '\0');
-                        TypeValue* tv = gen_typevalue(key.elements, &expr->span);
+                        Span span = expr->span;
+                        span.left.index += start_i+2;
+                        span.left.column += start_i+2;
+                        span.right.index += i+1;
+                        span.right.column += i+1;
+                        TypeValue* tv = gen_typevalue(key.elements, &span);
                         resolve_typevalue(program, options, func->module, tv, func->generics, func->type_generics);
                         list_append(&ci->type_bindings, tv);
                         list_append(&ci->binding_sizes, i - start_i);
                         if (mode != '.' && mode != ':' && mode != '!' && mode != '#') {
-                            expr->span.left.column += i;
-                            expr->span.right.column += i;
-                            expr->span.left.index += i;
-                            expr->span.right.index += i;
+                            expr->span.left.column += i+1;
+                            expr->span.right.column += i+1;
+                            expr->span.left.index += i+1;
+                            expr->span.right.index += i+1;
                             spanned_error("Invalid c intrinsic op", expr->span, "No such mode for intrinsci operator `%c%c`", op, mode);
                         }
                     } else if (op == '$') {
                         if (c != '[') {
-                            expr->span.left.column += i;
-                            expr->span.right.column += i;
-                            expr->span.left.index += i;
-                            expr->span.right.index += i;
+                            expr->span.left.column += i+1;
+                            expr->span.right.column += i+1;
+                            expr->span.left.index += i+1;
+                            expr->span.right.index += i+1;
                             spanned_error("Invalid c intrinsic", expr->span, "Expected `$%c[var]`", mode);
                         }
                         usize start_i = i;
@@ -1607,10 +1621,10 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                         while (true) {
                             char c = ci->c_expr[i++];
                             if (c == '\0') {
-                                expr->span.left.column += i;
-                                expr->span.right.column += i;
-                                expr->span.left.index += i;
-                                expr->span.right.index += i;
+                                expr->span.left.column += i+1;
+                                expr->span.right.column += i+1;
+                                expr->span.left.index += i+1;
+                                expr->span.right.index += i+1;
                                 spanned_error("Invalid c intrinsic", expr->span, "Expected `$%c[var]`", mode);
                             }
                             if (c == ']') break;
@@ -1623,10 +1637,12 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                         v->method_name = NULL;
                         v->values = NULL;
                         v->method_values = NULL;
-                        Identifier* ident = malloc(sizeof(Identifier));
-                        ident->name = key.elements;
-                        ident->span = expr->span;
-                        v->path = path_simple(ident);
+                        Span span = expr->span;
+                        span.left.index += start_i+2;
+                        span.left.column += start_i+2;
+                        span.right.index += i+1;
+                        span.right.column += i+1;
+                        v->path = gen_path(key.elements, &span);
                         find_variable(program, options, func->module, vars, v, func->generics, func->type_generics);
                         list_append(&ci->var_bindings, v);
                         list_append(&ci->binding_sizes, i - start_i);
@@ -1691,7 +1707,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
             if (inner->resolved->type->generics == NULL || inner->resolved->type->generics->generics.length != 1) spanned_error("Expected ptr to have a pointee", expr->span, "Pointer %s should have one generic argument as its pointee", to_str_writer(s, fprint_typevalue(s, inner->resolved->type)));
             fill_tvbox(program, options, func->module, expr->span, func->generics, func->type_generics, t_return, inner->resolved->type->generics->generics.elements[0]);
             if (!asref && !map_contains(t_return->type->trait_impls, program->raii.copy_key) 
-             && !list_contains(&t_return->type->def->traits, i, TraitDef* trait, trait == program->raii.copy)) spanned_error("Dereferencing non-copy type", inner->span, "Cannot dereference pointer as %s does not implement core::copy::Copy", to_str_writer(s, fprint_typevalue(s, t_return->type)));
+             && !list_contains(&t_return->type->def->traits, i, TraitBound* impl, impl->resolved == program->raii.copy)) spanned_error("Dereferencing non-copy type", inner->span, "Cannot dereference pointer as %s does not implement core::copy::Copy", to_str_writer(s, fprint_typevalue(s, t_return->type)));
         } break;
         default:
             unreachable("%s", ExprType__NAMES[expr->type]);
@@ -1748,17 +1764,18 @@ void resolve_generic_keys(Program* program, CompilerOptions* options, Module* mo
             type->extern_ref = NULL;
             type->fields = map_new();
             type->module = NULL;
+            type->traits = list_new(TraitBoundList);
         } else {
             str name = trait_keys->generics.elements[i]->name->name;
             type = map_get(trait_keys->resolved, name);
         }
-        type->traits = list_new(TraitList);
+        type->traits = list_new(TraitBoundList);
         list_foreach(&key->bounds, i, TraitBound* bound, {
             TraitDef* trait = resolve_item(program, options, module, bound->bound->name, MIT_TRAIT, func_generics, type_generics, &bound->bound->generics);
             bound->resolved = trait;
-            list_append(&type->traits, trait);
+            list_append(&type->traits, bound);
         });
-        map_put(keys->resolved, key->name->name, type);
+        if(map_put(keys->resolved, key->name->name, type) != NULL) spanned_error("Duplicate generic key", key->name->span, "Key `%s` already exists", key->name->name);
     });
 }
 
@@ -1794,16 +1811,19 @@ void resolve_funcdef_head(Program* program, CompilerOptions* options, FuncDef* f
     if (func->return_type == NULL) {
         func->return_type = gen_typevalue("::core::types::unit", &func->name->span);
     }
-    resolve_generic_keys(program, options, func->module, func->type_generics, NULL, NULL, NULL);
     if (func->trait_def) {
-        resolve_generic_keys(program, options, func->module, func->generics, NULL, NULL, func->type_generics);
+        resolve_generic_keys(program, options, func->module, func->generics, NULL, func->generics, func->type_generics);
     } else if (func->trait != NULL) {
         ModuleItem* template_mi = map_get(func->trait->methods, func->name->name);
+        if (template_mi == NULL) spanned_error("No such trait method", func->name->span, "No such method defined in trait %s::%s%s", 
+            to_str_writer(s, fprint_path(s, func->trait->module->path)),
+            func->trait->name->name,
+            to_str_writer(s, fprint_generic_keys(s, func->trait->keys)));
         FuncDef* template = template_mi->item;
         if (func->generics->generics.length != template->generics->generics.length) spanned_error("Invalid trait impl", func->name->span, "Generic mismatch, the trait method shpould have %lld generics btugot %lld", template->generics->generics.length, func->generics->generics.length);
-        resolve_generic_keys(program, options, func->module, func->generics, template->generics, NULL, func->type_generics);
+        resolve_generic_keys(program, options, func->module, func->generics, template->generics, func->generics, func->type_generics);
     } else {
-        resolve_generic_keys(program, options, func->module, func->generics, NULL, NULL, func->type_generics);
+        resolve_generic_keys(program, options, func->module, func->generics, NULL, func->generics, func->type_generics);
     }
 
     list_foreach(&func->args, i, Argument* arg, {
@@ -1867,7 +1887,7 @@ void resolve_typedef_head(Program* program, CompilerOptions* options, TypeDef* t
         if (options->verbosity >= 3) log("Type %s is extern", type->name->name);
     }
     if (str_eq(type->name->name, "_")) spanned_error("Invalid type name", type->name->span, "`_` is a reserved name.");
-    resolve_generic_keys(program, options, type->module, type->generics, NULL, NULL, NULL);
+    resolve_generic_keys(program, options, type->module, type->generics, NULL, NULL, type->generics);
 }
 
 void resolve_typedef_body(Program* program, CompilerOptions* options, TypeDef* type) {
@@ -1911,7 +1931,7 @@ void resolve_impl_head(Program* program, CompilerOptions* options, ImplBlock* im
         if (impl->trait_ref == NULL) log("Resolving impl block of %s", to_str_writer(s, fprint_typevalue(s, impl->type)));
         else log("Resolving impl block of %s on %s", to_str_writer(s, fprint_typevalue(s, impl->type)), to_str_writer(s, fprint_typevalue(s, impl->trait_ref)));
     }
-    resolve_generic_keys(program, options, impl->module, impl->generics, NULL, NULL, NULL);
+    resolve_generic_keys(program, options, impl->module, impl->generics, NULL, NULL, impl->generics);
     resolve_typevalue(program, options, impl->module, impl->type, NULL, impl->generics);
     if (impl->trait_ref != NULL) {
         impl->trait = resolve_item(program, options, impl->module, impl->trait_ref->name, MIT_TRAIT, NULL, impl->generics, &impl->trait_ref->generics);
@@ -1945,7 +1965,7 @@ void resolve_impl_body(Program* program, CompilerOptions* options, ImplBlock* im
         if (impl->type->def->fields != NULL) {
             map_foreach(impl->type->def->fields, str name, Field* field, {
                 TypeValue* field_ty = replace_generic(program, options, field->type, impl->type->generics, NULL, NULL, NULL);
-                if (!map_contains(field_ty->trait_impls, program->raii.copy_key) && !list_contains(&field_ty->def->traits, i, TraitDef* trait, trait == program->raii.copy)) {
+                if (!map_contains(field_ty->trait_impls, program->raii.copy_key) && !list_contains(&field_ty->def->traits, i, TraitBound* impl, impl->resolved == program->raii.copy)) {
                     spanned_error("Copy type with noncopy field", field->name->span, 
                     "Trying to implement core::copy::Copy on %s,\nbut field %s: %s is not Copy.\nFull impl type: %s\nFull impl field type: %s",
                     to_str_writer(s, fprint_typevalue(s, impl->type)), name, to_str_writer(s, fprint_typevalue(s, field_ty)),
@@ -1980,7 +2000,7 @@ void resolve_trait_head(Program* program, CompilerOptions* options, TraitDef* tr
     dummy->item = trait->self_type;
     ModuleItem* old = map_put(trait->module->items, trait->self_key->name->name, dummy);
 
-    resolve_generic_keys(program, options, trait->module, trait->keys, NULL, NULL, NULL);
+    resolve_generic_keys(program, options, trait->module, trait->keys, NULL, NULL, trait->keys);
 
     map_foreach(trait->methods, str name, ModuleItem* mi, ({
         UNUSED(name);
@@ -2203,13 +2223,13 @@ static void resolve_rec_impl(Program* program, CompilerOptions* options, Module*
 }
 
 void resolve(Program* program, CompilerOptions* options) {
-    program->raii.copy = resolve_item_raw(program, options, program->main_module, gen_path("::core::copy::Copy"), MIT_TRAIT, NULL)->item;
+    program->raii.copy = resolve_item_raw(program, options, program->main_module, gen_path("::core::copy::Copy", NULL), MIT_TRAIT, NULL)->item;
     program->raii.copy_key = to_str_writer(s, fprintf(s, "%p", program->raii.copy));
-    program->raii.clone = resolve_item_raw(program, options, program->main_module, gen_path("::core::clone::Clone"), MIT_TRAIT, NULL)->item;
+    program->raii.clone = resolve_item_raw(program, options, program->main_module, gen_path("::core::clone::Clone", NULL), MIT_TRAIT, NULL)->item;
     program->raii.clone_key = to_str_writer(s, fprintf(s, "%p", program->raii.clone));
-    program->raii.drop = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Drop"), MIT_TRAIT, NULL)->item;
+    program->raii.drop = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Drop", NULL), MIT_TRAIT, NULL)->item;
     program->raii.drop_key = to_str_writer(s, fprintf(s, "%p", program->raii.drop));
-    program->raii.raw = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Raw"), MIT_STRUCT, NULL)->item;
+    program->raii.raw = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Raw", NULL), MIT_STRUCT, NULL)->item;
     
     if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Registring impl names");
     map_foreach(program->packages, str key, Module* mod, {
@@ -2271,7 +2291,7 @@ void resolve(Program* program, CompilerOptions* options) {
     });
 
     program->tracegen.top_frame = malloc(sizeof(Variable));
-    program->tracegen.top_frame->path = gen_path("::core::trace::TOP_FRAME");
+    program->tracegen.top_frame->path = gen_path("::core::trace::TOP_FRAME", NULL);
     program->tracegen.top_frame->values = NULL;
     find_variable(program, options, program->main_module, NULL, program->tracegen.top_frame, NULL, NULL);
     program->tracegen.frame_type = gen_typevalue("::core::trace::Frame", NULL);

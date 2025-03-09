@@ -82,9 +82,10 @@ impl<T> Vec<T> {
         let item = std::mem::arr_take_unchecked(v.buffer, index);
         v.length -= 1;
         while index < v.length {
-            let a = std::mem::arr_offset(v.buffer, index);
-            let b = std::mem::arr_offset(v.buffer, index+1);
-            std::mem::swap(a, b);
+            std::mem::swap(
+                std::mem::arr_offset(v.buffer, index),
+                std::mem::arr_offset(v.buffer, index+1)
+            );
             index += 1;
         };
         Option::<_>::some(item)

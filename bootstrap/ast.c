@@ -1,6 +1,7 @@
 #include "ast.h"
 #include "lib.h"
 #include "lib/list.h"
+#include "lib/map.h"
 #include "resolver.h"
 LIB;
 #include "module.h"
@@ -88,10 +89,9 @@ void fprint_type(FILE* file, TypeDef* def) {
     fprint_td_path(file, def);
     if (def->traits.length > 0) {
         fprintf(file, ": ");
-        list_foreach(&def->traits, i, TraitDef* trait, {
+        list_foreach(&def->traits, i, TraitBound* trait, {
             if (i > 0) fprintf(file, " + ");
-            fprint_path(file, trait->module->path);
-            fprintf(file, "::%s", trait->name->name);
+            fprint_typevalue(file, trait->bound);
         });
     }
     fprint_generic_keys(file, def->generics);
@@ -156,15 +156,13 @@ void fprint_full_typevalue(FILE* file, TypeValue* tval) {
         map_foreach(tval->trait_impls, str key, ImplBlock* impl, {
             UNUSED(key);
             if (!first) fprintf(file, " + ");
-            fprint_path(file, impl->trait->module->path);
-            fprintf(file, "::%s", impl->trait->name->name);
+            fprint_full_typevalue(file, impl->trait_ref);
             first = false;
         });
         if (tval->def != NULL) {
-            list_foreach(&tval->def->traits, i, TraitDef* trait, {
+            list_foreach(&tval->def->traits, i, TraitBound* impl, {
                 if (i > 0) fprintf(file, " + ");
-                fprint_path(file, trait->module->path);
-                fprintf(file, "::%s", trait->name->name);
+                fprint_full_typevalue(file, impl->bound);
                 first = false;
             });
         }

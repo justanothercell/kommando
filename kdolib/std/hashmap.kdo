@@ -1,11 +1,13 @@
 use std::*;
 use std::vec::Vec;
+use std::iter::Iter;
 
 use core::copy::Copy;
 use core::clone::Clone;
 use core::eq::Eq;
 use core::hash::Hash;
 use core::hash::DefaultHasher;
+use core::fmt::*;
 
 pub struct Entry<K, V> {
     key: K, 
@@ -17,6 +19,36 @@ impl<K: Copy, V: Copy> Entry<K, V>: Copy { }
 impl<K: Clone, V: Clone> Entry<K, V>: Clone {
     fn clone(self: ptr<Entry<K, V>>) -> Entry<K, V> {
         _ { key: self.key.clone(), value: self.value.clone() }
+    }
+}
+
+impl<K: Clone, V: Clone> Entry<ptr<K>, ptr<V>> {
+    fn cloned(self: ptr<Entry<ptr<K>, ptr<V>>>) -> Entry<K, V> {
+        _ { key: self.key.clone(), value: self.value.clone() }
+    }
+}
+
+impl<K: Copy, V: Copy> Entry<ptr<K>, ptr<V>> {
+    fn deref(self: Entry<ptr<K>, ptr<V>>) -> Entry<K, V> {
+        _ { key: *self.key, value: *self.value }
+    }
+}
+
+impl<K: Fmt, V: Fmt> Entry<K, V> {
+    fn as_ref(self: ptr<Entry<K, V>>) -> Entry<ptr<K>, ptr<V>> {
+        _ { key: &self.key, value: &self.value }
+    }
+}
+impl<K: Fmt, V: Fmt> Entry<K, V>: Fmt {
+    fn dyn_fmt(self: ptr<Entry<K, V>>) -> DynFmt {
+        _ { object: typecast(self), fmt: Entry::<K, V>::fmt }
+    }
+    fn fmt(self: ptr<Entry<K, V>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+        stream.write_str("(")
+            .write(fmt, &self.key)
+            .write_str(": ")
+            .write(fmt, &self.value)
+            .write_str(")");
     }
 }
 
@@ -131,7 +163,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         false
     }
 
-    pub fn iter(self: ptr<HashMap<K, V>>) -> Iter<K, V> {
+    pub fn iter(self: ptr<HashMap<K, V>>) -> MapIter<K, V> {
         _ {
             map: self,
             i: 0,
@@ -140,14 +172,14 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
     }
 }
 
-pub struct Iter<K, V> {
+pub struct MapIter<K, V> {
     map: ptr<HashMap<K, V>>,
     i: usize, 
     j: usize
 }
 
-impl<K, V> Iter<K, V> {
-    pub fn next_ref(self: ptr<Iter<K, V>>) -> Option<ptr<Entry<K, V>>> {
+impl<K, V> MapIter<K, V>: Iter<ptr<Entry<K, V>>> {
+    pub fn next(self: ptr<MapIter<K, V>>) -> Option<ptr<Entry<K, V>>> {
         if self.i >= self.map.buckets.length {
             return Option::<_>::none();
         };
@@ -165,27 +197,6 @@ impl<K, V> Iter<K, V> {
         Option::<_>::none()
     }
 }
-
-impl<K: Copy, V: Copy> Iter<K, V> {
-    pub fn next(self: ptr<Iter<K, V>>) -> Option<Entry<K, V>> {
-        if self.i >= self.map.buckets.length {
-            return Option::<_>::none();
-        };
-        while self.i < self.map.buckets.length {
-            let bucket = self.map.buckets.get_ref(self.i).unwrap();
-            if self.j >= bucket.length {
-                self.i += 1;
-                self.j = 0;
-            } else {
-                let entry = bucket.get(self.j).unwrap();
-                self.j += 1;
-                return Option::<_>::some(entry);
-            }
-        };
-        Option::<_>::none()
-    }
-}
-
 
 impl<K: Hash + Eq, V: Copy> HashMap<K, V> {
     pub fn get(self: ptr<HashMap<K, V>>, key: K) -> Option<V> {

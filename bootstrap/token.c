@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "token.h"
 #include "lib.h"
 #include "lib/exit.h"
@@ -5,7 +6,6 @@
 #include "parser.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 bool is_alphabetic(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');

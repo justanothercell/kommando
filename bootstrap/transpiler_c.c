@@ -1243,7 +1243,7 @@ void transpile_to_c(Program* program, CompilerOptions* options, FILE* type_h_str
     program->tracegen.top_frame_c_name = gen_c_var_name(program, options, program->tracegen.top_frame, NULL, NULL);
     program->tracegen.frame_type_c_name = gen_c_type_name(program, options, program->tracegen.frame_type, NULL, NULL);
     program->tracegen.function_type_c_name = gen_c_type_name(program, options, program->tracegen.function_type, NULL, NULL);
-    PTR_DEF = resolve_item_raw(program, options, program->main_module, gen_path("::core::types::ptr"), MIT_STRUCT, NULL)->item;
+    PTR_DEF = resolve_item_raw(program, options, program->main_module, gen_path("::core::types::ptr", NULL), MIT_STRUCT, NULL)->item;
 
     usize len = strlen(base_name);
     str base_name_upper = malloc(len+1);

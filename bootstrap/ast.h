@@ -58,7 +58,12 @@ typedef struct TraitDef {
     GenericKeys* keys;
     Module* module;
 } TraitDef;
-LIST(TraitList, TraitDef*);
+typedef struct GenericValues GenericValues;
+typedef struct TraitBound {
+    TypeValue* bound;
+    TraitDef* resolved;
+} TraitBound;
+LIST(TraitBoundList, TraitBound*);
 
 typedef struct TypeDef {
     Identifier* name;
@@ -69,18 +74,13 @@ typedef struct TypeDef {
     u32 transpile_state;
     Module* module;
     AnnoList annotations;
-    TraitList traits;
+    TraitBoundList traits;
     GKey* key;
 } TypeDef;
 LIST(TypeValueList, TypeValue*);
 void fprint_td_path(FILE* file, TypeDef* def);
 void fprint_type(FILE* file, TypeDef* def);
 
-typedef struct TraitBound {
-    TypeValue* bound;
-    TraitDef* resolved;
-} TraitBound;
-LIST(TraitBoundList, TraitBound*);
 typedef struct GKey {
     Identifier* name;
     TraitBoundList bounds;

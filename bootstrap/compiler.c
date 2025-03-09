@@ -157,7 +157,7 @@ CompilerOptions build_args(StrList* args) {
         log("No out name set");
         goto print_help;
     }
-    if (options.out_dir == NULL) options.out_dir = "./build";
+    if (options.out_dir == NULL) options.out_dir = "build";
     if (options.c_compiler == NULL) options.c_compiler = "gcc";
     return options;
 }
@@ -177,7 +177,7 @@ void compile(CompilerOptions options) {
     if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "PARSER" ANSI_RESET_SEQUENCE, "Parsing source files...");
     TokenStream* stream = tokenstream_new(options.source, read_file_to_string(options.source));
     if (options.verbosity >= 2) log("Parsing package ::main");
-    Module* main = parse_module_contents(stream, gen_path("::main"));
+    Module* main = parse_module_contents(stream, gen_path("::main", NULL));
     ModuleItem* main_func_item = map_get(main->items, "main");
     if (main_func_item == NULL || main_func_item->type != MIT_FUNCTION) panic("no main function found");
 
@@ -191,7 +191,7 @@ void compile(CompilerOptions options) {
         if (access(file, F_OK) != 0) panic("Could not load package %s: no such file %s", file, package_name);
         TokenStream* s = tokenstream_new(file, read_file_to_string(file));
         if (options.verbosity >= 2) log("Parsing library package %s", package_name);
-        Path* modpath = gen_path(to_str_writer(s, fprintf(s, "::%s", package_name)));
+        Path* modpath = gen_path(to_str_writer(s, fprintf(s, "::%s", package_name)), NULL);
         if (modpath->elements.length != 1) panic("Library path may not be a submodule: expected path to look like ::foo, not %s", modpath);
         Module* package = parse_module_contents(s, modpath);
         package->filepath = file;

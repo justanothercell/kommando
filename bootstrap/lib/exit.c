@@ -115,7 +115,7 @@ void fprint_stacktrace(FILE* file) {
             str line = loc.elements[1];
             int line_end = 0;
             while (line[line_end] != 0 && line[line_end] != '(') line_end += 1;
-            fprintf(file, " ./%s:%.*s"ANSI(ANSI_FAINT)"%s"ANSI_RESET_SEQUENCE"\n", path, line_end, line, line + line_end);
+            fprintf(file, " %s:%.*s"ANSI(ANSI_FAINT)"%s"ANSI_RESET_SEQUENCE"\n", path, line_end, line, line + line_end);
         }
         else fprintf(file, " "ANSI(ANSI_FAINT)"%s:%s"ANSI_RESET_SEQUENCE"\n", loc.elements[0], loc.elements[1]);
     }

@@ -1,0 +1,31 @@
+use std::*;
+use std::vec::Vec;
+use std::iter::Iter;
+
+struct PeekIter<T, I: Iter<T>> {
+    iter: I,
+    stack: Vec<T>
+}
+
+impl<T, I: Iter<T>> PeekIter<T, I>: Iter<T> {
+    fn next(self: ptr<PeekIter<T, I>>) -> Option<T> {
+        if self.stack.length > 0 {
+            return self.stack.pop();
+        };
+        self.iter.next()
+    }
+}
+
+impl<T, I: Iter<T>> PeekIter<T, I> {
+    fn new(iter: I) -> PeekIter<T, I> {
+        _ { iter: iter, stack: Vec::<_>::new() }
+    }
+    fn peek(self: ptr<PeekIter<T, I>>, n: usize) -> Option<ptr<T>> {
+        while self.stack.length <= n {
+            let next = self.iter.next();
+            if next.is_none() { return Option::<_>::none() };
+            self.stack.push(next.unwrap());
+        };
+        self.stack.get_ref(self.stack.length - n - 1)
+    }
+}

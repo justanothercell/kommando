@@ -14,6 +14,7 @@ fn main() {
 
     println("map contains $ items", map.length.dyn_fmt());
     println("map contains 5: $", map.contains(5).dyn_fmt());
+    println("map contains 81: $", map.contains(81).dyn_fmt());
     println("value of key 11: $", map.get(11).unwrap().dyn_fmt());
 
     println("Iterating entries:");

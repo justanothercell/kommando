@@ -1,13 +1,30 @@
 use std::*;
 use std::vec::Vec;
+use std::iter::Iter;
 
 use core::copy::Copy;
 use core::clone::Clone;
 use core::cmp::Cmp;
 
 pub struct Slice<T> {
-    buffer: ptr<T>,
-    length: usize
+    length: usize,
+    buffer: ptr<T>
+}
+
+pub struct SliceIter<T> {
+    length: usize, 
+    index: usize,
+    buffer: ptr<T>
+}
+
+impl<T> SliceIter<T>: Iter<ptr<T>> {
+    fn next(self: ptr<SliceIter<T>>) -> Option<ptr<T>> {
+        if self.index < self.length {
+            Option::<_>::some(std::mem::arr_offset(self.buffer, std::mem::replace(&self.index, self.index+1)))
+        } else {
+            Option::<_>::none()
+        }
+    }
 }
 
 impl<T> Slice<T> {
@@ -33,6 +50,10 @@ impl<T> Slice<T> {
         if to < from { panic("Slice range negative") };
         if s.length < to { panic("Slice out of range for vector") };
         _ { buffer: std::mem::arr_offset(s.buffer, from), length: to - from }
+    }
+
+    pub fn iter(self: ptr<Slice<T>>) -> SliceIter<T> {
+        _ { length: self.length, buffer: self.buffer, index: 0 }
     }
 }
 
