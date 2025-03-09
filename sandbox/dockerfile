@@ -15,8 +15,8 @@ USER appuser
 # communication port
 EXPOSE 7878
 
-RUN pip install flask apscheduler wonderwords gunicorn
-
 ENV PATH "$PATH:/home/appuser/.local/bin"
+
+RUN pip install flask apscheduler wonderwords gunicorn
 
 CMD [ "gunicorn", " --bind", "0.0.0.0:7878", "runner:app"]
