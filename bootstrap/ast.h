@@ -113,6 +113,7 @@ typedef struct TypeValue {
     Map* trait_impls;
 } TypeValue;
 void fprint_typevalue(FILE* file, TypeValue* tval);
+void fprint_lit_typevalue(FILE* file, TypeValue* tval);
 void fprint_full_typevalue(FILE* file, TypeValue* tval);
 
 typedef struct VarBox VarBox;

@@ -82,6 +82,8 @@
 #define info(module, fmt, ...) finfo(stdout, module, fmt, ## __VA_ARGS__)
 #define fdebug(file, fmt, expr) ({ typeof(expr) result = expr; finfo(file, ANSI(ANSI_BOLD, ANSI_GREEN_FG) "DEBUG" ANSI_RESET_SEQUENCE, "%s", to_str_writer(stream, fprintf(stream, "%s = ", #expr); fprintf(stream, fmt, result))); result; })
 #define debug(fmt, expr) fdebug(stdout, fmt, expr)
+#define fwarn(file, fmt, ...) finfo(file, ANSI(ANSI_BOLD, ANSI_YELLO_FG) "WARN" ANSI_RESET_SEQUENCE, fmt, ## __VA_ARGS__)
+#define warn(fmt, ...) fwarn(stdout, fmt, ## __VA_ARGS__)
 
 #ifdef __x86_64__
     #define __TARGET_BYTES__ 8

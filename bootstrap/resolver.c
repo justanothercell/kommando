@@ -467,12 +467,12 @@ void resolve_typevalue(Program* program, CompilerOptions* options, Module* modul
         if (func_gen_t != NULL) {
             tval->def = func_gen_t;
             tval->ctx = func_generics;
-            return;
+            goto done;
         }
         if (type_gen_t != NULL) {
             tval->def = type_gen_t;
             tval->ctx = type_generics;
-            return;
+            goto done;
         }
     }
     // it is an actual type and not a generic parameter
@@ -484,6 +484,9 @@ void resolve_typevalue(Program* program, CompilerOptions* options, Module* modul
         });
     }
     tv_apply_traits(program, options, tval);
+    done: {}
+    if (options->do_lint && tval->def == program->ptr_type && !tval->name->absolute) 
+        warn("Reference "ANSI(ANSI_BOLD)"%s"ANSI_RESET_SEQUENCE" @ %s can be written as "ANSI(ANSI_BOLD)"&%s"ANSI_RESET_SEQUENCE, to_str_writer(s, fprint_lit_typevalue(s, tval)), to_str_writer(s, fprint_span(s, &tval->name->elements.elements[0]->span)), to_str_writer(s, fprint_lit_typevalue(s, tval->generics->generics.elements[0])));
 }
 
 void assert_types_equal(Program* program, CompilerOptions* options, Module* module, TypeValue* tv1, TypeValue* tv2, Span span, GenericKeys* func_generics, GenericKeys* type_generics) {
@@ -2230,6 +2233,7 @@ void resolve(Program* program, CompilerOptions* options) {
     program->raii.drop = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Drop", NULL), MIT_TRAIT, NULL)->item;
     program->raii.drop_key = to_str_writer(s, fprintf(s, "%p", program->raii.drop));
     program->raii.raw = resolve_item_raw(program, options, program->main_module, gen_path("::core::drop::Raw", NULL), MIT_STRUCT, NULL)->item;
+    program->ptr_type = resolve_item_raw(program, options, program->main_module, gen_path("::core::types::ptr", NULL), MIT_STRUCT, NULL)->item;
     
     if (options->verbosity >= 2) info(ANSI(ANSI_BOLD, ANSI_PURPLE_FG) "PASS" ANSI_RESET_SEQUENCE, "Registring impl names");
     map_foreach(program->packages, str key, Module* mod, {

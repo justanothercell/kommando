@@ -91,6 +91,7 @@ typedef struct Program {
     Module* main_module;
     TraceGen tracegen;
     RaiiData raii;
+    TypeDef* ptr_type;
     TranspilerData t;
 } Program;
 

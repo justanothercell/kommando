@@ -900,6 +900,13 @@ Path* parse_path(TokenStream* stream) {
 }
 
 TypeValue* parse_type_value(TokenStream* stream) {
+    Token* t = next_token(stream);
+    if (token_compare(t, "&", SNOWFLAKE)) {
+        TypeValue* tval = gen_typevalue("::core::types::ptr<_>", &t->span);
+        tval->generics->generics.elements[0] = parse_type_value(stream);
+        return tval;
+    }
+    stream->peek = t;
     Path* name = parse_path(stream);
     if (name->elements.length == 0) spanned_error("Expected type", next_token(stream)->span, "Expected thype but got this instead?");
     TypeValue* tval = malloc(sizeof(TypeValue));
@@ -908,7 +915,7 @@ TypeValue* parse_type_value(TokenStream* stream) {
     tval->def = NULL;
     tval->ctx = NULL;
     tval->trait_impls = map_new();
-    Token* t = peek_next_token(stream);
+    t = peek_next_token(stream);
     if (t != NULL) {
         if (token_compare(t, "<", SNOWFLAKE)) {
             tval->generics = parse_generic_values(stream);

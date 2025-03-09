@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +29,7 @@ CompilerOptions build_args(StrList* args) {
         printf("    --raw     -w - do not create wrapper code\n");
         printf("    --silent     - verbosity = 0\n");
         printf("    --static     - staticmay link libraries\n");
+        printf("    --nolint     - turn of lint warnigns (independant of verbosity)\n");
         printf("    --verbose -v - verbosity += 1 (default = 1)\n");
         printf("    --trace=[none|main|all]\n");
         printf("             none - do not generate traceback info\n");
@@ -56,6 +58,7 @@ CompilerOptions build_args(StrList* args) {
     options.run = false;
     options.static_links = false;
     options.emit_info = false;
+    options.do_lint = true;
     options.package_names = list_new(StrList);
     options.c_headers = list_new(StrList);
     options.packages = map_new();
@@ -79,6 +82,8 @@ CompilerOptions build_args(StrList* args) {
                 options.emit_info = true;
             } else if (str_eq(arg, "compile")) {
                 options.compile = true;
+            } else if (str_eq(arg, "nolint")) {
+                options.do_lint = false;
             } else if (str_eq(arg, "silent")) {
                 options.verbosity = 0;
             } else if (str_eq(arg, "static")) {

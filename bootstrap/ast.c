@@ -116,17 +116,6 @@ void fprint_typevalue(FILE* file, TypeValue* tval) {
     } else{
         fprint_path(file, tval->name);        
     }
-    /*if (map_size(tval->trait_impls) > 0) {
-        fprintf(file, ": ");
-        bool first = true;
-        map_foreach(tval->trait_impls, str key, ImplBlock* impl, {
-            UNUSED(key);
-            if (!first) fprintf(file, " + ");
-            fprint_path(file, impl->trait->module->path);
-            fprintf(file, "::%s", impl->trait->name->name);
-            first = false;
-        });
-    }*/
     if (tval->generics != NULL && tval->generics->generics.length > 0) {
         fputc('<', file);
         list_foreach(&tval->generics->generics, i, TypeValue* generic, {
@@ -136,6 +125,24 @@ void fprint_typevalue(FILE* file, TypeValue* tval) {
         fputc('>', file);   
     }
 }
+
+
+void fprint_lit_typevalue(FILE* file, TypeValue* tval) {
+    if (tval == NULL) {
+        fprintf(file, "(null)");
+        return;
+    }
+    fprint_path(file, tval->name);        
+    if (tval->generics != NULL && tval->generics->generics.length > 0) {
+        fputc('<', file);
+        list_foreach(&tval->generics->generics, i, TypeValue* generic, {
+            if (i > 0) fprintf(file, ", ");
+            fprint_lit_typevalue(file, generic);
+        });
+        fputc('>', file);   
+    }
+}
+
 
 void fprint_full_typevalue(FILE* file, TypeValue* tval) {
     if (tval == NULL) {
