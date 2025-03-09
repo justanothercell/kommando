@@ -3,5 +3,5 @@ pub mod peek;
 use std::*;
 
 pub trait Self: Iter<T> {
-    fn next(self: ptr<Self>) -> Option<T>;
+    fn next(self: &Self) -> Option<T>;
 }

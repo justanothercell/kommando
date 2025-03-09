@@ -55,7 +55,7 @@ impl<T, E> Result<T, E> {
         }
     }
 
-    pub fn as_ref(self: ptr<Result<T, E>>) -> Result<ptr<T>, ptr<E>> {
+    pub fn as_ref(self: &Result<T, E>) -> Result<&T, &E> {
         if self.is_ok {
             Result::<_, _>::ok(self.value.ref())
         } else {
@@ -85,10 +85,10 @@ impl<T, E: Fmt> Result<T, E> {
 }
 
 impl<T: Fmt, E: Fmt> Result<T, E>: Fmt {
-    fn dyn_fmt(self: ptr<Result<T, E>>) -> DynFmt {
+    fn dyn_fmt(self: &Result<T, E>) -> DynFmt {
         _ { object: typecast(self), fmt: Result::<T, E>::fmt }
     }
-    fn fmt(self: ptr<Result<T, E>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+    fn fmt(self: &Result<T, E>, fmt: &Formatter, stream: &FormatStream) {
         if self.is_ok {
             stream.write_str("some(").write(fmt, self.value.ref()).write_str(")");
             stream.write_str(")");
@@ -100,8 +100,8 @@ impl<T: Fmt, E: Fmt> Result<T, E>: Fmt {
 
 impl<T: Copy, E: Copy> Result<T, E>: Copy {}
 
-impl<T: Copy, E: Copy> Result<ptr<T>, ptr<E>> {
-    fn deref(self: Result<ptr<T>, ptr<E>>) -> Result<T, E> {
+impl<T: Copy, E: Copy> Result<&T, &E> {
+    fn deref(self: Result<&T, &E>) -> Result<T, E> {
         if self.is_ok {
             Result::<_, _>::ok(*self.value.get())
         } else {
@@ -111,7 +111,7 @@ impl<T: Copy, E: Copy> Result<ptr<T>, ptr<E>> {
 }
 
 impl<T: Clone, E: Clone> Result<T, E>: Clone {
-    fn clone(self: ptr<Result<T, E>>) -> Result<T, E> {
+    fn clone(self: &Result<T, E>) -> Result<T, E> {
         if self.is_ok {
             Result::<_, _>::ok(self.value.cloned())
         } else {
@@ -120,8 +120,8 @@ impl<T: Clone, E: Clone> Result<T, E>: Clone {
     }
 }
 
-impl<T: Clone, E: Clone> Result<ptr<T>, ptr<E>> {
-    fn cloned(self: ptr<Result<ptr<T>, ptr<E>>>) -> Result<T, E> {
+impl<T: Clone, E: Clone> Result<&T, &E> {
+    fn cloned(self: &Result<&T, &E>) -> Result<T, E> {
         if self.is_ok {
             Result::<_, _>::ok(self.value.get().clone())
         } else {
@@ -131,7 +131,7 @@ impl<T: Clone, E: Clone> Result<ptr<T>, ptr<E>> {
 }
 
 impl<T: Drop, E: Drop> Result<T, E>: Drop {
-    fn drop(self: ptr<Result<T, E>>) {
+    fn drop(self: &Result<T, E>) {
         if self.is_ok {
             self.value.drop_manually();
         } else {

@@ -6,26 +6,26 @@ use core::types::*;
 /// Initalizes the structure pointed to by ucp.
 /// returns -1 on error and 0 on success,
 #[extern]
-pub fn getcontext(ucp: ptr<ucontext_t>) -> i32;
+pub fn getcontext(ucp: &ucontext_t) -> i32;
 
 /// Restore the context to the structure pointed to by ucp.
 /// returns -1 on error, does not return on success.
 #[extern]
-pub fn setcontext(ucp: ptr<ucontext_t>) -> i32;
+pub fn setcontext(ucp: &ucontext_t) -> i32;
 
 /// Fill the context with this execution info.
 /// Note: the va_args of length count need to be of type i32.
 #[extern]
-pub fn makecontext(ucp: ptr<ucontext_t>, function: function_ptr<unit>, count: i32, ...);
+pub fn makecontext(ucp: &ucontext_t, function: function_ptr<unit>, count: i32, ...);
 
 /// save the current instruction context in uocp and continue with ucp.
 /// returns -1 on error and 0 on success (when returning back from a different context)
 #[extern]
-pub fn swapcontext(uocp: ptr<ucontext_t>, ucp: ptr<ucontext_t>) -> i32;
+pub fn swapcontext(uocp: &ucontext_t, ucp: &ucontext_t) -> i32;
 
 pub struct ucontext_t {
     uc_flags: u64,
-    uc_link: ptr<ucontext_t>,
+    uc_link: &ucontext_t,
     uc_stack: stack_t,
     uc_mcontext: mcontext_t,
     uc_sigmask: sigset_t,

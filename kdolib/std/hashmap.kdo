@@ -17,33 +17,33 @@ pub struct Entry<K, V> {
 impl<K: Copy, V: Copy> Entry<K, V>: Copy { }
 
 impl<K: Clone, V: Clone> Entry<K, V>: Clone {
-    fn clone(self: ptr<Entry<K, V>>) -> Entry<K, V> {
+    fn clone(self: &Entry<K, V>) -> Entry<K, V> {
         _ { key: self.key.clone(), value: self.value.clone() }
     }
 }
 
-impl<K: Clone, V: Clone> Entry<ptr<K>, ptr<V>> {
-    fn cloned(self: ptr<Entry<ptr<K>, ptr<V>>>) -> Entry<K, V> {
+impl<K: Clone, V: Clone> Entry<&K, &V> {
+    fn cloned(self: &Entry<&K, &V>) -> Entry<K, V> {
         _ { key: self.key.clone(), value: self.value.clone() }
     }
 }
 
-impl<K: Copy, V: Copy> Entry<ptr<K>, ptr<V>> {
-    fn deref(self: Entry<ptr<K>, ptr<V>>) -> Entry<K, V> {
+impl<K: Copy, V: Copy> Entry<&K, &V> {
+    fn deref(self: Entry<&K, &V>) -> Entry<K, V> {
         _ { key: *self.key, value: *self.value }
     }
 }
 
 impl<K: Fmt, V: Fmt> Entry<K, V> {
-    fn as_ref(self: ptr<Entry<K, V>>) -> Entry<ptr<K>, ptr<V>> {
+    fn as_ref(self: &Entry<K, V>) -> Entry<&K, &V> {
         _ { key: &self.key, value: &self.value }
     }
 }
 impl<K: Fmt, V: Fmt> Entry<K, V>: Fmt {
-    fn dyn_fmt(self: ptr<Entry<K, V>>) -> DynFmt {
+    fn dyn_fmt(self: &Entry<K, V>) -> DynFmt {
         _ { object: typecast(self), fmt: Entry::<K, V>::fmt }
     }
-    fn fmt(self: ptr<Entry<K, V>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+    fn fmt(self: &Entry<K, V>, fmt: &Formatter, stream: &FormatStream) {
         stream.write_str("(")
             .write(fmt, &self.key)
             .write_str(": ")
@@ -77,7 +77,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         }
     }
 
-    pub fn put(self: ptr<HashMap<K, V>>, key: K, value: V) -> Option<Entry<K, V>> {
+    pub fn put(self: &HashMap<K, V>, key: K, value: V) -> Option<Entry<K, V>> {
         let hasher = DefaultHasher::<>::new_with_key(self.random);
         key.hash(&hasher);
         let hash: u64 = hasher.finish();
@@ -115,7 +115,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         Option::<_>::none()
     }
 
-    pub fn remove(self: ptr<HashMap<K, V>>, key: K) -> Option<Entry<K, V>> {
+    pub fn remove(self: &HashMap<K, V>, key: K) -> Option<Entry<K, V>> {
         let hasher = DefaultHasher::<>::new_with_key(self.random);
         key.hash(&hasher);
         let hash: u64 = hasher.finish();
@@ -131,7 +131,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         Option::<_>::none()
     }
 
-    pub fn get_ref(self: ptr<HashMap<K, V>>, key: K) -> Option<ptr<V>> {
+    pub fn get_ref(self: &HashMap<K, V>, key: K) -> Option<&V> {
         let hasher = DefaultHasher::<>::new_with_key(self.random);
         key.hash(&hasher);
         let hash: u64 = hasher.finish();
@@ -147,7 +147,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         Option::<_>::none()
     }
 
-    pub fn contains(self: ptr<HashMap<K, V>>, key: K) -> bool {
+    pub fn contains(self: &HashMap<K, V>, key: K) -> bool {
         let hasher = DefaultHasher::<>::new_with_key(self.random);
         key.hash(&hasher);
         let hash: u64 = hasher.finish();
@@ -163,7 +163,7 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
         false
     }
 
-    pub fn iter(self: ptr<HashMap<K, V>>) -> MapIter<K, V> {
+    pub fn iter(self: &HashMap<K, V>) -> MapIter<K, V> {
         _ {
             map: self,
             i: 0,
@@ -173,13 +173,13 @@ impl<K: Hash + Eq, V> HashMap<K, V> {
 }
 
 pub struct MapIter<K, V> {
-    map: ptr<HashMap<K, V>>,
+    map: &HashMap<K, V>,
     i: usize, 
     j: usize
 }
 
-impl<K, V> MapIter<K, V>: Iter<ptr<Entry<K, V>>> {
-    pub fn next(self: ptr<MapIter<K, V>>) -> Option<ptr<Entry<K, V>>> {
+impl<K, V> MapIter<K, V>: Iter<&Entry<K, V>> {
+    pub fn next(self: &MapIter<K, V>) -> Option<&Entry<K, V>> {
         if self.i >= self.map.buckets.length {
             return Option::<_>::none();
         };
@@ -199,7 +199,7 @@ impl<K, V> MapIter<K, V>: Iter<ptr<Entry<K, V>>> {
 }
 
 impl<K: Hash + Eq, V: Copy> HashMap<K, V> {
-    pub fn get(self: ptr<HashMap<K, V>>, key: K) -> Option<V> {
+    pub fn get(self: &HashMap<K, V>, key: K) -> Option<V> {
         let hasher = DefaultHasher::<>::new_with_key(self.random);
         key.hash(&hasher);
         let hash: u64 = hasher.finish();
@@ -217,7 +217,7 @@ impl<K: Hash + Eq, V: Copy> HashMap<K, V> {
 }
 
 impl<K: Clone, V: Clone> HashMap<K, V>: Clone {
-    fn clone(self: ptr<HashMap<K, V>>) -> HashMap<K, V> {
+    fn clone(self: &HashMap<K, V>) -> HashMap<K, V> {
         _ { 
             buckets: self.buckets.clone(),
             random: self.random, 

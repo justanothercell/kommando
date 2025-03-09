@@ -15,7 +15,7 @@ pub struct CoroContext<A, T> {
 }
 
 impl<A, T> CoroContext<A, T> {
-    pub fn yield(ctx: ptr<CoroContext<A, T>>, ret: T) -> A {
+    pub fn yield(ctx: &CoroContext<A, T>, ret: T) -> A {
         ctx.ret.item = ret;
         if c_api::ucontext::swapcontext(&ctx.runner_ctx, &ctx.main_ctx) == 0-1 {
             panic("Coroutine: swapcontext failed")
@@ -62,7 +62,7 @@ impl<A, T> Coroutine<A, T> {
         }
     }
 
-    pub fn step(coro: ptr<Coroutine<A, T>>, arg: A) -> T {
+    pub fn step(coro: &Coroutine<A, T>, arg: A) -> T {
         if coro.state != 0 {
             c_api::fprintf(io::stderr, "Error: coroutine cannot be stepped, is already done\n");
             c_api::exit(1);
@@ -80,13 +80,13 @@ impl<A, T> Coroutine<A, T> {
     }
 }
 
-fn coro_start<A, T>(ctx: ptr<CoroContext<A, T>>) {
+fn coro_start<A, T>(ctx: &CoroContext<A, T>) {
     ctx.ret.item = (ctx.function)(ctx, std::mem::replace(&ctx.arg.item, std::mem::uninit()));
     ctx.state = 1;
 }
 
 impl<A, T> CoroContext<A, T>: Drop {
-    fn drop(self: ptr<CoroContext<A, T>>) {
+    fn drop(self: &CoroContext<A, T>) {
         c_api::free(self.stack);
         // TODO: drop A and T
     }

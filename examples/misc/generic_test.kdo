@@ -25,17 +25,17 @@ struct Bar<T> {
 }
 
 impl<T: Copy> Foo<T> {
-    fn x(self: Foo<T>, t: T) -> ptr<T> {
+    fn x(self: Foo<T>, t: T) -> &T {
         noop::<W<T>>();
         &t
     }
-    fn z(self: Foo<T>, t: ptr<T>) -> ptr<T> {
+    fn z(self: Foo<T>, t: &T) -> &T {
         noop::<V<T>>();
         &Bar::<T> {}.y(t)
     }
 }
 impl<K: Copy> Bar<K> {
-    fn y(self: Foo<K>, t: ptr<K>) -> K {
+    fn y(self: Foo<K>, t: &K) -> K {
         noop::<U<K>>();
         *Foo::<K> {}.x(*t)
     }
@@ -47,6 +47,6 @@ fn main() {
 
     let f = Foo::<u8> { };
     f.x(seven);
-    let g = Foo::<ptr<u8>> { };
+    let g = Foo::<&u8> { };
     g.x(&seven);
 }

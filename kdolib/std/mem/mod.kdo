@@ -5,7 +5,7 @@ use std::io::stderr;
 
 use core::copy::Copy;
 
-pub fn new_uninit<T>() -> ptr<T> {
+pub fn new_uninit<T>() -> &T {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 { return null(); };
     let raw_ptr = c_api::malloc(size);
@@ -15,13 +15,13 @@ pub fn new_uninit<T>() -> ptr<T> {
     typecast(raw_ptr)
 }
 
-pub fn new<T>(t: T) -> ptr<T>{
+pub fn new<T>(t: T) -> &T{
     let object: _<T> = new_uninit();
     *object = t;
     object
 }
 
-pub fn new_zeroed<T>() -> ptr<T> {
+pub fn new_zeroed<T>() -> &T {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 { return null(); };
     let raw_ptr = c_api::calloc(1, size); // calloc is faster than memset(raw_ptr, 0, size)
@@ -45,13 +45,13 @@ pub fn zeroed<T>() -> T {
 }
 
 
-pub fn free<T>(ptr: ptr<T>) {
+pub fn free<T>(ptr: &T) {
     let raw_ptr = to_raw(ptr);
     if raw_ptr == c_api::null { return; };
     c_api::free(raw_ptr);
 }
 
-pub fn arr_new<T>(n: usize) -> ptr<T> {
+pub fn arr_new<T>(n: usize) -> &T {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 || n == 0 { return null(); };
     let raw_ptr = c_api::calloc(n, size);
@@ -61,7 +61,7 @@ pub fn arr_new<T>(n: usize) -> ptr<T> {
     typecast(raw_ptr)
 }
 
-pub fn arr_resize<T>(arr: ptr<T>, n: usize) -> ptr<T> {
+pub fn arr_resize<T>(arr: &T, n: usize) -> &T {
     let size = core::intrinsics::sizeof::<T>();
     if size == 0 || n == 0 { return null(); };
     let raw_ptr = to_raw(arr);
@@ -72,31 +72,31 @@ pub fn arr_resize<T>(arr: ptr<T>, n: usize) -> ptr<T> {
     typecast(raw_ptr)
 }
 
-pub fn arr_offset<T>(arr: ptr<T>, i: usize) -> ptr<T> {
+pub fn arr_offset<T>(arr: &T, i: usize) -> &T {
     let usize_ptr = typecast::<_, usize>(arr);
     if usize_ptr == 0 { return null(); };
     let size = core::intrinsics::sizeof::<T>();
     typecast(usize_ptr + size * i)
 }
 
-pub fn arr_get<T: Copy>(arr: ptr<T>, i: usize) -> T {
+pub fn arr_get<T: Copy>(arr: &T, i: usize) -> T {
     *arr_offset(arr, i)
 }
 
 // see std::mem::take_unchecked for warnings
-pub fn arr_take_unchecked<T>(arr: ptr<T>, i: usize) -> T {
+pub fn arr_take_unchecked<T>(arr: &T, i: usize) -> T {
     take_unchecked(arr_offset(arr, i))
 }
 
-pub fn null<T>() -> ptr<T> {
+pub fn null<T>() -> &T {
     typecast(0usize)
 }
 
-pub fn to_raw<T>(ptr: ptr<T>) -> raw_ptr {
+pub fn to_raw<T>(ptr: &T) -> raw_ptr {
     typecast(ptr)
 }
 
-pub fn swap<T>(p1: ptr<T>, p2: ptr<T>) {
+pub fn swap<T>(p1: &T, p2: &T) {
     $"@![T] temp = *$![p1]";
     $"*$![p1] = *$![p2]";
     $"*$![p2] = temp";
@@ -107,11 +107,11 @@ pub fn swap<T>(p1: ptr<T>, p2: ptr<T>) {
 // If the item is trivially copyable, then no further cution need be taken.
 // If not, then you need to make sure the item is only ever dropped once and is not modified internally
 // while both instances exist. 
-pub fn take_unchecked<T>(p: ptr<T>) -> T {
+pub fn take_unchecked<T>(p: &T) -> T {
     $"*$![p]"
 }
 
-pub fn replace<T>(ptr: ptr<T>, item: T) -> T {
+pub fn replace<T>(ptr: &T, item: T) -> T {
     swap(ptr, &item);
     item
 }

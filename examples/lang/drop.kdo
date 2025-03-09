@@ -11,22 +11,22 @@ struct Parent {
 }
 
 impl Parent: Drop {
-    fn drop(self: ptr<Parent>) {
+    fn drop(self: &Parent) {
         println("> Parent dropped");
     }
 }
 
 impl Child: Drop {
-    fn drop(self: ptr<Child>) {
+    fn drop(self: &Child) {
         println("> $ dropped", self.dyn_fmt());
     }
 }
 
 impl Child: Fmt {
-    fn dyn_fmt(self: ptr<Child>) -> DynFmt {
+    fn dyn_fmt(self: &Child) -> DynFmt {
         _ { object: typecast(self), fmt: Child::<>::fmt }
     }
-    fn fmt(self: ptr<Child>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+    fn fmt(self: &Child, fmt: &Formatter, stream: &FormatStream) {
         stream.write_str("Child [").write(fmt, &self.id).write_str("]");
     }
 }
@@ -35,7 +35,7 @@ fn create_child(id: i32) -> Child {
     _ { id: id }
 }
 
-fn inspect_child(child: ptr<Child>) {
+fn inspect_child(child: &Child) {
     println("inspected $", child.dyn_fmt());
 }
 

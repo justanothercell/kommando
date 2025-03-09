@@ -2,7 +2,7 @@ use std::*;
 use c_api::printf;
 
 trait T: Grow {
-    fn grow(self: ptr<T>);
+    fn grow(self: &T);
 }
 
 struct Tree {
@@ -10,12 +10,12 @@ struct Tree {
 }
 
 impl Tree: Grow {
-    fn grow(self: ptr<Tree>) {
+    fn grow(self: &Tree) {
         self.height += 1.4372;
     }
 }
 
-fn fertilize<T: Grow>(object: ptr<T>) {
+fn fertilize<T: Grow>(object: &T) {
     printf("fertilizing...\n"); // twice as efficient
     object.grow();
     object.grow();

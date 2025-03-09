@@ -4,7 +4,7 @@ use c_api::fprintf;
 use c_api::printf;
 use c_api::ucontext::*;
 
-fn foo(main_ctx_ref: ptr<ucontext_t>, runner_ctx_ref: ptr<ucontext_t>) {
+fn foo(main_ctx_ref: &ucontext_t, runner_ctx_ref: &ucontext_t) {
     printf("foo: start, swap\n");
     if swapcontext(runner_ctx_ref, main_ctx_ref) == 0-1 {
         fprintf(io::stderr, "Error: swapcontext\n");

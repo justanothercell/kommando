@@ -6,11 +6,11 @@ struct Vehicle {
 }
 
 impl Vehicle: Fmt {
-    fn dyn_fmt(self: ptr<Vehicle>) -> DynFmt {
+    fn dyn_fmt(self: &Vehicle) -> DynFmt {
         _ { object: typecast(self), fmt: Vehicle::<>::fmt }
     }
 
-    fn fmt(self: ptr<Vehicle>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+    fn fmt(self: &Vehicle, fmt: &Formatter, stream: &FormatStream) {
         stream.write(fmt, &self.wheels).write_str(" wheeler");
     }
 }

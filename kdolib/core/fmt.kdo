@@ -24,137 +24,137 @@ pub struct FormatStream {
 }
 
 impl FormatStream {
-    pub fn write_str(stream: ptr<FormatStream>, string: c_str) -> ptr<FormatStream> {
+    pub fn write_str(stream: &FormatStream, string: c_str) -> &FormatStream {
         c_api::fputs(string, stream.inner);
         stream
     }
-    pub fn write_char(stream: ptr<FormatStream>, c: char) -> ptr<FormatStream> {
+    pub fn write_char(stream: &FormatStream, c: char) -> &FormatStream {
         c_api::fputc(c, stream.inner);
         stream
     }
-    pub fn writef<T: Copy>(stream: ptr<FormatStream>, fmt: c_str, obj: ptr<T>) -> ptr<FormatStream> {
+    pub fn writef<T: Copy>(stream: &FormatStream, fmt: c_str, obj: &T) -> &FormatStream {
         c_api::fprintf(stream.inner, fmt, *obj);
         stream
     }
-    pub fn write<T: Fmt>(stream: ptr<FormatStream>, fmt: ptr<Formatter>, obj: ptr<T>) -> ptr<FormatStream> {
+    pub fn write<T: Fmt>(stream: &FormatStream, fmt: &Formatter, obj: &T) -> &FormatStream {
         obj.fmt(fmt, stream);
         stream
     }
 }
 
 pub trait T: Fmt {
-    fn dyn_fmt(self: ptr<T>) -> DynFmt;
-    fn fmt(self: ptr<T>, f: ptr<Formatter>, stream: ptr<FormatStream>);
+    fn dyn_fmt(self: &T) -> DynFmt;
+    fn fmt(self: &T, f: &Formatter, stream: &FormatStream);
 }
 
 impl bool: Fmt { 
-    pub fn dyn_fmt(self: ptr<bool>) -> DynFmt { _ { object: typecast(self), fmt: bool::<>::fmt } }
-    pub fn fmt(self: ptr<bool>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &bool) -> DynFmt { _ { object: typecast(self), fmt: bool::<>::fmt } }
+    pub fn fmt(self: &bool, f: &Formatter, stream: &FormatStream) {
         stream.write_str(if *self { "true" } else { "false" });
     }
 }
 
 impl unit: Fmt { 
-    pub fn dyn_fmt(self: ptr<unit>) -> DynFmt { _ { object: typecast(self), fmt: unit::<>::fmt } }
-    pub fn fmt(self: ptr<unit>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &unit) -> DynFmt { _ { object: typecast(self), fmt: unit::<>::fmt } }
+    pub fn fmt(self: &unit, f: &Formatter, stream: &FormatStream) {
         stream.write_str("unit");
     }
 }
 
 impl c_str: Fmt { 
-    pub fn dyn_fmt(self: ptr<c_str>) -> DynFmt { _ { object: typecast(self), fmt: c_str::<>::fmt } }
-    pub fn fmt(self: ptr<c_str>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &c_str) -> DynFmt { _ { object: typecast(self), fmt: c_str::<>::fmt } }
+    pub fn fmt(self: &c_str, f: &Formatter, stream: &FormatStream) {
         stream.write_str(*self);
     }
 }
 
 impl raw_ptr: Fmt { 
-    pub fn dyn_fmt(self: ptr<raw_ptr>) -> DynFmt { _ { object: typecast(self), fmt: raw_ptr::<>::fmt } }
-    pub fn fmt(self: ptr<raw_ptr>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &raw_ptr) -> DynFmt { _ { object: typecast(self), fmt: raw_ptr::<>::fmt } }
+    pub fn fmt(self: &raw_ptr, f: &Formatter, stream: &FormatStream) {
         stream.writef("%p", self);
     }
 }
 
 impl<T> function_ptr<T>: Fmt { 
-    pub fn dyn_fmt(self: ptr<function_ptr<T>>) -> DynFmt { _ { object: typecast(self), fmt: function_ptr::<T>::fmt } }
-    pub fn fmt(self: ptr<function_ptr<T>>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &function_ptr<T>) -> DynFmt { _ { object: typecast(self), fmt: function_ptr::<T>::fmt } }
+    pub fn fmt(self: &function_ptr<T>, f: &Formatter, stream: &FormatStream) {
         stream.writef("%p", self);
     }
 }
 
 impl f32: Fmt { 
-    pub fn dyn_fmt(self: ptr<f32>) -> DynFmt { _ { object: typecast(self), fmt: f32::<>::fmt } }
-    pub fn fmt(self: ptr<f32>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &f32) -> DynFmt { _ { object: typecast(self), fmt: f32::<>::fmt } }
+    pub fn fmt(self: &f32, f: &Formatter, stream: &FormatStream) {
         stream.writef("%f", self);
     }
 }
 
 impl f64: Fmt { 
-    pub fn dyn_fmt(self: ptr<f64>) -> DynFmt { _ { object: typecast(self), fmt: f64::<>::fmt } }
-    pub fn fmt(self: ptr<f64>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &f64) -> DynFmt { _ { object: typecast(self), fmt: f64::<>::fmt } }
+    pub fn fmt(self: &f64, f: &Formatter, stream: &FormatStream) {
         stream.writef("%f", self);
     }
 }
 
 impl i8: Fmt { 
-    pub fn dyn_fmt(self: ptr<i8>) -> DynFmt { _ { object: typecast(self), fmt: i8::<>::fmt } }
-    pub fn fmt(self: ptr<i8>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &i8) -> DynFmt { _ { object: typecast(self), fmt: i8::<>::fmt } }
+    pub fn fmt(self: &i8, f: &Formatter, stream: &FormatStream) {
         stream.writef("%d", self);
     }
 }
 impl i16: Fmt { 
-    pub fn dyn_fmt(self: ptr<i16>) -> DynFmt { _ { object: typecast(self), fmt: i16::<>::fmt } }
-    pub fn fmt(self: ptr<i16>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &i16) -> DynFmt { _ { object: typecast(self), fmt: i16::<>::fmt } }
+    pub fn fmt(self: &i16, f: &Formatter, stream: &FormatStream) {
         stream.writef("%d", self);
     }
 }
 impl i32: Fmt { 
-    pub fn dyn_fmt(self: ptr<i32>) -> DynFmt { _ { object: typecast(self), fmt: i32::<>::fmt } }
-    pub fn fmt(self: ptr<i32>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &i32) -> DynFmt { _ { object: typecast(self), fmt: i32::<>::fmt } }
+    pub fn fmt(self: &i32, f: &Formatter, stream: &FormatStream) {
         stream.writef("%d", self);
     }
 }
 impl i64: Fmt { 
-    pub fn dyn_fmt(self: ptr<i64>) -> DynFmt { _ { object: typecast(self), fmt: i64::<>::fmt } }
-    pub fn fmt(self: ptr<i64>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &i64) -> DynFmt { _ { object: typecast(self), fmt: i64::<>::fmt } }
+    pub fn fmt(self: &i64, f: &Formatter, stream: &FormatStream) {
         stream.writef("%lld", self);
     }
 }
 
 impl isize: Fmt { 
-    pub fn dyn_fmt(self: ptr<isize>) -> DynFmt { _ { object: typecast(self), fmt: isize::<>::fmt } }
-    pub fn fmt(self: ptr<isize>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &isize) -> DynFmt { _ { object: typecast(self), fmt: isize::<>::fmt } }
+    pub fn fmt(self: &isize, f: &Formatter, stream: &FormatStream) {
         stream.writef("%lld", self);
     }
 }
 
 impl u8: Fmt { 
-    pub fn dyn_fmt(self: ptr<u8>) -> DynFmt { _ { object: typecast(self), fmt: u8::<>::fmt } }
-    pub fn fmt(self: ptr<u8>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &u8) -> DynFmt { _ { object: typecast(self), fmt: u8::<>::fmt } }
+    pub fn fmt(self: &u8, f: &Formatter, stream: &FormatStream) {
         stream.writef("%u", self);
     }
 }
 impl u16: Fmt { 
-    pub fn dyn_fmt(self: ptr<u16>) -> DynFmt { _ { object: typecast(self), fmt: u16::<>::fmt } }
-    pub fn fmt(self: ptr<u16>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &u16) -> DynFmt { _ { object: typecast(self), fmt: u16::<>::fmt } }
+    pub fn fmt(self: &u16, f: &Formatter, stream: &FormatStream) {
         stream.writef("%u", self);
     }
 }
 impl u32: Fmt { 
-    pub fn dyn_fmt(self: ptr<u32>) -> DynFmt { _ { object: typecast(self), fmt: u32::<>::fmt } }
-    pub fn fmt(self: ptr<u32>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &u32) -> DynFmt { _ { object: typecast(self), fmt: u32::<>::fmt } }
+    pub fn fmt(self: &u32, f: &Formatter, stream: &FormatStream) {
         stream.writef("%u", self);
     }
 }
 impl u64: Fmt { 
-    pub fn dyn_fmt(self: ptr<u64>) -> DynFmt { _ { object: typecast(self), fmt: u64::<>::fmt } }
-    pub fn fmt(self: ptr<u64>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &u64) -> DynFmt { _ { object: typecast(self), fmt: u64::<>::fmt } }
+    pub fn fmt(self: &u64, f: &Formatter, stream: &FormatStream) {
         stream.writef("%llu", self);
     }
 }
 impl usize: Fmt { 
-    pub fn dyn_fmt(self: ptr<usize>) -> DynFmt { _ { object: typecast(self), fmt: usize::<>::fmt } }
-    pub fn fmt(self: ptr<usize>, f: ptr<Formatter>, stream: ptr<FormatStream>) {
+    pub fn dyn_fmt(self: &usize) -> DynFmt { _ { object: typecast(self), fmt: usize::<>::fmt } }
+    pub fn fmt(self: &usize, f: &Formatter, stream: &FormatStream) {
         stream.writef("%llu", self);
     }
 }

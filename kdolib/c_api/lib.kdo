@@ -44,7 +44,7 @@ pub fn formatf(format: c_str, ...) -> c_str {
 }
 
 #[extern]
-pub fn open_memstream(stream: ptr<c_str>, size: ptr<usize>) -> CFileStream;
+pub fn open_memstream(stream: &c_str, size: &usize) -> CFileStream;
 
 #[extern]
 pub fn exit(code: i32);
@@ -79,7 +79,7 @@ pub fn freestr(str: c_str) {
 
 // gnu-c
 #[extern]
-pub fn getline(out_line: ptr<c_str>, out_size: ptr<usize>, stream: raw_ptr) -> i32;
+pub fn getline(out_line: &c_str, out_size: &usize, stream: raw_ptr) -> i32;
 
 #[extern]
 pub fn raise(signal: i32) -> i32;

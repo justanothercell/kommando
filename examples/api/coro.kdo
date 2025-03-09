@@ -2,7 +2,7 @@ use std::*;
 use std::coroutine::*;
 use c_api::printf;
 
-fn foo(ctx: ptr<CoroContext<i32, c_str>>, arg: i32) -> c_str {
+fn foo(ctx: &CoroContext<i32, c_str>, arg: i32) -> c_str {
     printf("foo: started with arg=%d\n", arg);
     ctx.yield("hello");
     ctx.yield("world");

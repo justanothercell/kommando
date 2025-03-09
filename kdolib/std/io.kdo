@@ -19,7 +19,7 @@ pub fn input(message: std::c_str) -> std::c_str {
     if length == 0 { 
         return c_api::nullstr;
     };
-    let out_line_as_u8_ptr: ::std::ptr<::std::u8> = std::typecast(out_line);
+    let out_line_as_u8_ptr: &::core::types::u8 = std::typecast(out_line);
     *std::mem::arr_offset(out_line_as_u8_ptr, length - 1) = 0;
     out_line
 }

@@ -61,7 +61,7 @@ impl<T> Option<T> {
         }
     }
 
-    pub fn replace(self: ptr<Option<T>>, new: T) -> Option<T> {
+    pub fn replace(self: &Option<T>, new: T) -> Option<T> {
         let old = std::mem::replace(&self.value.item, new);
         if self.exists {
             Option::<_>::some(old)
@@ -71,7 +71,7 @@ impl<T> Option<T> {
         }
     }
 
-    pub fn take(self: ptr<Option<T>>) -> T {
+    pub fn take(self: &Option<T>) -> T {
         if self.exists {
             self.exists = false;
             self.value.take()
@@ -80,7 +80,7 @@ impl<T> Option<T> {
         }
     }
 
-    pub fn try_take(self: ptr<Option<T>>) -> Option<T> {
+    pub fn try_take(self: &Option<T>) -> Option<T> {
         if self.exists {
             self.exists = false;
             Option::<_>::some(self.value.take())
@@ -90,7 +90,7 @@ impl<T> Option<T> {
         }
     }
 
-    pub fn as_ref(self: ptr<Option<T>>) -> Option<ptr<T>> {
+    pub fn as_ref(self: &Option<T>) -> Option<&T> {
         if self.exists {
             Option::<_>::some(self.value.ref())
         } else {
@@ -100,10 +100,10 @@ impl<T> Option<T> {
 }
 
 impl<T: Fmt> Option<T>: Fmt {
-    fn dyn_fmt(self: ptr<Option<T>>) -> DynFmt {
+    fn dyn_fmt(self: &Option<T>) -> DynFmt {
         _ { object: typecast(self), fmt: Option::<T>::fmt }
     }
-    fn fmt(self: ptr<Option<T>>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+    fn fmt(self: &Option<T>, fmt: &Formatter, stream: &FormatStream) {
         if self.exists {
             stream.write_str("some(").write(fmt, self.value.ref()).write_str(")");
         } else {
@@ -114,8 +114,8 @@ impl<T: Fmt> Option<T>: Fmt {
 
 impl<T: Copy> Option<T>: Copy {}
 
-impl<T: Copy> Option<ptr<T>>{
-    pub fn deref(self: Option<ptr<T>>) -> Option<T> {
+impl<T: Copy> Option<&T>{
+    pub fn deref(self: Option<&T>) -> Option<T> {
         if self.exists {
             Option::<_>::some(*self.value.get())
         } else {
@@ -124,8 +124,8 @@ impl<T: Copy> Option<ptr<T>>{
     }
 }
 
-impl<T: Clone> Option<ptr<T>>{
-    pub fn cloned(self: ptr<Option<ptr<T>>>) -> Option<T> {
+impl<T: Clone> Option<&T>{
+    pub fn cloned(self: &Option<&T>) -> Option<T> {
         if self.exists {
             Option::<_>::some(self.value.get().clone())
         } else {
@@ -135,7 +135,7 @@ impl<T: Clone> Option<ptr<T>>{
 }
 
 impl<T: Clone> Option<T>: Clone {
-    fn clone(self: ptr<Option<T>>) -> Option<T> {
+    fn clone(self: &Option<T>) -> Option<T> {
         if self.exists {
             Option::<_>::some(self.value.cloned())
         } else {
@@ -145,7 +145,7 @@ impl<T: Clone> Option<T>: Clone {
 }
 
 impl<T: Drop> Option<T>: Drop {
-    fn drop(self: ptr<Option<T>>) {
+    fn drop(self: &Option<T>) {
         if self.exists {
             self.value.item.drop();
         }

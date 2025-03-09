@@ -7,7 +7,7 @@ pub struct Queue<T> {
     index: usize,
     length: usize,
     capacity: usize,
-    buffer: ptr<T>
+    buffer: &T
 }
 
 impl<T> Queue<T> {
@@ -29,7 +29,7 @@ impl<T> Queue<T> {
         }
     }
 
-    pub fn push(v: ptr<Queue<T>>, item: T) {
+    pub fn push(v: &Queue<T>, item: T) {
         if v.length == v.capacity {
             let old_capacity = v.capacity;
             v.capacity *= 2;
@@ -45,7 +45,7 @@ impl<T> Queue<T> {
         v.length += 1;
     }
 
-    pub fn pop(v: ptr<Queue<T>>) -> Option<T> {
+    pub fn pop(v: &Queue<T>) -> Option<T> {
         if v.length > 0 {
             let item = std::mem::arr_take_unchecked(v.buffer, v.index);
             v.length -= 1;
@@ -59,7 +59,7 @@ impl<T> Queue<T> {
         }
     }
 
-    pub fn peek(v: ptr<Queue<T>>) -> Option<ptr<T>> {
+    pub fn peek(v: &Queue<T>) -> Option<&T> {
         if v.length > 0 {
             Option::<_>::some(std::mem::arr_offset(v.buffer, v.index))
         } else {
@@ -67,12 +67,12 @@ impl<T> Queue<T> {
         }
     }
 
-    pub fn clear(v: ptr<Queue<T>>) {
+    pub fn clear(v: &Queue<T>) {
         v.length = 0;
         v.index = 0;
     }
 
-    pub fn free(v: ptr<Queue<T>>) {
+    pub fn free(v: &Queue<T>) {
         std::mem::free(v.buffer);
         v.buffer = std::mem::null();
         v.index = 0;
@@ -82,7 +82,7 @@ impl<T> Queue<T> {
 }
 
 impl<T> Queue<T>: Drop {
-    fn drop(self: ptr<Queue<T>>) {
+    fn drop(self: &Queue<T>) {
         let i = 0usize;
         while i < self.length {
             std::mem::arr_take_unchecked(self.buffer, (i + self.index) % self.capacity); // drops item

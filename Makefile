@@ -64,7 +64,7 @@ test: clean_examples
 				fail=$$((fail + 1)); \
 			fi; \
 		else \
-			if make --no-print-directory compile file=$$file flags="--silent" > /dev/null 2>&1; then \
+			if make --no-print-directory compile file=$$file flags="--silent --nolint" > /dev/null 2>&1; then \
 				printf "[\x1b[1;32mOK\x1b[0m] ($$index/$$count) $$file\n"; \
 				success=$$((success + 1)); \
 			else \

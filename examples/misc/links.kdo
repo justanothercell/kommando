@@ -1,17 +1,17 @@
 use std::*;
 
 struct Link<T> {
-    prev: ptr<Link<T>>,
-    next: ptr<Link<T>>,
+    prev: &Link<T>,
+    next: &Link<T>,
     item: T
 }
 
-fn link_new<T>(item: T) -> ptr<Link<T>> {
+fn link_new<T>(item: T) -> &Link<T> {
     mem::new(_ { prev: mem::null(), next: mem::null(), item: item })
 }
 
 
-fn link_insert_after<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
+fn link_insert_after<T>(link: &Link<T>, item: T) -> &Link<T> {
     let next = link_new::<T>(item);
     if link.next != mem::null() {
         next.next = link.next;
@@ -22,7 +22,7 @@ fn link_insert_after<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
     next
 }
 
-fn link_insert_before<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
+fn link_insert_before<T>(link: &Link<T>, item: T) -> &Link<T> {
     let prev = link_new::<T>(item);
     if link.prev != mem::null() {
         prev.prev = link.prev;
@@ -33,14 +33,14 @@ fn link_insert_before<T>(link: ptr<Link<T>>, item: T) -> ptr<Link<T>> {
     prev
 }
 
-fn link_goto_start<T>(link: ptr<Link<T>>) -> ptr<Link<T>> {
+fn link_goto_start<T>(link: &Link<T>) -> &Link<T> {
     while link.prev != mem::null() {
         link = link.prev;
     };
     link
 }
 
-fn link_goto_end<T>(link: ptr<Link<T>>) -> ptr<Link<T>> {
+fn link_goto_end<T>(link: &Link<T>) -> &Link<T> {
     while link.next != mem::null() {
         link = link.next;
     };

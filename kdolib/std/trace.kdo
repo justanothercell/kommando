@@ -10,7 +10,7 @@ pub use Function;
 pub use Location;
 
 pub struct Traceback {
-    top: ptr<Frame>
+    top: &Frame
 }
 
 pub impl Traceback {
@@ -35,7 +35,7 @@ pub impl Traceback {
             return _ { top: std::mem::null() };
         };
         let frame = TOP_FRAME;
-        let top: ptr<Frame> = std::mem::new_uninit();
+        let top: &Frame = std::mem::new_uninit();
         let current = top;
         while frame != std::mem::null() {
             *current = *frame;
@@ -50,7 +50,7 @@ pub impl Traceback {
         }
     }
 
-    pub fn fprint(self: ptr<Traceback>, stream: CFileStream) {
+    pub fn fprint(self: &Traceback, stream: CFileStream) {
         let index = 0;
         let frame = self.top;
         if frame == std::mem::null() {
@@ -78,7 +78,7 @@ pub impl Traceback {
         }
     }
 
-    pub fn free(self: ptr<Traceback>) {
+    pub fn free(self: &Traceback) {
         let frame = self.top;
         while frame != std::mem::null() {
             let parent = frame.parent;

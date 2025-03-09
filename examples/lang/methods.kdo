@@ -10,7 +10,7 @@ impl Car {
         _ { beeps: 3 }
     }
 
-    fn beep(car: ptr<Car>) {
+    fn beep(car: &Car) {
         if car.beeps > 0 {
             car.beeps = car.beeps - 1;
             printf("beep beep!\n");

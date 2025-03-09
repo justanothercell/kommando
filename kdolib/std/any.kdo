@@ -9,7 +9,7 @@ pub struct Any {
 }
 
 impl Any {
-    pub fn from<T>(object: ptr<T>) -> Any {
+    pub fn from<T>(object: &T) -> Any {
         _ {
             tid: typeid::<T>(),
             object: typecast(object)
@@ -20,7 +20,7 @@ impl Any {
         typeid::<T>() == self.tid
     }
 
-    pub fn as<T>(self: Any) -> ptr<T> {
+    pub fn as<T>(self: Any) -> &T {
         if self.is::<T>() {
             typecast(self.object)
         } else {
@@ -33,7 +33,7 @@ impl Any {
         }
     }
 
-    pub fn try_as<T>(self: Any) -> Option<ptr<T>> {
+    pub fn try_as<T>(self: Any) -> Option<&T> {
         if self.is::<T>() {
             Option::<_>::some(typecast(self.object))
         } else {

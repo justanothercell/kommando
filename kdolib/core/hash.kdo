@@ -3,10 +3,10 @@ use core::types::*;
 use core::intrinsics::*;
 
 pub trait H: Hasher {
-    fn digest(self: ptr<H>, data: u8);
-    fn digest_bytes(self: ptr<H>, bytes: ptr<u8>, length: usize);
-    fn digest_bytes_of<T>(self: ptr<H>, item: ptr<T>);
-    fn finish(self: ptr<H>) -> u64;
+    fn digest(self: &H, data: u8);
+    fn digest_bytes(self: &H, bytes: &u8, length: usize);
+    fn digest_bytes_of<T>(self: &H, item: &T);
+    fn finish(self: &H) -> u64;
 }
 
 const FNV1a_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
@@ -19,24 +19,24 @@ pub struct FNV1aHasher {
 pub use FNV1aHasher as DefaultHasher;
 
 impl FNV1aHasher: Hasher {
-    fn digest(self: ptr<FNV1aHasher>, data: u8) {
+    fn digest(self: &FNV1aHasher, data: u8) {
         self.hash ^= numcast(data);
         self.hash *= FNV1a_PRIME;
     }
-    fn digest_bytes(self: ptr<FNV1aHasher>, bytes: ptr<u8>, length: usize) {
+    fn digest_bytes(self: &FNV1aHasher, bytes: &u8, length: usize) {
         let base: usize = typecast(bytes);
         let offset: usize = 0;
         while offset < length {
-            self.digest(*typecast::<_, ptr<u8>>(base + offset));
+            self.digest(*typecast::<_, &u8>(base + offset));
             offset += 1;
         }
     }
-    fn digest_bytes_of<T>(self: ptr<FNV1aHasher>, item: ptr<T>) {
-        let item: ptr<u8> = typecast::<ptr<T>, ptr<u8>>(item);
+    fn digest_bytes_of<T>(self: &FNV1aHasher, item: &T) {
+        let item: &u8 = typecast::<&T, &u8>(item);
         let size = sizeof::<T>();
         self.digest_bytes(item, size);
     }
-    fn finish(self: ptr<FNV1aHasher>) -> u64 {
+    fn finish(self: &FNV1aHasher) -> u64 {
         self.hash
     }
 }
@@ -52,32 +52,32 @@ impl FNV1aHasher {
 }
 
 pub trait T: Hash {
-    fn hash<H: Hasher>(self: ptr<T>, hasher: ptr<H>);
+    fn hash<H: Hasher>(self: &T, hasher: &H);
 }
 
 #[extern]
 fn strlen(s: c_str) -> usize;
 impl c_str: Hash {
-    pub fn hash<H: Hasher>(self: ptr<c_str>, hasher: ptr<H>) {
+    pub fn hash<H: Hasher>(self: &c_str, hasher: &H) {
         let len = strlen(*self);
         hasher.digest_bytes_of(&len);
         hasher.digest_bytes(typecast(*self), len);
     }
 }
 
-impl bool: Hash { pub fn hash<H: Hasher>(self: ptr<bool>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl raw_ptr: Hash { pub fn hash<H: Hasher>(self: ptr<raw_ptr>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
+impl bool: Hash { pub fn hash<H: Hasher>(self: &bool, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl raw_ptr: Hash { pub fn hash<H: Hasher>(self: &raw_ptr, hasher: &H) { hasher.digest_bytes_of(self) } }
 
-impl i8: Hash { pub fn hash<H: Hasher>(self: ptr<i8>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl i16: Hash { pub fn hash<H: Hasher>(self: ptr<i16>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl i32: Hash { pub fn hash<H: Hasher>(self: ptr<i32>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl i64: Hash { pub fn hash<H: Hasher>(self: ptr<i64>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl i128: Hash { pub fn hash<H: Hasher>(self: ptr<i128>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl isize: Hash { pub fn hash<H: Hasher>(self: ptr<isize>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
+impl i8: Hash { pub fn hash<H: Hasher>(self: &i8, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl i16: Hash { pub fn hash<H: Hasher>(self: &i16, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl i32: Hash { pub fn hash<H: Hasher>(self: &i32, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl i64: Hash { pub fn hash<H: Hasher>(self: &i64, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl i128: Hash { pub fn hash<H: Hasher>(self: &i128, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl isize: Hash { pub fn hash<H: Hasher>(self: &isize, hasher: &H) { hasher.digest_bytes_of(self) } }
 
-impl u8: Hash { pub fn hash<H: Hasher>(self: ptr<u8>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl u16: Hash { pub fn hash<H: Hasher>(self: ptr<u16>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl u32: Hash { pub fn hash<H: Hasher>(self: ptr<u32>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl u64: Hash { pub fn hash<H: Hasher>(self: ptr<u64>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl u128: Hash { pub fn hash<H: Hasher>(self: ptr<u128>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
-impl usize: Hash { pub fn hash<H: Hasher>(self: ptr<usize>, hasher: ptr<H>) { hasher.digest_bytes_of(self) } }
+impl u8: Hash { pub fn hash<H: Hasher>(self: &u8, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl u16: Hash { pub fn hash<H: Hasher>(self: &u16, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl u32: Hash { pub fn hash<H: Hasher>(self: &u32, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl u64: Hash { pub fn hash<H: Hasher>(self: &u64, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl u128: Hash { pub fn hash<H: Hasher>(self: &u128, hasher: &H) { hasher.digest_bytes_of(self) } }
+impl usize: Hash { pub fn hash<H: Hasher>(self: &usize, hasher: &H) { hasher.digest_bytes_of(self) } }
