@@ -17,4 +17,6 @@ EXPOSE 7878
 
 RUN pip install flask apscheduler wonderwords gunicorn
 
-CMD [ "gunicorn", " --bind 0.0.0.0:7878", "app:app"]
+ENV PATH "$PATH:/home/appuser/.local/bin"
+
+CMD [ "gunicorn", " --bind", "0.0.0.0:7878", "runner:app"]
