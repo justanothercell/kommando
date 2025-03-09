@@ -20,4 +20,4 @@ ENV TMPDIR "/sandbox"
 
 RUN pip install flask apscheduler wonderwords gunicorn
 
-CMD [ "gunicorn", "--preload", "--worker-tmp-dir", "/sandbox", " --bind", "0.0.0.0:7878", "runner:app"]
+CMD [ "gunicorn", "--preload", "--worker-tmp-dir", "/sandbox", "--bind", "0.0.0.0:7878", "runner:app"]
