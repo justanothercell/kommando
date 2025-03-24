@@ -26,10 +26,10 @@ To advertise its printablility, we need to implement the `Fmt` trait:
 !}
 !
 impl Color: Fmt {
-    fn dyn_fmt(self: ptr<Color>) -> DynFmt { 
+    fn dyn_fmt(self: &Color) -> DynFmt { 
         todo()
     }
-    fn fmt(self: ptr<Vehicle>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) {
+    fn fmt(self: &Vehicle, fmt: &Formatter, stream: &FormatStream) {
         todo()
     }
 }
@@ -50,14 +50,14 @@ since all type information is lost when passing it to the `println` function and
 !}
 !
 impl Color: Fmt {
-    fn dyn_fmt(self: ptr<Color>) -> DynFmt { 
+    fn dyn_fmt(self: &Color) -> DynFmt { 
         _ { object: typecast(self), fmt: Color::<>::fmt }
     }
-    fn fmt(self: ptr<Color>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) { 
-        stream.write_str("Color { r: ").write(fmt, self.r)
-                    .write_str(", g: ").write(fmt, self.g)
-                    .write_str(", b: ").write(fmt, self.b)
-                    .write_str(", a: ").write(fmt, self.a)
+    fn fmt(self: &Color, fmt: &Formatter, stream: &FormatStream) { 
+        stream.write_str("Color { r: ").write(fmt, &self.r)
+                    .write_str(", g: ").write(fmt, &self.g)
+                    .write_str(", b: ").write(fmt, &self.b)
+                    .write_str(", a: ").write(fmt, &self.a)
         .write_str(" }");
     }
 }
@@ -82,14 +82,14 @@ Now we can comfortably print our `Color` anywhere:
 !}
 !
 !impl Color: Fmt {
-!    fn dyn_fmt(self: ptr<Color>) -> DynFmt { 
+!    fn dyn_fmt(self: &Color) -> DynFmt { 
 !        _ { object: typecast(self), fmt: Color::<>::fmt }
 !    }
-!    fn fmt(self: ptr<Color>, fmt: ptr<Formatter>, stream: ptr<FormatStream>) { 
-!        stream.write_str("Color { r: ").write(fmt, self.r)
-!                    .write_str(", g: ").write(fmt, self.g)
-!                    .write_str(", b: ").write(fmt, self.b)
-!                    .write_str(", a: ").write(fmt, self.a)
+!    fn fmt(self: &Color, fmt: &Formatter, stream: &FormatStream) { 
+!        stream.write_str("Color { r: ").write(fmt, &self.r)
+!                    .write_str(", g: ").write(fmt, &self.g)
+!                    .write_str(", b: ").write(fmt, &self.b)
+!                    .write_str(", a: ").write(fmt, &self.a)
 !        .write_str(" }");
 !    }
 !}

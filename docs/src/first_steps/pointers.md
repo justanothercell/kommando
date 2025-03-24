@@ -36,12 +36,14 @@ fn main() {
 Here we _take a reference_ of `value` by using the `&` prefix operator.<br>
 To access the inner value inside the pointer, we need to _dereference_ it using the `*` prefix operator.
 
+>**Note:** The cannonical name of a reference `&T` is `ptr<T>`. The compiler will give you a hint so that you may replace it with `&T`. To see this in the online editor, enable the `compiler output` checkbox. To disable those warnigns entirely, set he `--no-lint` flag. If you specifically want to use the canonical name, use the fully qualified path: `::core::types::ptr<T>` to disable warnings.
+
 A pointer is only valid as long as the original object is valid:
 ```rs
 !use std::*;
 !
 fn create_pointer() -> &i32 {
-    let value = 0;
+    let value = 4;
     let p = &value; // create pointer to value
     p // value still exists...
 } // value gets removed at end of function, p is now invalid!
@@ -52,7 +54,7 @@ fn main() {
 }
 ```
 `p` may now have any and all states, or may even crash the program when used.
-Even if the original object is still around but was moved, `p` is still invalid
+Even if the original object is still around but was moved, `p` is still invalid, since in both cases the pointed-to value is no longer where `p` points to.
 
 ---
 

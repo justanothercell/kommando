@@ -4,52 +4,52 @@ Sometimes structures and functions are supposed to work for multiple datataypes:
 ```rs
 !use std::*;
 !
-struct I32Box {
+struct I32Container {
     item: i32
 }
-struct BoolBox {
+struct BoolContainer {
     item: bool
 }
 // and so on...
 
 fn main() {
-    let i32b = I32Box { item: 4 };
-    let bb = BoolBox { item: false };
+    let i32b = I32Container { item: 4 };
+    let bb = BoolContainer { item: false };
 }
 ```
 As an alternative to creating a variant for each possible type, we can replace the concrete `item` type with a _generic_ placeholder type `T`:
 ```rs
 !use std::*;
 !
-struct Box<T> {
+struct Container<T> {
     item: T
 }
 
 fn main() {
-    let i32b = Box::<i32> { item: 4 };
+    let i32b = Container::<i32> { item: 4 };
     // `_` wildcard is inferred to be bool
-    let bb = Box::<_> { item: false };
+    let bb = Container::<_> { item: false };
     // omitted type is inferred to be c_str
-    let strb = Box { item: "hello" };
+    let strb = Container { item: "hello" };
 }
 ```
 We can also make methods generic to work on any `T`:
 ```rs
 !use std::*;
 !
-!struct Box<T> {
+!struct Container<T> {
 !    item: T
 !}
 !
-// "for any T we want a Box of T with the follwing methods"
-impl<T> Box<T> {
-    fn wrap(item: T) -> Box<T>  {
-        // wildcard inferred to be Box::<T>
+// "for any T we want a Container of T with the follwing methods"
+impl<T> Container<T> {
+    fn wrap(item: T) -> Container<T>  {
+        // wildcard inferred to be Container::<T>
         _ { item: item }
     }
 
     // `self` name is arbitrary
-    fn unwrap(self: Box<T>) -> T {
+    fn unwrap(self: Container<T>) -> T {
         self.item
     }
 }
