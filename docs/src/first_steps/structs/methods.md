@@ -13,7 +13,7 @@ Methods for the most part function like normal functions:
 !}
 !
 impl Color {
-    fn ansi_fg(c: ptr<Color>) -> c_str {
+    fn ansi_fg(c: &Color) -> c_str {
         c_api::formatf("\x1b[38;2;%u;%u;%um", c.r, c.g, c.b)
     }
 
@@ -41,7 +41,7 @@ To invoke the method we insert `<>` to disambiguate it from a function in anothe
 !}
 !
 !impl Color {
-!    fn ansi_fg(c: ptr<Color>) -> c_str {
+!    fn ansi_fg(c: &Color) -> c_str {
 !        c_api::formatf("\x1b[38;2;%u;%u;%um", c.r, c.g, c.b)
 !    }
 !
@@ -57,7 +57,7 @@ fn main() {
     );
 }
 ```
-Is the first parameter of a method `Color` or `ptr<Color>`, we can also use the direct method syntax:
+Is the first parameter of a method `Color` or `&Color`, we can also use the direct method syntax:
 ```rs
 !use std::*;
 !
@@ -69,7 +69,7 @@ Is the first parameter of a method `Color` or `ptr<Color>`, we can also use the 
 !}
 !
 !impl Color {
-!    fn ansi_fg(c: ptr<Color>) -> c_str {
+!    fn ansi_fg(c: &Color) -> c_str {
 !        c_api::formatf("\x1b[38;2;%u;%u;%um", c.r, c.g, c.b)
 !    }
 !
