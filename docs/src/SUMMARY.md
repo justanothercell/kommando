@@ -17,6 +17,8 @@
     - [Generics](./first_steps/generics/generics.md)
         - [Traits](./first_steps/generics/traits.md)
     - [Printing II: Printable](./first_steps/structs/printable.md)
+    - [Copy and Clone](./first_steps/copy_clone.md)
+    - [Drop](./first_steps/drop.md)
 - [Language](./lang/lang.md)
     - [Primitive types](./lang/primitives/primitives.md)
         - [Unit](./lang/primitives/unit.md)

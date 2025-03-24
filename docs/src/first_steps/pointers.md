@@ -1,6 +1,6 @@
 # Pointers
 
-All objects are passed by value and as such copied. That means once you pass a value, you are disconnected from it.
+All objects are passed by value and as such copied. That means once you pass a value somewhere, it exists as a separate entity from the original.
 
 ```rs
 !use std::*;
@@ -21,7 +21,7 @@ This can however be done by explicitly taking a reference:
 ```rs
 !use std::*;
 !
-fn increment(v: ptr<i32>) { // v points to value
+fn increment(v: &i32) { // v points to value
     *v += 1; // increment the value pointed to by v
     c_api::printf("incremented: %d\n", *v); // read the value pointed to by v
 }
@@ -40,7 +40,7 @@ A pointer is only valid as long as the original object is valid:
 ```rs
 !use std::*;
 !
-fn create_pointer() -> ptr<i32> {
+fn create_pointer() -> &i32 {
     let value = 0;
     let p = &value; // create pointer to value
     p // value still exists...
@@ -56,12 +56,12 @@ Even if the original object is still around but was moved, `p` is still invalid
 
 ---
 
-Unlike c, pointers of literals is supported:
+Unlike c, pointers of literals are supported:
 
 ```rs
 !use std::*;
 !
-!fn increment(v: ptr<i32>) { // v points to value
+!fn increment(v: &i32) { // v points to value
 !    *v += 1; // increment the value pointed to by v
 !    c_api::printf("incremented: %d\n", *v); // read the value pointed to by v
 !}
@@ -93,10 +93,11 @@ The pointer is only valid for the duration of the function call:
 !use std::*;
 !
 !fn identity<T>(x: T) -> T {
+    // x is still valid here
 !    x // passthrough
 !}
 !
 fn main() {
-    let invalid_ptr = identity(&1);
+    let now_invalid_ptr = identity(&1);
 }
 ```
