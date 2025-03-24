@@ -138,7 +138,7 @@ impl Color {
                        .write_str(";").write(fmt, &self.b)
         .write_str("m");
     }
-    fn ansi_reset() -> DynFmt {
+    fn dyn_ansi_reset() -> DynFmt {
         // dummy object since this is a static method
         _ { object: c_api::null, fmt: Color::<>::ansi_reset_fmt }
     }
