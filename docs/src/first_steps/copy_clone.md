@@ -50,7 +50,9 @@ fn main() {
 }
 ```
 
-There are 3 way of resolving this issue, dependign on whether you want linake or not:
+---
+
+There are 3 way of resolving this issue, depending on whether you want linake or not:
 
 ## 1. Taking a reference (full link)
 This is recommended when you actually want to work on the same value, i.e. when passing to a method
@@ -93,7 +95,7 @@ fn main() {
     let x = a.x; // is now alled
 }
 ```
-Now `b` explicitly points to `a`, so they are fully linked
+Now `a` and `b` are unlinked but `a.r` and `b.r` point to the same value
 
 ## 3. Implementing core::clone::Clone
 This is recommended when you want to have two fully unlinked copies of a complex type, e.g. one with allocated fields like a vector.
