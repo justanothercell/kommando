@@ -27,7 +27,7 @@ impl Color {
 !    c_api::printf("Look, %scolorful text%s!\n", Color::<>::ansi_fg(&c), Color::<>::ansi_reset());
 !}
 ```
->**Note:** `ansi_fg` allocates memory! [Later](printable.md) we will use an allocation-free method using `Fmt` and the modern print api which can be adapted to this example
+>**Note:** `ansi_fg` allocates memory! [Later](printable.md) we will use an allocation-free method via the `Fmt` trait and the modern print api, which can be adapted to this example
 
 To invoke the method we insert `<>` to disambiguate it from a function in another module:
 ```rs
