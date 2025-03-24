@@ -58,7 +58,7 @@ Pointers to structs automatically dereference on field access:
 !
 !fn main() {
 !let c = Color { r: 255, g: 150, b: 180, a: 255 };
-let c_ref: ptr<Color> = &c; // points to c
+let c_ref: &Color = &c; // points to c
 (*c_ref).r /= 2; // manually dereference to access the inner value of c_ref
 // ...or let the compiler do so automatically:
 c_api::printf("Color { r: %u, g: %u, b: %u, a: %u }\n", c_ref.r, c_ref.g, c_ref.b, c_ref.a);
