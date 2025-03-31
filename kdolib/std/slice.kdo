@@ -11,6 +11,8 @@ pub struct Slice<T> {
     buffer: &T
 }
 
+impl<T> Slice<T>: Copy {}
+
 pub struct SliceIter<T> {
     length: usize, 
     index: usize,
@@ -21,6 +23,22 @@ impl<T> SliceIter<T>: Iter<&T> {
     fn next(self: &SliceIter<T>) -> Option<&T> {
         if self.index < self.length {
             Option::<_>::some(std::mem::arr_offset(self.buffer, std::mem::replace(&self.index, self.index+1)))
+        } else {
+            Option::<_>::none()
+        }
+    }
+}
+
+pub struct SliceCopyIter<T> {
+    length: usize, 
+    index: usize,
+    buffer: &T
+}
+
+impl<T: Copy> SliceCopyIter<T>: Iter<T> {
+    fn next(self: &SliceCopyIter<T>) -> Option<T> {
+        if self.index < self.length {
+            Option::<_>::some(*std::mem::arr_offset(self.buffer, std::mem::replace(&self.index, self.index+1)))
         } else {
             Option::<_>::none()
         }
@@ -53,6 +71,12 @@ impl<T> Slice<T> {
     }
 
     pub fn iter(self: &Slice<T>) -> SliceIter<T> {
+        _ { length: self.length, buffer: self.buffer, index: 0 }
+    }
+}
+
+impl<T: Copy> Slice<T> {
+    pub fn copy_iter(self: &Slice<T>) -> SliceCopyIter<T> {
         _ { length: self.length, buffer: self.buffer, index: 0 }
     }
 }
@@ -94,6 +118,39 @@ impl<T> Slice<T> {
     }
 }
 
+use core::eq::Eq;
+
+impl<T: Eq> Slice<T> {
+    fn split(self: &Slice<T>, delimeter: &T) -> Spliterator<T> {
+        _ { length: self.length, index: 0, buffer: self.buffer, delimeter: delimeter }
+    }
+}
+
+pub struct Spliterator<T: Eq> {
+    length: usize, 
+    index: usize,
+    buffer: &T,
+    delimeter: &T
+}
+
+impl<T: Eq> Spliterator<T>: Iter<Slice<T>> {
+    fn next(self: &Spliterator<T>) -> Option<Slice<T>> {
+        if self.index < self.length {
+            let start = self.index;
+            while self.index < self.length && std::mem::arr_offset(self.buffer, self.index).eq(self.delimeter) == false {
+                self.index += 1;
+            };
+            self.index += 1;
+            Option::<_>::some(Slice { 
+                buffer: std::mem::arr_offset(self.buffer, start),
+                length: self.index - start - 1
+            })
+        } else {
+            Option::<_>::none()
+        }
+    }
+}
+
 impl Slice<char> {
     pub fn from_c_str(s: c_str) -> Slice<char> {
         let length = c_api::str::strlen(s);
@@ -101,6 +158,17 @@ impl Slice<char> {
             length: length,
             buffer: typecast(s)
         }
+    }
+
+    fn dyn_fmt_str(s: &Slice<char>) -> DynFmt {
+        _ { object: typecast(s), fmt: Slice::<char>::fmt_str }
+    }
+    fn fmt_str(s: &Slice<char>, fmt: &Formatter, stream: &FormatStream) {
+        let i = 0usize;
+        while i < s.length {
+            stream.write_char(s.get(i).unwrap());
+            i += 1;
+        };
     }
 }
 
@@ -158,5 +226,3 @@ impl<T: Copy> Slice<T> {
         cloned
     }
 }
-
-impl<T> Slice<T>: Copy {}

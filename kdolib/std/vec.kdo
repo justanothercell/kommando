@@ -3,6 +3,7 @@ use std::slice::Slice;
 use core::copy::Copy;
 use core::clone::Clone;
 use core::drop::Drop;
+use std::iter::Iter;
 
 pub struct Vec<T> {
     length: usize,
@@ -104,6 +105,79 @@ impl<T> Vec<T> {
         if v.length < to { panic("Slice out of range for vector") };
         _ { buffer: std::mem::arr_offset(v.buffer, from), length: to - from }
     }
+
+    pub fn collect<I: Iter<T>>(iter: I) -> Vec<T> {
+        let v = Vec::<T>::new();
+        let next = iter.next();
+        while next.is_some() {
+            v.push(next.unwrap());
+            next = iter.next();
+        };
+        v
+    }
+
+    pub fn iter(self: &Vec<T>) -> std::slice::SliceIter<T> {
+        self.slice().iter()
+    }
+}
+
+impl<T: Copy> Vec<T> {
+    pub fn copy_iter(self: &Vec<T>) -> std::slice::SliceCopyIter<T> {
+        self.slice().copy_iter()
+    }
+}
+
+impl<T: Copy> Vec<T> {
+    pub fn join<I: Iter<Slice<T>>>(iter: I) -> Vec<T> {
+        let v = Vec::<T>::new();
+        let next = iter.next();
+        while next.is_some() {
+            let slice = next.unwrap();
+            let index = 0usize;
+            while index < slice.length {
+                v.push(slice.get(index).unwrap());
+                index += 1;
+            };
+        };
+        v
+    }
+    pub fn join_with<I: Iter<Slice<T>>>(iter: I, delimeter: T) -> Vec<T> {
+        let v = Vec::<T>::new();
+        let next = iter.next();
+        while next.is_some() {
+            if v.length > 0 {
+                v.push(delimeter);
+            };
+            let slice = next.unwrap();
+            let index = 0usize;
+            while index < slice.length {
+                v.push(slice.get(index).unwrap());
+                index += 1;
+            };
+        };
+        v
+    }
+    pub fn join_with_slice<I: Iter<Slice<T>>>(iter: I, delimeter: Slice<T>) -> Vec<T> {
+        let v = Vec::<T>::new();
+        let next = iter.next();
+        while next.is_some() {
+            if v.length > 0 {
+                let index = 0usize;
+                while index < delimeter.length {
+                    v.push(delimeter.get(index).unwrap());
+                    index += 1;
+                };
+            };
+            let slice = next.unwrap();
+            let index = 0usize;
+            while index < slice.length {
+                v.push(slice.get(index).unwrap());
+                index += 1;
+            };
+            next = iter.next();
+        };
+        v
+    }
 }
 
 impl Vec<char> {
@@ -114,6 +188,17 @@ impl Vec<char> {
         *std::mem::arr_offset(v.buffer, v.length) = 0; // we append zero terminator but we do not increase length
         typecast(v.buffer)
     }
+
+    fn dyn_fmt_str(s: &Vec<char>) -> DynFmt {
+        _ { object: typecast(s), fmt: Vec::<char>::fmt_str }
+    }
+    fn fmt_str(s: &Vec<char>, fmt: &Formatter, stream: &FormatStream) {
+        let i = 0usize;
+        while i < s.length {
+            stream.write_char(s.get(i).unwrap());
+            i += 1;
+        };
+    }
 }
 
 use std::fmt::*;
@@ -123,14 +208,7 @@ impl<T: Fmt> Vec<T>: Fmt {
         _ { object: typecast(v), fmt: Vec::<T>::fmt }
     }
     fn fmt(v: &Vec<T>, fmt: &Formatter, stream: &FormatStream) {
-        stream.write_str("[");
-        let i = 0usize;
-        while i < v.length {
-            if i > 0 { stream.write_str(", "); };
-            v.get_ref(i).unwrap().fmt(fmt, stream);
-            i += 1;
-        };
-        stream.write_str("]");
+        v.slice().fmt(fmt, stream);
     }
 }
 

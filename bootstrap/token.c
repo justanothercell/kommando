@@ -139,6 +139,14 @@ Token* try_next_token(TokenStream* stream) {
             } else break;
         }
         stream->peek_char = next;
+    } else if (next == '\'') {
+        next = next_char(stream);
+        list_append(&tok, next);
+        type = CHAR;
+        if (next_char(stream) != '\'') {
+            Span span = from_points(&start, &stream->point);
+            spanned_error("Expected char literal", span, "This is not a valid char literal");
+        }
     } else {
         list_append(&tok, next);
         type = SNOWFLAKE;

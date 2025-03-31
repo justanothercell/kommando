@@ -1,12 +1,17 @@
 pub mod box;
+pub mod rc;
 
 use std::*;
 use std::io::stderr;
 
 use core::copy::Copy;
 
+pub use core::intrinsics::typecast;
+pub use core::intrinsics::numcast;
+pub use core::intrinsics::sizeof;
+
 pub fn new_uninit<T>() -> &T {
-    let size = core::intrinsics::sizeof::<T>();
+    let size = sizeof::<T>();
     if size == 0 { return null(); };
     let raw_ptr = c_api::malloc(size);
     if raw_ptr == c_api::null {
@@ -17,12 +22,12 @@ pub fn new_uninit<T>() -> &T {
 
 pub fn new<T>(t: T) -> &T{
     let object: _<T> = new_uninit();
-    *object = t;
+    put_unchecked(object, t);
     object
 }
 
 pub fn new_zeroed<T>() -> &T {
-    let size = core::intrinsics::sizeof::<T>();
+    let size = sizeof::<T>();
     if size == 0 { return null(); };
     let raw_ptr = c_api::calloc(1, size); // calloc is faster than memset(raw_ptr, 0, size)
     if raw_ptr == c_api::null {
@@ -32,7 +37,7 @@ pub fn new_zeroed<T>() -> &T {
 }
 
 pub fn uninit<T>() -> T {
-    let size = core::intrinsics::sizeof::<T>();
+    let size = sizeof::<T>();
     let raw_ptr = c_api::alloca(size);
     $"*(@![T]*)$![raw_ptr]"
 }
@@ -52,7 +57,7 @@ pub fn free<T>(ptr: &T) {
 }
 
 pub fn arr_new<T>(n: usize) -> &T {
-    let size = core::intrinsics::sizeof::<T>();
+    let size = sizeof::<T>();
     if size == 0 || n == 0 { return null(); };
     let raw_ptr = c_api::calloc(n, size);
     if raw_ptr == c_api::null {
@@ -62,7 +67,7 @@ pub fn arr_new<T>(n: usize) -> &T {
 }
 
 pub fn arr_resize<T>(arr: &T, n: usize) -> &T {
-    let size = core::intrinsics::sizeof::<T>();
+    let size = sizeof::<T>();
     if size == 0 || n == 0 { return null(); };
     let raw_ptr = to_raw(arr);
     raw_ptr = c_api::reallocarray(raw_ptr, n, size);
@@ -104,11 +109,16 @@ pub fn swap<T>(p1: &T, p2: &T) {
 
 
 // Takes the item out of the pointer. 
-// If the item is trivially copyable, then no further cution need be taken.
+// If the item is trivially copyable, then no further caution need be taken.
 // If not, then you need to make sure the item is only ever dropped once and is not modified internally
 // while both instances exist. 
 pub fn take_unchecked<T>(p: &T) -> T {
     $"*$![p]"
+}
+
+// Puts the item into the pointer without dropping the old contents of p  
+pub fn put_unchecked<T>(p: &T, item: T) {
+    $"*$![p] = $![item]";
 }
 
 pub fn replace<T>(ptr: &T, item: T) -> T {
@@ -121,4 +131,8 @@ pub use core::intrinsics::forget;
 
 pub fn drop<T>(t: T) {
     // t is dropped, destructors are run
+}
+
+pub fn as_raw_bytes<T>(t: &T) -> std::slice::Slice<u8> {
+    _ { buffer: typecast(t), length: sizeof::<T>() }
 }

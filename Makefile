@@ -20,6 +20,10 @@ clean:
 
 br: build run
 
+check: 
+	@name=$(basename $(file) .kdo); \
+	./kommando $(shell ./kdolib/link) $$name.kdo $$name $(flags)
+
 run:
 	@name=$(basename $(file) .kdo); \
 	./kommando $(shell ./kdolib/link) $$name.kdo $$name -cr $(flags)
@@ -47,7 +51,7 @@ test: clean_examples
 	else \
 		make --no-print-directory build; \
 	fi; \
-	@success=0; \
+	success=0; \
 	fail=0; \
 	all_files=$$(find ./examples -name "*.kdo"); \
 	count=$$(echo $$all_files | wc -w); \
@@ -56,7 +60,7 @@ test: clean_examples
 	for file in $$all_files; do \
 		index=$$((index + 1)); \
 		if [ -v verbose ]; then \
-			if make --no-print-directory compile file=$$file flags="--silent"; then \
+			if make --no-print-directory compile file=$$file flags="--silent $(flags)"; then \
 				printf "[\x1b[1;32mOK\x1b[0m] ($$index/$$count) $$file\n"; \
 				success=$$((success + 1)); \
 			else \
@@ -64,7 +68,7 @@ test: clean_examples
 				fail=$$((fail + 1)); \
 			fi; \
 		else \
-			if make --no-print-directory compile file=$$file flags="--silent --nolint" > /dev/null 2>&1; then \
+			if make --no-print-directory compile file=$$file flags="--silent --nolint $(flags)" > /dev/null 2>&1; then \
 				printf "[\x1b[1;32mOK\x1b[0m] ($$index/$$count) $$file\n"; \
 				success=$$((success + 1)); \
 			else \

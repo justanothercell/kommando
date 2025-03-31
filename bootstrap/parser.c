@@ -686,7 +686,7 @@ Expression* parse_expresslet(TokenStream* stream, bool allow_lit) {
             expression->expr = var;
             expression->type = EXPR_VARIABLE;
         }
-    } else if (t->type == NUMERAL || t->type == STRING) {
+    } else if (t->type == NUMERAL || t->type == STRING || t->type == CHAR) {
         expression->type = EXPR_LITERAL;
         expression->expr = t;
     } else unexpected_token(t);
@@ -840,7 +840,7 @@ Expression* parse_expression(TokenStream* stream, bool allow_lit) {
                 bin_op_precedence(t->string, t->span); // make sure op is valid
                 if (rhs->type == EXPR_BIN_OP) {
                     BinOp* rhs_inner = rhs->expr;
-                    if (bin_op_precedence(t->string, t->span) > bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
+                    if (bin_op_precedence(t->string, t->span) >= bin_op_precedence(rhs_inner->op, rhs_inner->op_span)) {
                         Expression* a = expr;
                         Expression* b = rhs_inner->lhs;
                         Expression* c = rhs_inner->rhs;

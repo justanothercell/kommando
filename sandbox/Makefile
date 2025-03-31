@@ -35,4 +35,4 @@ shell_container:
 clean_all: delete_container delete_image
 
 run_server_with_ssl:
-	sudo gunicorn --preload --certfile=$(SANDBOX_DOMAIN_CERT_FILE) --keyfile=$(SANDBOX_DOMAIN_KEY_FILE) --bind 0.0.0.0:443 app:app
+	sudo gunicorn --log-file=log/latest.log --preload --certfile=$(SANDBOX_DOMAIN_CERT_FILE) --keyfile=$(SANDBOX_DOMAIN_KEY_FILE) --bind 0.0.0.0:443 app:app

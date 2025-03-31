@@ -7,6 +7,7 @@ ENUM(TokenType,
     STRING,
     NUMERAL,
     IDENTIFIER,
+    CHAR,
     SNOWFLAKE
 );
 

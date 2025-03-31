@@ -24,6 +24,7 @@ impl<T: Clone> Box<T>: Clone {
 
 impl<T> Box<T>: Drop {
     pub fn drop(self: &Box<T>) {
-        std::mem::free(self.item)
+        std::mem::drop(std::mem::take_unchecked(self.item));
+        std::mem::free(self.item);
     }
 }

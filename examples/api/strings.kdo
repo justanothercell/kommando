@@ -1,0 +1,24 @@
+use std::*;
+use std::slice::Slice;
+use std::slice::Spliterator;
+use std::vec::Vec;
+
+fn main() {
+    let s = Slice::<char>::from_c_str("this is a sample text");
+    let split = Vec::<Slice<char>>::collect::<Spliterator<char>>(s.split(&' '));
+
+    println("$", split.dyn_fmt());
+
+    let iter = split.iter();
+    let next = iter.next();
+    let first = true;
+    while next.is_some() {
+        if first == false { print(", "); };
+        first = false;
+        print("$", next.unwrap().dyn_fmt_str());
+        next = iter.next();
+    };
+    println("");
+
+    println("$", Vec::<char>::join_with_slice(split.copy_iter(), Slice::<char>::from_c_str(" | ")).dyn_fmt_str());
+}

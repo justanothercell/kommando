@@ -527,17 +527,19 @@ void transpile_expression(Program* program, CompilerOptions* options, DropItemLi
             }
             MethodCall* call = expr->expr;
             FuncDef* fd = call->def;
+            GenericValues* type_call_generics = NULL;
             if (fd->trait != NULL) {
                 TypeValue* actual = replace_generic(program, options, call->tv, func_generics, type_generics, NULL, NULL);
+                type_call_generics = actual->generics;
                 ImplBlock* trait_impl = map_get(actual->trait_impls, to_str_writer(s, fprintf(s, "%p", call->def->trait)));
-                if (trait_impl == NULL) spanned_error("No trait impl found", expr->span, "This is probably a compiler error");
+                if (trait_impl == NULL) spanned_error("No trait impl found", expr->span, "This is probably a compiler error.\n%s not implemented by: %s\nType provided by: %s", fd->trait->name->name, to_str_writer(s, fprint_full_typevalue(s, actual)), to_str_writer(s, fprint_full_typevalue(s, call->tv)));
                 ModuleItem* method = map_get(trait_impl->methods, fd->name->name);
                 if (method == NULL) spanned_error("No method in trait impl found", expr->span, "This is probably a compiler error");
                 if (method->type != MIT_FUNCTION) spanned_error("is not a method", expr->span, "This is probably a compiler error");
                 fd = method->item;
             }
             GenericValues* call_generics = expand_generics(call->generics, type_generics, func_generics);
-            GenericValues* type_call_generics = expand_generics(call->impl_vals, type_generics, func_generics);
+            if (type_call_generics == NULL) type_call_generics = expand_generics(call->impl_vals, type_generics, func_generics);
             str c_fn_name = gen_c_fn_name(program, options, fd, type_call_generics, call_generics);
             Module* root = fd->module;
             while (root->parent != NULL) { root = root->parent; }
@@ -699,6 +701,9 @@ void transpile_expression(Program* program, CompilerOptions* options, DropItemLi
             switch (lit->type) {
                 case STRING:
                     fprint_str_lit(code_stream, lit->string);
+                    break;
+                case CHAR:
+                    fprintf(code_stream, "'%s'", lit->string);
                     break;
                 case NUMERAL: {
                     int end = strlen(lit->string);
@@ -1206,7 +1211,6 @@ void queue_func(Program* program, CompilerOptions* options, FuncDef* func, Gener
     str key = to_str_writer(s, {
         if (func->impl_type != NULL) {
             TypeValue* concrete = replace_generic(program, options, func->impl_type, type_generics, func_generics, NULL, NULL);
-            fprint_path(s, func->module->path);
             fprint_typevalue(s, concrete);
         } else {
             fprint_path(s, func->module->path);

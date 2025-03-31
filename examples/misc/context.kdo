@@ -45,7 +45,7 @@ fn main() {
         fprintf(io::stderr, "Error: swapcontext\n");
         exit(1);
     };
-    if env::argc > 1 {
+    if core::env::argc > 1 {
         printf("main: final swapping\n");
         if swapcontext(&main_ctx, &runner_ctx) == 0-1 {
             fprintf(io::stderr, "Error: swapcontext\n");

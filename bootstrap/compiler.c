@@ -279,5 +279,5 @@ void compile(CompilerOptions options) {
         i32 r = system(command);
         if (r != 0) panic("%s failed with error code %lu", options.c_compiler, WEXITSTATUS(r));
     }
-    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "CONPILER" ANSI_RESET_SEQUENCE, "Compilation finished!");
+    if (options.verbosity >= 1) info(ANSI(ANSI_BOLD, ANSI_CYAN_FG) "COMPILER" ANSI_RESET_SEQUENCE, "Compilation finished!");
 }

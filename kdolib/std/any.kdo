@@ -8,6 +8,8 @@ pub struct Any {
     object: raw_ptr
 }
 
+impl Any: core::copy::Copy {}
+
 impl Any {
     pub fn from<T>(object: &T) -> Any {
         _ {
@@ -24,12 +26,7 @@ impl Any {
         if self.is::<T>() {
             typecast(self.object)
         } else {
-            let msg = c_api::nullstr;
-            let size = 0usize;
-            let stream = c_api::open_memstream(&msg, &size);
-            c_api::fprintf(stream, "ERROR: cannot interpret this `Any` object as %s\n", typename::<T>());
-            c_api::fclose(stream);
-            panic(msg)
+            panic(format( "ERROR: cannot interpret this `Any` object as $", typename::<T>().dyn_fmt()))
         }
     }
 

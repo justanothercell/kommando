@@ -579,8 +579,8 @@ static void find_variable(Program* program, CompilerOptions* options, Module* mo
             });
             if (!found) panic("Compiler error: trait not found");
         } else {
-            validate_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->generics);
-            validate_item(program, options, var->values, var->method_values, method->type_generics, method->generics, method->type_generics);
+            validate_item(program, options, var->values, var->method_values, method->impl_type->def->generics, method->generics, method->generics);
+            validate_item(program, options, var->values, var->method_values, method->impl_type->def->generics, method->generics, method->type_generics);
         }
         return;
     }
@@ -652,7 +652,7 @@ static VarBox* register_variable(Program* program, CompilerOptions* options, Var
     v->mi = NULL;
     v->values = NULL;
     StackVar sv = { .var=v };
-    if (map_contains(v->resolved->type->trait_impls, program->raii.copy_key)) {
+    if (map_contains(v->resolved->type->trait_impls, program->raii.copy_key) || list_contains(&v->resolved->type->def->traits, i, TraitBound* bound, bound->resolved == program->raii.copy)) {
         v->is_copy = true;
         sv.state = VS_COPY;
     } else {
@@ -839,6 +839,7 @@ GenericValues* collect_generics(TypeValue* template, TypeValue* match, GenericKe
 
 //                  Foo<_>               Foo<T>            Foo<i32>          <T, U, V>                     <T, U, V>
 void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, GenericValues* type_generics, GenericValues* func_generics) {
+    // log("%s %s %s", to_str_writer(s, fprint_typevalue(s, template)), to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_typevalue(s, value)));
     if (!template->name->absolute && template->name->elements.length == 1 && str_eq(template->name->elements.elements[0]->name, "_")) {
         if (!match->name->absolute && match->name->elements.length == 1) {
             str generic = match->name->elements.elements[0]->name;
@@ -877,6 +878,16 @@ void patch_generics(TypeValue* template, TypeValue* match, TypeValue* value, Gen
             return;
         }
         spanned_error("Not a generic", match->name->elements.elements[0]->span, "%s is not a generic parameter and cannot substitute _ @ %s", to_str_writer(s, fprint_typevalue(s, match)), to_str_writer(s, fprint_span(s, &template->name->elements.elements[0]->span)));
+    } else if (!value->name->absolute && value->name->elements.length == 1 && str_eq(value->name->elements.elements[0]->name, "_")) {
+        TypeValue* new_value = malloc(sizeof(TypeValue));
+        new_value->generics = value->generics;
+        new_value->ctx = template->ctx;
+        new_value->name = template->name;
+        new_value->def = template->def;
+        new_value->trait_impls = template->trait_impls;
+        if (new_value->generics == NULL) new_value->generics = template->generics;
+        patch_generics(template, match, new_value, type_generics, func_generics);
+        return;
     }
     if (!match->name->absolute && match->name->elements.length == 1 && match->generics == NULL) return;
     if (template->generics != NULL && match->generics != NULL && value->generics != NULL) {
@@ -1273,6 +1284,10 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                     t_return->type = gen_typevalue("::core::types::c_str", &expr->span);
                     resolve_typevalue(program, options, func->module, t_return->type, func->generics, func->type_generics);
                 } break;
+                case CHAR: {
+                    t_return->type = gen_typevalue("::core::types::u8", &expr->span);
+                    resolve_typevalue(program, options, func->module, t_return->type, func->generics, func->type_generics);
+                } break;
                 case NUMERAL: {
                     str num = lit->string;
                     str ty = "i32";
@@ -1314,7 +1329,7 @@ void resolve_expr(Program* program, CompilerOptions* options, FuncDef* func, Exp
                                     if (vars->return_flag && vars->return_move == NULL) vars->return_move = var; 
                                     if (vars->break_flag && vars->break_move == NULL) vars->break_move = var; 
                                 } else {
-                                    spanned_error("Moving variable in loop", var->path->elements.elements[0]->span, "Cannot move variable while inside loop as it might be moved again during the next iteration");
+                                    spanned_error("Moving variable in loop", var->path->elements.elements[0]->span, "Cannot move variable of type %s while inside loop as it might be moved again during the next iteration", to_str_writer(s, fprint_typevalue(s, sv->var->resolved->type)));
                                 }
                             }
                             sv->state = VS_MOVED; // got moved
@@ -2076,7 +2091,10 @@ void resovle_imports(Program* program, CompilerOptions* options, Module* module,
                 
                 if (map_contains(module->items, item->name->name)) {
                     ModuleItem* orig = map_get(module->items, item->name->name);
-                    if (orig->item == imported->item) continue;
+                    if (orig->item == imported->item) { // do not error if this specific item is already imported
+                        continue;
+                    }
+                    if (orig->origin == NULL) continue; // do not error if wildcard import would override local item
                     spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", item->name->name, 
                                                                     ModuleItemType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
                                                                     ModuleItemType__NAMES[item->type], to_str_writer(s, fprint_span(s, &item->name->span)));
@@ -2099,7 +2117,10 @@ void resovle_imports(Program* program, CompilerOptions* options, Module* module,
             imported->name = oname;
             if (map_contains(module->items, oname->name)) {
                 ModuleItem* orig = map_get(module->items, oname->name);
-                if (orig->item == imported->item) continue;
+                if (orig->item == imported->item) {
+                    //if (options->do_lint) warn("%s, imported @ %s is already in scope", item->name->name, to_str_writer(s, fprint_span(s, &import->path->elements.elements[0]->span)));
+                    continue;
+                }
                 spanned_error("Importing: name collision", import->path->elements.elements[0]->span, "%s is defined as %s @ %s and imported from %s @ %s", oname->name, 
                                                                 ModuleItemType__NAMES[orig->type], to_str_writer(s, fprint_span(s, &orig->name->span)),
                                                                 ModuleItemType__NAMES[item->type], to_str_writer(s, fprint_span(s, &oname->span)));
@@ -2297,6 +2318,8 @@ void resolve(Program* program, CompilerOptions* options) {
     program->tracegen.top_frame = malloc(sizeof(Variable));
     program->tracegen.top_frame->path = gen_path("::core::trace::TOP_FRAME", NULL);
     program->tracegen.top_frame->values = NULL;
+    program->tracegen.top_frame->method_name = NULL;
+    program->tracegen.top_frame->method_values = NULL;
     find_variable(program, options, program->main_module, NULL, program->tracegen.top_frame, NULL, NULL);
     program->tracegen.frame_type = gen_typevalue("::core::trace::Frame", NULL);
     resolve_typevalue(program, options, program->main_module, program->tracegen.frame_type, NULL, NULL);
