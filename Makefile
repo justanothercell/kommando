@@ -20,7 +20,7 @@ clean:
 
 br: build run
 
-check: 
+check:
 	@name=$(basename $(file) .kdo); \
 	./kommando $(shell ./kdolib/link) $$name.kdo $$name $(flags)
 
@@ -88,3 +88,4 @@ stats:
 	@echo "examples:  $(shell cat $(shell find ./examples -type f \( -name '*.kdo' \)) | wc -l) lines (*.kdo)"
 	@echo "kdolib:    $(shell cat $(shell find ./kdolib -type f \( -name '*.kdo' \)) | wc -l) lines (*.kdo)"
 	@echo "docs:      $(shell cat $(shell find ./docs/src -type f \( -name '*.md' \)) | wc -l) lines (*.md)"
+	@echo "sandbox:   $(shell cat $(shell find ./sandbox -type f \( -not -path '*/log/*' -not -path '*/include/*' -not -path '*/artifacts/*' \)) | wc -l) lines (*)"
